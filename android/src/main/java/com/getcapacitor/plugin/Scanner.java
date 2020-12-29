@@ -309,21 +309,25 @@ class Scanner {
         messages.clear();
     }
 
-    public static synchronized Scanner getInstance(Context context, Callback callback, Handler handler) {
+    public static synchronized Scanner getInstance(Context context, Callback callback, Handler handler, Integer scanMode) {
         if (instance == null) {
-            instance = new Scanner(context, callback, handler);
+            instance = new Scanner(context, callback, handler, scanMode);
         }
 
         return instance;
     }
 
-    private Scanner(Context context, Callback callback, Handler handler) {
+    private Scanner(Context context, Callback callback, Handler handler, Integer scanMode) {
         this.context = context;
         this.callback = callback;
         this.handler = handler;
 
         // Create BluetoothCentral
         this.central = new BluetoothCentral(context, bluetoothCentralCallback, handler);
+
+        if (scanMode != null) {
+            this.central.setScanMode(scanMode);
+        }
     }
 
     public abstract static class Callback {

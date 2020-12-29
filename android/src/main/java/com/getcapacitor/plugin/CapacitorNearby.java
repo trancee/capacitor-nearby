@@ -113,6 +113,9 @@ public class CapacitorNearby extends Plugin {
     private Scanner scanner;
     private Server server;
 
+    Integer advertiseMode = AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY;
+    Integer txPowerLevel = AdvertiseSettings.ADVERTISE_TX_POWER_HIGH;
+
     private BluetoothLeAdvertiser advertiser;
     private AdvertiseCallback advertiseCallback;
 
@@ -259,30 +262,18 @@ public class CapacitorNearby extends Plugin {
                     return;
                 }
 
-//                // Initializes Bluetooth adapter.
-//                manager =
-//                        (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
-//
-//                adapter =
-//                        manager.getAdapter();
-//
-//                // Ensures Bluetooth is available on the device and it is enabled. If not,
-//                // displays a dialog requesting user permission to enable Bluetooth.
-//                if (adapter == null || !adapter.isEnabled()) {
-//                    saveCall(call);
-//
-//                    Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-//                    startActivityForResult(call, enableBtIntent, REQUEST_BLUETOOTH_SERVICE);
-//                    return;
-//                }
-//
-//                advertiser =
-//                        adapter.getBluetoothLeAdvertiser();
-//
-//                scanner =
-//                        adapter.getBluetoothLeScanner();
-//
-//                Log.i(getLogTag(), "LeMaximumAdvertisingDataLength: " + adapter.getLeMaximumAdvertisingDataLength());
+                Integer scanMode = null;
+
+                advertiseMode = AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY;
+                txPowerLevel = AdvertiseSettings.ADVERTISE_TX_POWER_HIGH;
+
+                JSObject optionsObject = call.getObject("options", null);
+                if (optionsObject != null) {
+                    scanMode = optionsObject.getInteger("scanMode");
+
+                    advertiseMode = optionsObject.getInteger("advertiseMode");
+                    txPowerLevel = optionsObject.getInteger("txPowerLevel");
+                }
 
                 BluetoothAdapter bluetoothAdapter =
                         BluetoothAdapter.getDefaultAdapter();
@@ -291,7 +282,7 @@ public class CapacitorNearby extends Plugin {
                         bluetoothAdapter.getBluetoothLeAdvertiser();
 
                 scanner =
-                        Scanner.getInstance(getContext(), scannerCallback, handler);
+                        Scanner.getInstance(getContext(), scannerCallback, handler, scanMode);
 
                 server =
                         Server.getInstance(getContext());
@@ -386,7 +377,22 @@ public class CapacitorNearby extends Plugin {
                 return;
             }
 
-            Integer interval = call.getInt("interval");
+            Integer ttlSeconds = null;
+
+            JSObject optionsObject = call.getObject("options", null);
+            if (optionsObject != null) {
+                ttlSeconds = optionsObject.getInteger("ttlSeconds");
+
+                String messageUUID = optionsObject.getString("messageUUID");
+                if (messageUUID != null) {
+                    UUID uuid = UUID.fromString(messageUUID);
+
+//                    byte[] message = this.messages.containsKey(uuid);
+//                    if (message != null) {
+//
+//                    }
+                }
+            }
 
             // Create UUID to identify this message.
             final UUID messageUUID = UUID.randomUUID();
@@ -458,9 +464,9 @@ public class CapacitorNearby extends Plugin {
                 AdvertiseSettings advertiseSettings =
                         new AdvertiseSettings.Builder()
                                 // Set advertise mode to control the advertising power and latency.
-                                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+                                .setAdvertiseMode(advertiseMode)
                                 // Set advertise TX power level to control the transmission power level for the advertising.
-                                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+                                .setTxPowerLevel(txPowerLevel)
                                 // Limit advertising to a given amount of time.
 //                            .setTimeout(30 * 1000)  // May not exceed 180000 milliseconds. A value of 0 will disable the time limit.
                                 // Set whether the advertisement type should be connectable or non-connectable.
@@ -501,10 +507,10 @@ public class CapacitorNearby extends Plugin {
                 call.success(data);
             }
 
-            if (interval != null) {
+            if (ttlSeconds != null) {
                 // Sets the time to live in seconds for the publish or subscribe.
                 // Stops scanning after a pre-defined scan period.
-                handler.postDelayed(() -> onPublishExpired(messageUUID), interval * 1000);
+                handler.postDelayed(() -> onPublishExpired(messageUUID), ttlSeconds * 1000);
             }
         } catch (Exception e) {
             Log.e(getLogTag(), "publish", e);
@@ -635,7 +641,12 @@ public class CapacitorNearby extends Plugin {
 
         if (!mScanning) {
             try {
-                Integer interval = call.getInt("interval");
+                Integer ttlSeconds = null;
+
+                JSObject optionsObject = call.getObject("options", null);
+                if (optionsObject != null) {
+                    ttlSeconds = optionsObject.getInteger("ttlSeconds");
+                }
 
                 List<ScanFilter> filters = new ArrayList<>();
                 ScanFilter filter = new ScanFilter.Builder()
@@ -662,10 +673,10 @@ public class CapacitorNearby extends Plugin {
 //                scanner.startScan(filters, settings, scanCallback);
                 mScanning = true;
 
-                if (interval != null) {
+                if (ttlSeconds != null) {
                     // Sets the time to live in seconds for the publish or subscribe.
                     // Stops scanning after a pre-defined scan period.
-                    handler.postDelayed(() -> onSubscribeExpired(), interval * 1000);
+                    handler.postDelayed(() -> onSubscribeExpired(), ttlSeconds * 1000);
                 }
             } catch (Exception e) {
                 Log.e(getLogTag(), "scan", e);
@@ -771,9 +782,9 @@ public class CapacitorNearby extends Plugin {
 
         LocationRequest locationRequest = LocationRequest.create();
         // This method sets the rate in milliseconds at which your app prefers to receive location updates.
-        locationRequest.setInterval(3000);
+        locationRequest.setInterval(10000);
         // This method sets the fastest rate in milliseconds at which your app can handle location updates.
-        locationRequest.setFastestInterval(1000);
+        locationRequest.setFastestInterval(5000);
         // This method sets the priority of the request, which gives the Google Play services location services a strong hint about which location sources to use.
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 

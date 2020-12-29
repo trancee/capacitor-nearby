@@ -6,14 +6,70 @@ declare module '@capacitor/core' {
   }
 }
 
+export enum TTLSeconds {
+  // The default time to live in seconds.
+  TTL_SECONDS_DEFAULT = 300,
+  // The maximum time to live in seconds, if not TTL_SECONDS_INFINITE.
+  TTL_SECONDS_MAX = 86400,
+  // An infinite time to live in seconds.
+  // Note: This is currently only supported for subscriptions.
+  TTL_SECONDS_INFINITE = 2147483647,
+}
+
 export type Status = {
   isPublishing: boolean;
   isSubscribing: boolean;
   uuids: string[];
 }
 
+export enum ScanMode {
+  // Perform Bluetooth LE scan in low power mode.
+  LOW_POWER = 0,
+  // Perform Bluetooth LE scan in balanced power mode.
+  BALANCED = 1,
+  // Scan using highest duty cycle.
+  LOW_LATENCY = 2,
+
+  // A special Bluetooth LE scan mode.
+  OPPORTUNISTIC = -1,
+}
+
+export enum AdvertiseMode {
+  // Perform Bluetooth LE advertising in low power mode.
+  LOW_POWER = 0,
+  // Perform Bluetooth LE advertising in balanced power mode.
+  BALANCED = 1,
+  // Perform Bluetooth LE advertising in low latency, high power mode.
+  LOW_LATENCY = 2,
+}
+
+export enum TxPowerLevel {
+  // Advertise using the lowest transmission (TX) power level.
+  ULTRA_LOW = 0,
+  // Advertise using low TX power level.
+  LOW = 1,
+  // Advertise using medium TX power level.
+  MEDIUM = 2,
+  // Advertise using high TX power level.
+  HIGH = 3,
+}
+
+export interface InitializeOptions {
+  scanMode?: ScanMode;
+
+  advertiseMode?: AdvertiseMode;
+  txPowerLevel?: TxPowerLevel;
+}
+
 export interface PublishOptions {
-  interval?: number;
+  ttlSeconds?: TTLSeconds;
+
+  // Send message as a reply to this one.
+  messageUUID?: string;
+}
+
+export interface SubscribeOptions {
+  ttlSeconds?: TTLSeconds;
 }
 
 export type PublishResult = {
@@ -21,12 +77,11 @@ export type PublishResult = {
   timestamp: number;
 }
 
-export interface SubscribeOptions {
-  interval?: number;
-}
-
 export interface CapacitorNearbyPlugin {
-  initialize(): Promise<void>;
+  initialize(options: {
+    // A InitializeOptions object for this operation
+    options?: InitializeOptions,
+  }): Promise<void>;
   reset(): Promise<void>;
 
   publish(options: {

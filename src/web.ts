@@ -3,6 +3,7 @@ import { CapacitorNearbyPlugin } from './definitions';
 
 import {
   Status,
+  InitializeOptions,
   PublishOptions,
   PublishResult,
   SubscribeOptions,
@@ -16,8 +17,10 @@ export class CapacitorNearbyWeb extends WebPlugin implements CapacitorNearbyPlug
     });
   }
 
-  async initialize(): Promise<void> {
-    console.error('initialize');
+  async initialize(options: {
+    options?: InitializeOptions,
+  }): Promise<void> {
+    console.error('initialize', options);
     throw new Error("Method not implemented.");
   }
   async reset(): Promise<void> {
