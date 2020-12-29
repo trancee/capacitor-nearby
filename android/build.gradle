@@ -4,8 +4,6 @@ ext {
     androidxEspressoCoreVersion = project.hasProperty('androidxEspressoCoreVersion') ? rootProject.ext.androidxEspressoCoreVersion : '3.3.0'
 
     googlePlayServicesLocationVersion = project.hasProperty('googlePlayServicesLocationVersion') ? rootProject.ext.googlePlayServicesLocationVersion : '17.1.0'
-
-    nordicSemiBleVersion = project.hasProperty('nordicSemiBleVersion') ? rootProject.ext.nordicSemiBleVersion : '2.2.4'
 }
 
 buildscript {
@@ -52,11 +50,14 @@ repositories {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
+
     implementation project(':capacitor-android')
+
     implementation "com.google.android.gms:play-services-location:$googlePlayServicesLocationVersion"
-//    implementation "no.nordicsemi.android:ble:$nordicSemiBleVersion"
-    implementation project(path: ':blessed')
+
+    implementation 'com.jakewharton.timber:timber:4.7.1'
     implementation 'org.jetbrains:annotations:19.0.0'
+
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
