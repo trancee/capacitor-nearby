@@ -4,28 +4,11 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothClass;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
-import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattDescriptor;
-import android.bluetooth.BluetoothGattServer;
-import android.bluetooth.BluetoothGattServerCallback;
-import android.bluetooth.BluetoothGattService;
-import android.bluetooth.BluetoothManager;
-import android.bluetooth.BluetoothProfile;
+import android.bluetooth.le.AdvertiseCallback;
 import android.bluetooth.le.AdvertiseData;
-import android.bluetooth.le.AdvertisingSet;
-import android.bluetooth.le.AdvertisingSetCallback;
-import android.bluetooth.le.AdvertisingSetParameters;
+import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
-import android.bluetooth.le.BluetoothLeScanner;
-import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
-import android.bluetooth.le.ScanRecord;
-import android.bluetooth.le.ScanResult;
-import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
@@ -34,6 +17,7 @@ import android.location.LocationManager;
 import android.os.Handler;
 import android.os.ParcelUuid;
 import android.provider.Settings;
+import android.util.Base64;
 import android.util.Log;
 
 import com.getcapacitor.JSArray;
@@ -42,18 +26,18 @@ import com.getcapacitor.NativePlugin;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
-import com.google.android.gms.common.api.ApiException;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResponse;
-import com.google.android.gms.location.LocationSettingsStatusCodes;
-import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import com.welie.blessed.BluetoothCentral;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,16 +45,45 @@ import java.util.Set;
 import java.util.UUID;
 
 interface Constants {
-    // v5 (Name-based | SHA1 hash) UUID (winkee.app)
-    String SERVICE_UUID = "1c2cceae-66cd-55cd-8769-d961a7412368";
-    // v5 (Name-based | SHA1 hash) UUID (profile.winkee.app)
-    String CHARACTERISTIC_UUID = "35274eec-ae41-5975-a27a-608b334ce36e";
-    String DESCRIPTOR_UUID = "35274eec-ae41-5975-a27a-608b334ce36e";
+    int MANUFACTURER_ID = 0;
 
+    // v5 (Name-based | SHA1 hash) UUID (winkee.app)
+    UUID SERVICE_UUID = UUID.fromString("1c2cceae-66cd-55cd-8769-d961a7412368");
+    // v5 (Name-based | SHA1 hash) UUID (profile.winkee.app)
+    UUID CHARACTERISTIC_UUID = UUID.fromString("35274eec-ae41-5975-a27a-608b334ce36e");
+
+    String BLUETOOTH_NOT_SUPPORTED = "Bluetooth not supported";
     String BLE_NOT_SUPPORTED = "Bluetooth Low Energy not supported";
+    String NOT_INITIALIZED = "API not initialized";
+    String ALREADY_INITIALIZED = "API already initialized";
+    String PERMISSION_DENIED = "permissions not granted";
+    String PUBLISH_MESSAGE = "must provide message";
+    String MESSAGE_UUID_NOT_FOUND = "message UUID not found";
+
+    String ERROR_ADD_SERVICE = "add service failed";
+    String ERROR_ADD_CHARACTERISTIC = "add characteristic failed";
 
     int GATT_MTU_SIZE_DEFAULT = 23;
+    int GATT_MTU_SIZE = 185;    // iOS always asks for 185
     int GATT_MAX_MTU_SIZE = 517;
+
+    static byte[] toBytes(int l) {
+        byte[] result = new byte[Integer.BYTES];
+        for (int i = Integer.BYTES - 1; i >= 0; i--) {
+            result[i] = (byte) (l & 0xFF);
+            l >>= Byte.SIZE;
+        }
+        return result;
+    }
+
+    static int fromBytes(final byte[] b) {
+        int result = 0;
+        for (int i = 0; i < Integer.BYTES; i++) {
+            result <<= Byte.SIZE;
+            result |= (b[i] & 0xFF);
+        }
+        return result;
+    }
 }
 
 @NativePlugin(
@@ -97,29 +110,120 @@ public class CapacitorNearby extends Plugin {
     protected static final int REQUEST_LOCATION_SERVICE = 10001;
     protected static final int REQUEST_BLUETOOTH_SERVICE = 10002;
 
-    private BluetoothManager manager;
-    private BluetoothAdapter adapter;
-    private BluetoothLeScanner scanner;
+    private Scanner scanner;
+    private Server server;
+
     private BluetoothLeAdvertiser advertiser;
+    private AdvertiseCallback advertiseCallback;
 
     private boolean mScanning;
     private boolean mAdvertising;
 
-    private ScanCallback scanCallback;
-    private AdvertisingSetCallback advertisingCallback;
-
-    private AdvertisingSet mAdvertisingSet;
-
-    private BluetoothGattServer gattServer;
+    private final Map<UUID, byte[]> messages = new HashMap<>();
 
     private Handler handler = new Handler();
+
+    @Override
+    protected void handleRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.handleRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        boolean permissionGranted = false;
+
+        PluginCall call = getSavedCall();
+        if (call != null) {
+            freeSavedCall();
+
+            for (int result : grantResults) {
+                if (result == PackageManager.PERMISSION_DENIED) {
+                    call.reject(Constants.PERMISSION_DENIED);
+                    break;
+                }
+            }
+
+            if (permissionGranted) {
+                initialize(call);
+            }
+        }
+
+        JSObject data = new JSObject();
+        data.put("permissionGranted", permissionGranted);
+
+        notifyListeners("onPermissionChanged", data);
+    }
+
+    @Override
+    protected void handleOnActivityResult(int requestCode, int resultCode, Intent intentData) {
+        super.handleOnActivityResult(requestCode, resultCode, intentData);
+
+        {
+            boolean permissionGranted = resultCode == Activity.RESULT_OK;
+
+            JSObject data = new JSObject();
+            data.put("permissionGranted", permissionGranted);
+
+            notifyListeners("onPermissionChanged", data);
+        }
+
+        PluginCall call = getSavedCall();
+        if (call != null) {
+            freeSavedCall();
+
+            if (resultCode == Activity.RESULT_OK) {
+                initialize(call);
+            } else {
+                call.reject(Constants.PERMISSION_DENIED);
+            }
+        }
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        super.handleOnDestroy();
+
+        close();
+    }
+
+    @Override
+    protected void handleOnResume() {
+        super.handleOnResume();
+
+        if (!isBluetoothEnabled()) {
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(null, enableBtIntent, REQUEST_BLUETOOTH_SERVICE);
+        } else {
+//            checkPermissions();
+        }
+    }
+
+    private boolean isBluetoothEnabled() {
+        BluetoothAdapter bluetoothAdapter =
+                BluetoothAdapter.getDefaultAdapter();
+
+        if (bluetoothAdapter == null) {
+            return false;
+        }
+
+        return bluetoothAdapter.isEnabled();
+    }
 
     @SuppressLint("NewApi")
     @PluginMethod
     public void initialize(PluginCall call) {
         try {
-            // Use this check to determine whether BLE is supported on the device. Then
-            // you can selectively disable BLE-related features.
+//            if (manager != null || adapter != null || scanner != null || advertiser != null) {
+//                call.reject(Constants.ALREADY_INITIALIZED);
+//                return;
+//            }
+
+            if (!getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH)) {
+                Log.i(getLogTag(),
+                        String.format(
+                                Constants.BLUETOOTH_NOT_SUPPORTED));
+
+                call.error(Constants.BLUETOOTH_NOT_SUPPORTED);
+                return;
+            }
+
             if (!getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
                 Log.i(getLogTag(),
                         String.format(
@@ -129,39 +233,68 @@ public class CapacitorNearby extends Plugin {
                 return;
             }
 
+            if (!isBluetoothEnabled()) {
+                saveCall(call);
+
+                Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                startActivityForResult(call, intent, REQUEST_BLUETOOTH_SERVICE);
+
+                return;
+            }
+
             if (hasRequiredPermissions()) {
                 final LocationManager locationManager =
                         (LocationManager) getContext().getSystemService(Context.LOCATION_SERVICE);
 
                 if (!locationManager.isLocationEnabled()) {
-//                    Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-//                    startActivityForResult(call, intent, REQUEST_LOCATION_SERVICE);
-                    showEnableLocationSetting();
+                    saveCall(call);
+
+                    if (isGooglePlayServicesAvailable()) {
+                        showEnableLocationSetting();
+                    } else {
+                        Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                        startActivityForResult(call, intent, REQUEST_LOCATION_SERVICE);
+                    }
+
                     return;
                 }
 
-                // Initializes Bluetooth adapter.
-                manager =
-                        (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+//                // Initializes Bluetooth adapter.
+//                manager =
+//                        (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+//
+//                adapter =
+//                        manager.getAdapter();
+//
+//                // Ensures Bluetooth is available on the device and it is enabled. If not,
+//                // displays a dialog requesting user permission to enable Bluetooth.
+//                if (adapter == null || !adapter.isEnabled()) {
+//                    saveCall(call);
+//
+//                    Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+//                    startActivityForResult(call, enableBtIntent, REQUEST_BLUETOOTH_SERVICE);
+//                    return;
+//                }
+//
+//                advertiser =
+//                        adapter.getBluetoothLeAdvertiser();
+//
+//                scanner =
+//                        adapter.getBluetoothLeScanner();
+//
+//                Log.i(getLogTag(), "LeMaximumAdvertisingDataLength: " + adapter.getLeMaximumAdvertisingDataLength());
 
-                adapter =
-                        manager.getAdapter();
-
-                // Ensures Bluetooth is available on the device and it is enabled. If not,
-                // displays a dialog requesting user permission to enable Bluetooth.
-                if (adapter == null || !adapter.isEnabled()) {
-                    Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-                    startActivityForResult(call, enableBtIntent, REQUEST_BLUETOOTH_SERVICE);
-                    return;
-                }
+                BluetoothAdapter bluetoothAdapter =
+                        BluetoothAdapter.getDefaultAdapter();
 
                 advertiser =
-                        adapter.getBluetoothLeAdvertiser();
+                        bluetoothAdapter.getBluetoothLeAdvertiser();
 
                 scanner =
-                        adapter.getBluetoothLeScanner();
+                        Scanner.getInstance(getContext(), scannerCallback, handler);
 
-                Log.i(getLogTag(), "LeMaximumAdvertisingDataLength: " + adapter.getLeMaximumAdvertisingDataLength());
+                server =
+                        Server.getInstance(getContext());
 
                 call.success();
             } else {
@@ -179,786 +312,498 @@ public class CapacitorNearby extends Plugin {
         }
     }
 
-    @Override
-    protected void handleRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.handleRequestPermissionsResult(requestCode, permissions, grantResults);
+    private final Scanner.Callback scannerCallback = new Scanner.Callback() {
+        public void onFound(UUID uuid, String message) {
+            if (mScanning) {
+                JSObject data = new JSObject();
+                data.put("uuid", uuid.toString());
+                data.put("message", message);
 
-        PluginCall call = getSavedCall();
-        if (call != null) {
-            freeSavedCall();
+                notifyListeners("onFound", data);
+            }
+        }
 
-            for (int result : grantResults) {
-                if (result == PackageManager.PERMISSION_DENIED) {
-                    call.unavailable();
+        public void onLost(UUID uuid) {
+            if (mScanning) {
+                JSObject data = new JSObject();
+                data.put("uuid", uuid.toString());
+
+                notifyListeners("onLost", data);
+            }
+        }
+
+        public void onPermissionChanged(Boolean permissionGranted) {
+            close();
+
+            JSObject data = new JSObject();
+            data.put("permissionGranted", permissionGranted);
+
+            notifyListeners("onPermissionChanged", data);
+        }
+    };
+
+    private void close() {
+        for (UUID messageUUID : this.messages.keySet()) {
+            doUnpublish(messageUUID);
+        }
+
+        stopAdvertising();
+
+        advertiser = null;
+        advertiseCallback = null;
+
+        server = null;
+    }
+
+    @PluginMethod()
+    public void reset(PluginCall call) {
+        try {
+            close();
+
+//            initialize(call);
+            call.success();
+        } catch (Exception e) {
+            call.error(e.getLocalizedMessage(), e);
+        }
+    }
+
+    @PluginMethod
+    public void publish(PluginCall call) {
+        if (advertiser == null) {
+            call.reject(Constants.NOT_INITIALIZED);
+            return;
+        }
+
+        try {
+            final byte[] message;
+
+            String content = call.getString("message", null);
+
+            if (content != null) {
+                message = Base64.decode(content, Base64.DEFAULT);
+            } else {
+                call.reject(Constants.PUBLISH_MESSAGE);
+                return;
+            }
+
+            Integer interval = call.getInt("interval");
+
+            // Create UUID to identify this message.
+            final UUID messageUUID = UUID.randomUUID();
+
+            final long timestamp = System.currentTimeMillis() / 1000;
+
+            if (!mAdvertising) {
+                if (advertiseCallback == null) {
+                    // Bluetooth LE advertising callbacks, used to deliver advertising operation status.
+                    // https://developer.android.com/reference/android/bluetooth/le/AdvertiseCallback
+                    advertiseCallback =
+                            new AdvertiseCallback() {
+                                @Override
+                                // Callback triggered in response to BluetoothLeAdvertiser#startAdvertising indicating that the advertising has been started successfully.
+                                public void onStartSuccess(AdvertiseSettings settingsInEffect) {
+//                                    // Returns the TX power level for advertising.
+//                                    int txPower = settingsInEffect.getTxPowerLevel();
+//                                    // Returns the advertise mode.
+//                                    int mode = settingsInEffect.getMode();
+//
+//                                    // Returns the advertising time limit in milliseconds.
+//                                    int timeout = settingsInEffect.getTimeout();
+//                                    // Returns whether the advertisement will indicate connectable.
+//                                    boolean isConnectable = settingsInEffect.isConnectable();
+//
+//                                    Log.i(getLogTag(),
+//                                            String.format(
+//                                                    "onStartSuccess(txPower=%s, mode=%s, timeout=%s, isConnectable=%s)",
+//                                                    txPower, mode, timeout, isConnectable));
+
+                                    startAdvertising(messageUUID, message);
+
+//                                    JSObject data = new JSObject();
+//                                    data.put("txPower", txPower);
+//                                    data.put("mode", mode);
+//                                    data.put("timeout", timeout);
+//                                    data.put("isConnectable", isConnectable);
+//
+//                                    notifyListeners("onStartSuccess", data);
+
+                                    JSObject data = new JSObject();
+                                    data.put("uuid", messageUUID);
+                                    data.put("timestamp", timestamp);
+
+                                    call.success(data);
+                                }
+
+                                @Override
+                                // Callback when advertising could not be started.
+                                public void onStartFailure(int errorCode) {
+//                                    Log.e(getLogTag(),
+//                                            String.format(
+//                                                    "onStartFailure(errorCode=%s)",
+//                                                    errorCode));
+
+                                    stopAdvertising();
+
+//                                    JSObject data = new JSObject();
+//                                    data.put("errorCode", errorCode);
+//
+//                                    notifyListeners("onStartFailure", data);
+
+                                    call.error(advertiseFailed(errorCode));
+                                }
+                            };
+                }
+
+                // The AdvertiseSettings provide a way to adjust advertising preferences for each Bluetooth LE advertisement instance.
+                AdvertiseSettings advertiseSettings =
+                        new AdvertiseSettings.Builder()
+                                // Set advertise mode to control the advertising power and latency.
+                                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+                                // Set advertise TX power level to control the transmission power level for the advertising.
+                                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+                                // Limit advertising to a given amount of time.
+//                            .setTimeout(30 * 1000)  // May not exceed 180000 milliseconds. A value of 0 will disable the time limit.
+                                // Set whether the advertisement type should be connectable or non-connectable.
+                                .setConnectable(true)
+                                .build();
+
+                // Advertise data packet container for Bluetooth LE advertising.
+                // This represents the data to be advertised as well as the scan response data for active scans.
+                AdvertiseData advertiseData =
+                        new AdvertiseData.Builder()
+//                                .addServiceData(
+//                                        new ParcelUuid(Constants.SERVICE_UUID),
+//                                        new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF}
+//                                )
+                                // Add a service UUID to advertise data.
+                                .addServiceUuid(new ParcelUuid(Constants.SERVICE_UUID))
+                                // Whether the transmission power level should be included in the advertise packet.
+                                .setIncludeTxPowerLevel(false)
+                                // Set whether the device name should be included in advertise packet.
+                                .setIncludeDeviceName(false)
+//                                .addManufacturerData(
+//                                        Constants.MANUFACTURER_ID,
+//                                        Constants.toBytes((int) timestamp)
+//                                )
+                                .build();
+
+                // java.lang.IllegalArgumentException: Legacy advertising data too big
+                // java.lang.IllegalArgumentException: Advertising data too big
+                advertiser.startAdvertising(advertiseSettings, advertiseData, advertiseCallback);
+                mAdvertising = true;
+            } else {
+                startAdvertising(messageUUID, message);
+
+                JSObject data = new JSObject();
+                data.put("uuid", messageUUID);
+                data.put("timestamp", timestamp);
+
+                call.success(data);
+            }
+
+            if (interval != null) {
+                // Sets the time to live in seconds for the publish or subscribe.
+                // Stops scanning after a pre-defined scan period.
+                handler.postDelayed(() -> onPublishExpired(messageUUID), interval * 1000);
+            }
+        } catch (Exception e) {
+            Log.e(getLogTag(), "publish", e);
+
+            call.error(e.getLocalizedMessage(), e);
+        }
+    }
+
+    private String advertiseFailed(int errorCode) {
+        switch (errorCode) {
+            case AdvertiseCallback.ADVERTISE_FAILED_ALREADY_STARTED:
+                return "Failed to start advertising as the advertising is already started.";
+            case AdvertiseCallback.ADVERTISE_FAILED_DATA_TOO_LARGE:
+                return "Failed to start advertising as the advertise data to be broadcasted is larger than 31 bytes.";
+            case AdvertiseCallback.ADVERTISE_FAILED_FEATURE_UNSUPPORTED:
+                return "This feature is not supported on this platform.";
+            case AdvertiseCallback.ADVERTISE_FAILED_INTERNAL_ERROR:
+                return "Operation failed due to an internal error.";
+            case AdvertiseCallback.ADVERTISE_FAILED_TOO_MANY_ADVERTISERS:
+                return "Failed to start advertising because no advertising instance is available.";
+            default:
+                return "Unknown error.";
+        }
+    }
+
+    private void onPublishExpired(UUID messageUUID) {
+        if (this.messages.containsKey(messageUUID)) {
+            JSObject data = new JSObject();
+            data.put("uuid", messageUUID);
+
+            notifyListeners("onPublishExpired", data);
+        }
+
+        doUnpublish(messageUUID);
+
+        stopAdvertising();
+    }
+
+    private void startAdvertising(UUID messageUUID, byte[] message) {
+        this.messages.put(messageUUID, message);
+
+        if (server != null) {
+            server.addMessage(messageUUID, message);
+
+            server.restart();
+
+            mAdvertising = true;
+        }
+    }
+
+    private void stopAdvertising() {
+        // Only stop server if there are no more messages to publish.
+        if (this.messages.isEmpty()) {
+            if (server != null) {
+                server.stop();
+
+                // We need to keep the reference.
+//                server = null;
+            }
+
+            if (advertiser != null && advertiseCallback != null) {
+                advertiser.stopAdvertising(advertiseCallback);
+
+                // We need to keep the reference.
+//                advertiser = null;
+                advertiseCallback = null;
+            }
+
+            mAdvertising = false;
+        } else {
+            if (server != null) {
+                server.restart();
+            }
+        }
+    }
+
+    @PluginMethod
+    public void unpublish(PluginCall call) {
+        if (advertiser == null) {
+            call.reject(Constants.NOT_INITIALIZED);
+            return;
+        }
+
+        try {
+            String uuid = call.getString("uuid", null);
+
+            if (uuid == null || uuid.length() == 0) {
+                // Unpublish all messages.
+                for (UUID messageUUID : this.messages.keySet()) {
+                    doUnpublish(messageUUID);
+                }
+            } else {
+                // Unpublish message.
+                UUID messageUUID = UUID.fromString(uuid);
+
+                if (this.messages.containsKey(messageUUID)) {
+                    doUnpublish(messageUUID);
+                } else {
+                    call.reject(Constants.MESSAGE_UUID_NOT_FOUND);
                     return;
                 }
             }
 
-            initialize(call);
+            stopAdvertising();
+
+            call.success();
+        } catch (Exception e) {
+            Log.e(getLogTag(), "stopAdvertising", e);
+
+            call.error(e.getLocalizedMessage(), e);
         }
     }
 
-    @Override
-    protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
-        super.handleOnActivityResult(requestCode, resultCode, data);
-
-        PluginCall call = getSavedCall();
-        if (call != null) {
-            freeSavedCall();
-
-            if (resultCode == Activity.RESULT_OK) {
-                initialize(call);
-            } else {
-                call.unavailable();
-            }
-        }
-    }
-
-    @SuppressLint("NewApi")
-    @Override
-    protected void handleOnDestroy() {
-        super.handleOnDestroy();
-
-        if (gattServer != null) {
-            gattServer.close();
-
-            gattServer = null;
+    private void doUnpublish(UUID messageUUID) {
+        if (server != null) {
+            server.removeMessage(messageUUID);
         }
 
-        if (advertiser != null) {
-            advertiser.stopAdvertisingSet(advertisingCallback);
-            mAdvertising = false;
-
-            advertiser = null;
-        }
-
-        if (scanner != null) {
-            // Stops an ongoing Bluetooth LE scan.
-            scanner.stopScan(scanCallback);
-            mScanning = false;
-
-            scanner = null;
-        }
+        this.messages.remove(messageUUID);
     }
 
-    private BluetoothGattServer startGattServer() {
-        BluetoothGattServerCallback gattCallback = new BluetoothGattServerCallback() {
-            // Callback indicating when a remote device has been connected or disconnected.
-            @Override
-            public void onConnectionStateChange(BluetoothDevice device, int status, int newState) {
-                Log.i(getLogTag(),
-                        String.format(
-                                "onConnectionStateChange(device=%s, status=%s, newState=%s)",
-                                device, status, newState));
-
-                switch (newState) {
-                    case BluetoothProfile.STATE_CONNECTED:
-                        if (devices.containsKey(device.getAddress())) {
-                            gattServer.cancelConnection(device);
-                        } else {
-                            // Allow connection to proceed. Mark device connected
-                            devices.put(device.getAddress(), device);
-                        }
-
-                        break;
-                    case BluetoothProfile.STATE_DISCONNECTED:
-                        // We've disconnected
-                        devices.remove(device.getAddress());
-
-                        break;
-                }
-
-                JSObject bluetoothDeviceObject = new JSObject();
-                bluetoothDeviceObject.put("address", device.getAddress());
-                bluetoothDeviceObject.put("name", device.getName());
-                bluetoothDeviceObject.put("type", device.getType());
-
-                if (device.getUuids() != null) {
-                    bluetoothDeviceObject.put("uuids", JSArray.from(device.getUuids()));
-                }
-
-                JSObject data = new JSObject();
-                data.put("device", bluetoothDeviceObject);
-                data.put("status", status);
-                data.put("newState", newState);
-
-                notifyListeners("onConnectionStateChange", data);
-
-                super.onConnectionStateChange(device, status, newState);
-            }
-
-            // Indicates whether a local service has been added successfully.
-            @Override
-            public void onServiceAdded(int status, BluetoothGattService service) {
-                Log.i(getLogTag(),
-                        String.format(
-                                "onServiceAdded(status=%s, service=%s)",
-                                status, service));
-
-                JSObject bluetoothGattServiceObject = new JSObject();
-                bluetoothGattServiceObject.put("uuid", service.getUuid().toString());
-                bluetoothGattServiceObject.put("type", service.getType());
-
-                JSObject data = new JSObject();
-                data.put("status", status);
-                data.put("service", bluetoothGattServiceObject);
-
-                notifyListeners("onServiceAdded", data);
-
-                super.onServiceAdded(status, service);
-            }
-
-            // A remote client has requested to read a local characteristic.
-            @Override
-            public void onCharacteristicReadRequest(BluetoothDevice device, int requestId, int offset, BluetoothGattCharacteristic characteristic) {
-                Log.i(getLogTag(),
-                        String.format(
-                                "onCharacteristicReadRequest(device=%s, requestId=%s, offset=%s, characteristic=%s)",
-                                device, requestId, offset, characteristic));
-
-                super.onCharacteristicReadRequest(device, requestId, offset, characteristic);
-            }
-
-            // A remote client has requested to write to a local characteristic.
-            @Override
-            public void onCharacteristicWriteRequest(BluetoothDevice device, int requestId, BluetoothGattCharacteristic characteristic, boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
-                Log.i(getLogTag(),
-                        String.format(
-                                "onCharacteristicWriteRequest(device=%s, requestId=%s, offset=%s, characteristic=%s, preparedWrite=%s, responseNeeded=%s, offset=%s, value=%s)",
-                                device, requestId, offset, characteristic, preparedWrite, responseNeeded, offset, value));
-
-                BluetoothGattCharacteristic localCharacteristic = gattServer.getService(UUID.fromString(Constants.SERVICE_UUID)).getCharacteristic(characteristic.getUuid());
-                if (localCharacteristic != null) {
-                    // Must send response before notifying callback (which might trigger data send before remote central received ack)
-                    if (responseNeeded) {
-                        boolean success = gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
-                    }
-                } else {
-                    // Request for unrecognized characteristic. Send GATT_FAILURE
-                    boolean success = gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, null);
-                }
-
-                super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value);
-            }
-
-            // A remote client has requested to read a local descriptor.
-            @Override
-            public void onDescriptorReadRequest(BluetoothDevice device, int requestId, int offset, BluetoothGattDescriptor descriptor) {
-                Log.i(getLogTag(),
-                        String.format(
-                                "onDescriptorReadRequest(device=%s, requestId=%s, offset=%s, descriptor=%s)",
-                                device, requestId, offset, descriptor));
-
-                super.onDescriptorReadRequest(device, requestId, offset, descriptor);
-            }
-
-            // A remote client has requested to write to a local descriptor.
-            @Override
-            public void onDescriptorWriteRequest(BluetoothDevice device, int requestId, BluetoothGattDescriptor descriptor, boolean preparedWrite, boolean responseNeeded, int offset, byte[] value) {
-                Log.i(getLogTag(),
-                        String.format(
-                                "onDescriptorWriteRequest(device=%s, requestId=%s, descriptor=%s, preparedWrite=%s, responseNeeded=%s, offset=%s, value=%s)",
-                                device, requestId, descriptor, preparedWrite, responseNeeded, offset, value));
-
-                if (Arrays.equals(value, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE) && responseNeeded) {
-                    boolean success = gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE);
-                }
-
-                super.onDescriptorWriteRequest(device, requestId, descriptor, preparedWrite, responseNeeded, offset, value);
-            }
-
-            // Execute all pending write operations for this device.
-            @Override
-            public void onExecuteWrite(BluetoothDevice device, int requestId, boolean execute) {
-                Log.i(getLogTag(),
-                        String.format(
-                                "onExecuteWrite(device=%s, requestId=%s, execute=%s)",
-                                device, requestId, execute));
-
-                super.onExecuteWrite(device, requestId, execute);
-            }
-
-            // Callback invoked when a notification or indication has been sent to a remote device.
-            @Override
-            public void onNotificationSent(BluetoothDevice device, int status) {
-                Log.i(getLogTag(),
-                        String.format(
-                                "onNotificationSent(device=%s, status=%s)",
-                                device, status));
-
-                super.onNotificationSent(device, status);
-            }
-        };
-
-        return manager.openGattServer(getContext(), gattCallback);
-    }
-
-    private boolean setupGattServer() {
-        BluetoothGattService service =
-                new BluetoothGattService(
-                        UUID.fromString(Constants.SERVICE_UUID),
-
-                        BluetoothGattService.SERVICE_TYPE_PRIMARY
-                );
-
-        BluetoothGattCharacteristic dataCharacteristic =
-                new BluetoothGattCharacteristic(
-                        UUID.fromString(Constants.CHARACTERISTIC_UUID),
-
-                        BluetoothGattCharacteristic.PROPERTY_READ |
-                                BluetoothGattCharacteristic.PROPERTY_WRITE |
-                                BluetoothGattCharacteristic.PROPERTY_INDICATE,
-
-                        BluetoothGattCharacteristic.PERMISSION_READ |
-                                BluetoothGattCharacteristic.PERMISSION_WRITE
-                );
-
-        dataCharacteristic.addDescriptor(
-                new BluetoothGattDescriptor(
-                        UUID.fromString(Constants.DESCRIPTOR_UUID),
-
-                        BluetoothGattDescriptor.PERMISSION_WRITE |
-                                BluetoothGattDescriptor.PERMISSION_READ));
-
-        service.addCharacteristic(dataCharacteristic);
-
-        return gattServer.addService(service);
-    }
-
-    @SuppressLint("NewApi")
     @PluginMethod
-    public void advertise(PluginCall call) {
-        if (advertiser == null) {
-            call.unavailable();
-            return;
-        }
-
-        if (!mAdvertising) {
-            advertisingCallback =
-                    new AdvertisingSetCallback() {
-                        @Override
-                        public void onAdvertisingSetStarted(AdvertisingSet advertisingSet, int txPower, int status) {
-                            Log.i(getLogTag(),
-                                    String.format(
-                                            "onAdvertisingSetStarted(txPower=%s, status=%s)",
-                                            txPower, status));
-
-                            mAdvertisingSet = advertisingSet;
-
-                            JSObject data = new JSObject();
-                            data.put("txPower", txPower);
-                            data.put("status", status);
-
-                            notifyListeners("onAdvertisingSetStarted", data);
-                        }
-
-                        @Override
-                        public void onAdvertisingDataSet(AdvertisingSet advertisingSet, int status) {
-                            Log.i(getLogTag(),
-                                    String.format(
-                                            "onAdvertisingDataSet(status=%s)",
-                                            status));
-
-                            JSObject data = new JSObject();
-                            data.put("status", status);
-
-                            notifyListeners("onAdvertisingDataSet", data);
-                        }
-
-                        @Override
-                        public void onScanResponseDataSet(AdvertisingSet advertisingSet, int status) {
-                            Log.i(getLogTag(),
-                                    String.format(
-                                            "onScanResponseDataSet(status=%s)",
-                                            status));
-
-                            JSObject data = new JSObject();
-                            data.put("status", status);
-
-                            notifyListeners("onScanResponseDataSet", data);
-                        }
-
-                        @Override
-                        public void onAdvertisingSetStopped(AdvertisingSet advertisingSet) {
-                            Log.i(getLogTag(),
-                                    String.format(
-                                            "onAdvertisingSetStopped()"));
-
-                            notifyListeners("onAdvertisingSetStopped", null);
-                        }
-                    };
-
-            try {
-                AdvertisingSetParameters parameters = (new AdvertisingSetParameters.Builder())
-                        .setLegacyMode(true)
-                        .setConnectable(true)
-                        .setScannable(true)
-                        .setInterval(AdvertisingSetParameters.INTERVAL_HIGH)
-                        .setTxPowerLevel(AdvertisingSetParameters.TX_POWER_HIGH)
-                        .build();
-
-                AdvertiseData data = (new AdvertiseData.Builder())
-                        .setIncludeTxPowerLevel(false)
-                        .setIncludeDeviceName(false)
-//                        .addServiceData(ParcelUuid.fromString(Constants.SERVICE_UUID), "UEHV6nWB2yk8pyoJadR*.7kCMdnjS#M|%1%2".getBytes())
-                        .addServiceUuid(ParcelUuid.fromString(Constants.SERVICE_UUID))
-                        .build();
-
-                AdvertiseData scanResponse = (new AdvertiseData.Builder())
-                        .setIncludeDeviceName(false)
-                        .build();
-
-//            // Stops scanning after a pre-defined scan period.
-//            handler.postDelayed(new Runnable() {
-//                @Override
-//                public void run() {
-//                    mScanning = false;
-//                    advertiser.stopAdvertisingSet(advertisingCallback);
-//                }
-//            }, SCAN_PERIOD);
-
-                gattServer = startGattServer();
-                setupGattServer();
-
-                // java.lang.IllegalArgumentException: Legacy advertising data too big
-                // java.lang.IllegalArgumentException: Advertising data too big
-                advertiser.startAdvertisingSet(parameters, data, scanResponse, null, null, advertisingCallback);
-                mAdvertising = true;
-            } catch (Exception e) {
-                Log.e(getLogTag(), "startAdvertisingSet", e);
-
-                call.error(e.getLocalizedMessage(), e);
-                return;
-            }
-        } else {
-            try {
-                synchronized (devices) {
-                    for (BluetoothDevice device : devices.values()) {
-                        gattServer.cancelConnection(device);
-                    }
-
-                    devices.clear();
-                }
-
-                gattServer.close();
-                gattServer = null;
-
-                advertiser.stopAdvertisingSet(advertisingCallback);
-                mAdvertising = false;
-            } catch (Exception e) {
-                Log.e(getLogTag(), "stopAdvertisingSet", e);
-
-                call.error(e.getLocalizedMessage(), e);
-                return;
-            }
-        }
-
-        JSObject data = new JSObject();
-        data.put("isAdvertising", mAdvertising);
-
-        call.success(data);
-    }
-
-    private final Map<String, BluetoothDevice> devices = new HashMap<>();
-
-    private void connect(final BluetoothDevice device) {
-        if (devices.containsKey(device.getAddress())) {
-            return;
-        }
-
-        BluetoothGattCallback gattCallback =
-                new BluetoothGattCallback() {
-                    // Callback indicating when GATT client has connected/disconnected to/from a remote GATT server.
-                    @Override
-                    public void onConnectionStateChange(final BluetoothGatt gatt, int status,
-                                                        int newState) {
-                        Log.i(getLogTag(),
-                                String.format(
-                                        "onConnectionStateChange(gatt=%s, status=%s, newState=%s)",
-                                        gatt, status, newState));
-
-                        if (status == BluetoothGatt.GATT_SUCCESS) {
-                            synchronized (devices) {
-                                switch (newState) {
-                                    case BluetoothProfile.STATE_DISCONNECTING:
-                                        break;
-
-                                    case BluetoothProfile.STATE_DISCONNECTED:
-                                        devices.remove(device.getAddress());
-
-                                        gatt.close();
-                                        break;
-
-                                    case BluetoothProfile.STATE_CONNECTED:
-//                                        // FIXME: Might need to use UI Thread to prevent rare threading issue causing a deadlock.
-//                                        handler.post(new Runnable() {
-//                                            @Override
-//                                            public void run() {
-//                                                // Discover services
-//                                                gatt.discoverServices();
-//                                            }
-//                                        });
-
-                                        // Discover services
-                                        gatt.discoverServices();
-
-//                                        connections.put(device.getAddress(), gatt);
-
-                                        gatt.requestMtu(Constants.GATT_MAX_MTU_SIZE);
-
-                                        break;
-                                }
-                            }
-                        } else {
-                            gatt.close();
-                        }
-
-                        JSObject data = new JSObject();
-                        data.put("status", status);
-                        data.put("newState", newState);
-
-                        notifyListeners("onConnectionStateChange", data);
-
-                        super.onConnectionStateChange(gatt, status, newState);
-                    }
-
-                    // Callback indicating the MTU for a given device connection has changed.
-                    @Override
-                    public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
-                        Log.i(getLogTag(),
-                                String.format(
-                                        "onMtuChanged(gatt=%s, mtu=%s, status=%s)",
-                                        gatt, mtu, status));
-
-                        JSObject data = new JSObject();
-                        data.put("mtu", mtu);
-                        data.put("status", status);
-
-                        notifyListeners("onMtuChanged", data);
-
-                        super.onMtuChanged(gatt, mtu, status);
-                    }
-
-                    // Callback invoked when the list of remote services, characteristics and descriptors for the remote device have been updated, ie new services have been discovered.
-                    @Override
-                    public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-                        Log.i(getLogTag(),
-                                String.format(
-                                        "onServicesDiscovered(gatt=%s, status=%s)",
-                                        gatt, status));
-
-                        JSArray servicesArray = new JSArray();
-
-                        if (status == BluetoothGatt.GATT_SUCCESS) {
-                            for (BluetoothGattService service : gatt.getServices()) {
-                                JSObject serviceObject = new JSObject();
-
-                                serviceObject.put("uuid", service.getUuid());
-                                serviceObject.put("type", service.getType());
-
-                                JSArray characteristicsArray = new JSArray();
-
-                                for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
-                                    JSObject characteristicObject = new JSObject();
-
-                                    characteristicObject.put("uuid", characteristic.getUuid());
-                                    characteristicObject.put("value", characteristic.getValue());
-
-                                    characteristicsArray.put(characteristicObject);
-
-                                    characteristic.setValue("Hello world.");
-                                    gatt.writeCharacteristic(characteristic);
-                                }
-
-                                serviceObject.put("characteristics", characteristicsArray);
-
-                                servicesArray.put(serviceObject);
-                            }
-                        }
-
-                        JSObject data = new JSObject();
-                        data.put("status", status);
-                        data.put("services", servicesArray);
-
-                        notifyListeners("onServicesDiscovered", data);
-
-                        super.onServicesDiscovered(gatt, status);
-                    }
-
-                    // Callback indicating the result of a descriptor write operation.
-                    @Override
-                    public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor,
-                                                  int status) {
-                        Log.i(getLogTag(),
-                                String.format(
-                                        "onDescriptorWrite(gatt=%s, descriptor=%s, status=%s)",
-                                        gatt, descriptor, status));
-                    }
-
-                    // Callback triggered as a result of a remote characteristic notification.
-                    @Override
-                    public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-                        Log.i(getLogTag(),
-                                String.format(
-                                        "onCharacteristicChanged(gatt=%s, characteristic=%s)",
-                                        gatt, characteristic));
-
-                        super.onCharacteristicChanged(gatt, characteristic);
-                    }
-
-                    // Callback indicating the result of a characteristic write operation.
-                    @Override
-                    public void onCharacteristicWrite(BluetoothGatt gatt,
-                                                      BluetoothGattCharacteristic characteristic, int status) {
-                        Log.i(getLogTag(),
-                                String.format(
-                                        "onCharacteristicWrite(gatt=%s, characteristic=%s, status=%s)",
-                                        gatt, characteristic, status));
-                    }
-
-                    // Callback reporting the result of a characteristic read operation.
-                    @Override
-                    public void onCharacteristicRead(BluetoothGatt gatt,
-                                                     BluetoothGattCharacteristic characteristic,
-                                                     int status) {
-                        Log.i(getLogTag(),
-                                String.format(
-                                        "onCharacteristicRead(gatt=%s, characteristic=%s, status=%s)",
-                                        gatt, characteristic, status));
-                    }
-
-                    // Callback reporting the RSSI for a remote device connection.
-                    @Override
-                    public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status) {
-                        Log.i(getLogTag(),
-                                String.format(
-                                        "onReadRemoteRssi(gatt=%s, rssi=%s, status=%s)",
-                                        gatt, rssi, status));
-
-                        super.onReadRemoteRssi(gatt, rssi, status);
-                    }
-                };
-
-        // Connect to GATT Server hosted by this device.
-        device.connectGatt(getContext(), false, gattCallback);
-    }
-
-    @SuppressLint("NewApi")
-    @PluginMethod
-    public void scan(final PluginCall call) {
+    public void subscribe(final PluginCall call) {
         if (scanner == null) {
-            call.unavailable();
+            call.reject(Constants.NOT_INITIALIZED);
             return;
         }
 
         if (!mScanning) {
-            scanCallback =
-                    new ScanCallback() {
-                        // Callback when a BLE advertisement has been found.
-                        @Override
-                        public void onScanResult(int callbackType, ScanResult result) {
-                            super.onScanResult(callbackType, result);
-
-                            Log.i(getLogTag(),
-                                    String.format(
-                                            "onScanResult(callbackType=%s, result=%s)",
-                                            callbackType, result));
-
-                            BluetoothDevice device = result.getDevice();
-                            connect(device);
-
-                            devices.replace(device.getAddress(), device);
-                            if (devices.containsKey(device.getAddress())) return;
-                            devices.put(device.getAddress(), device);
-
-                            try {
-                                BluetoothClass bluetoothClass = device.getBluetoothClass();
-
-                                JSObject bluetoothClassObject = new JSObject();
-                                bluetoothClassObject.put("deviceClass", bluetoothClass.getDeviceClass());
-                                bluetoothClassObject.put("majorDeviceClass", bluetoothClass.getMajorDeviceClass());
-
-                                JSObject bluetoothDeviceObject = new JSObject();
-                                bluetoothDeviceObject.put("address", device.getAddress());
-                                bluetoothDeviceObject.put("name", device.getName());
-                                bluetoothDeviceObject.put("type", device.getType());
-
-                                if (device.getUuids() != null) {
-                                    bluetoothDeviceObject.put("uuids", JSArray.from(device.getUuids()));
-                                }
-
-                                ScanRecord scanRecord = result.getScanRecord();
-
-                                JSObject scanRecordObject = new JSObject();
-                                scanRecordObject.put("advertiseFlags", scanRecord.getAdvertiseFlags());
-                                scanRecordObject.put("bytes", scanRecord.getBytes());
-                                scanRecordObject.put("deviceName", scanRecord.getDeviceName());
-                                scanRecordObject.put("txPowerLevel", scanRecord.getTxPowerLevel());
-
-                                JSObject scanResultObject = new JSObject();
-                                scanResultObject.put("device", bluetoothDeviceObject);
-                                scanResultObject.put("scanRecord", scanRecordObject);
-                                scanResultObject.put("timestampNanos", result.getTimestampNanos());
-                                scanResultObject.put("rssi", result.getRssi());
-                                scanResultObject.put("txPower", result.getTxPower());// O
-                                scanResultObject.put("primaryPhy", result.getPrimaryPhy());// O
-                                scanResultObject.put("secondaryPhy", result.getSecondaryPhy());// O
-                                scanResultObject.put("advertisingSid", result.getAdvertisingSid());// O
-                                scanResultObject.put("periodicAdvertisingInterval", result.getPeriodicAdvertisingInterval());// O
-                                scanResultObject.put("dataStatus", result.getDataStatus());// O
-                                scanResultObject.put("isConnectable", result.isConnectable());// O
-                                scanResultObject.put("isLegacy", result.isLegacy());// O
-
-                                JSObject data = new JSObject();
-                                data.put("callbackType", callbackType);
-                                data.put("result", scanResultObject);
-
-                                notifyListeners("onScanResult", data);
-                            } catch (Exception e) {
-                                Log.e(getLogTag(), "onScanResult", e);
-
-                                call.error(e.getLocalizedMessage(), e);
-                                return;
-                            }
-                        }
-
-                        // Callback when scan could not be started.
-                        @Override
-                        public void onScanFailed(int errorCode) {
-                            super.onScanFailed(errorCode);
-
-                            Log.i(getLogTag(),
-                                    String.format(
-                                            "onScanFailed(errorCode=%s)",
-                                            errorCode));
-
-                            JSObject data = new JSObject();
-                            data.put("errorCode", errorCode);
-
-                            notifyListeners("onScanFailed", data);
-                        }
-
-                        // Callback when batch results are delivered.
-                        @Override
-                        public void onBatchScanResults(List<ScanResult> results) {
-                            super.onBatchScanResults(results);
-
-                            Log.i(getLogTag(),
-                                    String.format(
-                                            "onBatchScanResults(results=%s)",
-                                            results));
-
-                            for (ScanResult result : results) {
-                                BluetoothDevice device = result.getDevice();
-
-                                if (devices.containsKey(device.getAddress())) return;
-                                devices.put(device.getAddress(), device);
-
-                                connect(device);
-                            }
-                        }
-                    };
-
-//            // Stops scanning after a pre-defined scan period.
-//            handler.postDelayed(new Runnable() {
-//                @Override
-//                public void run() {
-//                    mScanning = false;
-//                    scanner.stopScan(scanCallback);
-//                }
-//            }, SCAN_PERIOD);
-
             try {
-                ArrayList<ScanFilter> filters = new ArrayList<>();
+                Integer interval = call.getInt("interval");
 
-                {
-                    ScanFilter.Builder builder = new ScanFilter.Builder();
-                    // Set filter on service uuid.
-                    builder.setServiceUuid(ParcelUuid.fromString(Constants.SERVICE_UUID));
-                    filters.add(builder.build());
-                }
+                List<ScanFilter> filters = new ArrayList<>();
+                ScanFilter filter = new ScanFilter.Builder()
+                        .setServiceUuid(new ParcelUuid(Constants.SERVICE_UUID))
+                        // Set partial filter on service data.
+                        // For any bit in the mask, set it to 1 if it needs to match the one in service data,
+                        // otherwise set it to 0 to ignore that bit.
+//                        .setServiceData(
+//                                new ParcelUuid(Constants.SERVICE_UUID),
+//                                new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF},
+//                                new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00}
+//                        )
+                        .build();
+                filters.add(filter);
 
-                ScanSettings.Builder builder = new ScanSettings.Builder();
-                // Set scan mode for Bluetooth LE scan.
-                builder.setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY);
-                // Set callback type for Bluetooth LE scan.
-                builder.setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES);
-                // Set match mode for Bluetooth LE scan filters hardware match.
-                // MATCH_MODE_STICKY: For sticky mode, higher threshold of signal strength and sightings is required before reporting by hw
-                // MATCH_MODE_AGGRESSIVE: In Aggressive mode, hw will determine a match sooner even with feeble signal strength and few number of sightings/match in a duration.
-                builder.setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE);
-                ScanSettings settings = builder.build();
+                scanner.start(filters, new Scanner.ScanCallback() {
+                    @Override
+                    public void onFailed(int errorCode) {
+                        call.error(scanFailed(errorCode));
+                    }
+                });
 
                 // Start Bluetooth LE scan.
-                scanner.startScan(filters, settings, scanCallback);
+//                scanner.startScan(filters, settings, scanCallback);
                 mScanning = true;
+
+                if (interval != null) {
+                    // Sets the time to live in seconds for the publish or subscribe.
+                    // Stops scanning after a pre-defined scan period.
+                    handler.postDelayed(() -> onSubscribeExpired(), interval * 1000);
+                }
             } catch (Exception e) {
-                Log.e(getLogTag(), "startScan", e);
+                Log.e(getLogTag(), "scan", e);
 
                 call.error(e.getLocalizedMessage(), e);
                 return;
             }
         } else {
-            try {
-                // Stops an ongoing Bluetooth LE scan.
-                scanner.stopScan(scanCallback);
-                mScanning = false;
-            } catch (Exception e) {
-                Log.e(getLogTag(), "stopScan", e);
-
-                call.error(e.getLocalizedMessage(), e);
-                return;
-            }
+            doUnsubscribe();
         }
 
-        JSObject data = new JSObject();
-        data.put("isScanning", mScanning);
-
-        call.success(data);
+        call.success();
     }
 
+    private String scanFailed(int errorCode) {
+        switch (errorCode) {
+            case BluetoothCentral.SCAN_FAILED_ALREADY_STARTED:
+                return "Fails to start scan as BLE scan with the same settings is already started by the app.";
+            case BluetoothCentral.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED:
+                return "Fails to start scan as app cannot be registered.";
+            case BluetoothCentral.SCAN_FAILED_INTERNAL_ERROR:
+                return "Fails to start scan due an internal error.";
+            case BluetoothCentral.SCAN_FAILED_FEATURE_UNSUPPORTED:
+                return "Fails to start power optimized scan as this feature is not supported.";
+            case BluetoothCentral.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES:
+                return "Failed to start scan as it is out of hardware resources.";
+            case BluetoothCentral.SCAN_FAILED_SCANNING_TOO_FREQUENTLY:
+                return "Failed to start scan as application tries to scan too frequently.";
+            default:
+                return "Unknown error.";
+        }
+    }
+
+    private void onSubscribeExpired() {
+        if (mScanning) {
+            notifyListeners("onSubscribeExpired", null);
+        }
+
+        doUnsubscribe();
+    }
+
+    private void doUnsubscribe() {
+        mScanning = false;
+
+        if (scanner != null) {
+            scanner.stop();
+        }
+    }
+
+    @PluginMethod()
+    public void unsubscribe(PluginCall call) {
+        if (scanner == null) {
+            call.reject(Constants.NOT_INITIALIZED);
+            return;
+        }
+
+        try {
+            doUnsubscribe();
+
+            call.success();
+        } catch (Exception e) {
+            call.error(e.getLocalizedMessage(), e);
+        }
+    }
+
+    @PluginMethod()
+    public void status(PluginCall call) {
+        try {
+            boolean isPublishing = mAdvertising;
+            boolean isSubscribing = mScanning;
+
+            Set<UUID> uuids = this.messages.keySet();
+
+            Log.i(getLogTag(),
+                    String.format(
+                            "status(isPublishing=%s, isSubscribing=%s, uuids=%s)",
+                            isPublishing, isSubscribing, uuids));
+
+            JSObject data = new JSObject();
+            data.put("isPublishing", isPublishing);
+            data.put("isSubscribing", isSubscribing);
+            data.put("uuids", new JSArray(uuids));
+
+            call.success(data);
+        } catch (Exception e) {
+            call.error(e.getLocalizedMessage(), e);
+        }
+    }
+
+    private boolean isGooglePlayServicesAvailable() {
+        final Activity activity = getBridge().getActivity();
+
+        GoogleApiAvailability googleApiAvailability = GoogleApiAvailability.getInstance();
+
+        int status = googleApiAvailability.isGooglePlayServicesAvailable(activity);
+
+        return (status == ConnectionResult.SUCCESS);
+    }
+
+    // https://developer.android.com/training/location/change-location-settings
     private void showEnableLocationSetting() {
         final Activity activity = getBridge().getActivity();
 
+        LocationRequest locationRequest = LocationRequest.create();
+        // This method sets the rate in milliseconds at which your app prefers to receive location updates.
+        locationRequest.setInterval(3000);
+        // This method sets the fastest rate in milliseconds at which your app can handle location updates.
+        locationRequest.setFastestInterval(1000);
+        // This method sets the priority of the request, which gives the Google Play services location services a strong hint about which location sources to use.
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+
         LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
+                .addLocationRequest(locationRequest)
+                // Whether or not location is required by the calling app in order to continue.
+                .setAlwaysShow(true)
+                // Sets whether the client wants BLE scan to be enabled.
                 .setNeedBle(true);
 
-        LocationServices.getSettingsClient(activity)
-                .checkLocationSettings(builder.build())
-                .addOnCompleteListener(new OnCompleteListener<LocationSettingsResponse>() {
-                    @Override
-                    public void onComplete(Task<LocationSettingsResponse> task) {
-                        try {
-                            LocationSettingsResponse response = task.getResult(ApiException.class);
-                            // All location settings are satisfied. The client can initialize location
-                            // requests here.
-                        } catch (ApiException exception) {
-                            switch (exception.getStatusCode()) {
-                                case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
-                                    // Location settings are not satisfied. But could be fixed by showing the
-                                    // user a dialog.
-                                    try {
-                                        // Cast to a resolvable exception.
-                                        ResolvableApiException resolvable = (ResolvableApiException) exception;
-                                        // Show the dialog by calling startResolutionForResult(),
-                                        // and check the result in onActivityResult().
-                                        resolvable.startResolutionForResult(
-                                                activity,
-                                                REQUEST_LOCATION_SERVICE
-                                        );
-                                    } catch (IntentSender.SendIntentException e) {
-                                        // Ignore the error.
-                                    } catch (ClassCastException e) {
-                                        // Ignore, should be an impossible error.
-                                    }
-                                    break;
-                                case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
-                                    // Location settings are not satisfied. However, we have no way to fix the
-                                    // settings so we won't show the dialog.
-                                    break;
-                            }
-                        }
-                    }
-                });
+        Task<LocationSettingsResponse> task =
+                LocationServices.getSettingsClient(activity)
+                        .checkLocationSettings(builder.build());
+
+        task.addOnFailureListener(activity, e -> {
+            if (e instanceof ResolvableApiException) {
+                // Location settings are not satisfied, but this can be fixed
+                // by showing the user a dialog.
+                try {
+                    // Show the dialog by calling startResolutionForResult(),
+                    // and check the result in onActivityResult().
+                    ResolvableApiException resolvable = (ResolvableApiException) e;
+                    resolvable.startResolutionForResult(
+                            activity,
+                            REQUEST_LOCATION_SERVICE
+                    );
+                } catch (IntentSender.SendIntentException sendEx) {
+                    // Ignore the error.
+                }
+            }
+        });
     }
 }
