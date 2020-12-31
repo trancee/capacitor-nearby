@@ -308,6 +308,7 @@ public class BluetoothPeripheral {
             final BluetoothGattCharacteristic parentCharacteristic = descriptor.getCharacteristic();
             if (gattStatus != GattStatus.SUCCESS) {
                 Timber.e("failed to write <%s> to descriptor of characteristic <%s> for device: '%s', status '%s' ", bytes2String(currentWriteBytes), parentCharacteristic.getUuid(), getAddress(), gattStatus);
+                if (failureThatShouldTriggerBonding(gattStatus)) return;
             }
 
             // Check if this was the Client Configuration Descriptor
@@ -353,6 +354,7 @@ public class BluetoothPeripheral {
             final GattStatus gattStatus = GattStatus.fromValue(status);
             if (gattStatus != GattStatus.SUCCESS) {
                 Timber.e("reading descriptor <%s> failed for device '%s, status '%s'", descriptor.getUuid(), getAddress(), gattStatus);
+                if (failureThatShouldTriggerBonding(gattStatus)) return;
             }
 
             final byte[] value = copyOf(descriptor.getValue());
@@ -385,16 +387,7 @@ public class BluetoothPeripheral {
             final GattStatus gattStatus = GattStatus.fromValue(status);
             if (gattStatus != GattStatus.SUCCESS) {
                 Timber.e("read failed for characteristic <%s>, status '%s'", characteristic.getUuid(), gattStatus);
-
-                if (gattStatus == GattStatus.AUTHORIZATION_FAILED || gattStatus == GattStatus.INSUFFICIENT_AUTHENTICATION) {
-                    // Characteristic encrypted and needs bonding,
-                    // So retry operation after bonding completes
-                    // This only seems to happen on Android 5/6/7
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                        Timber.i("read will be retried after bonding, bonding should be in progress");
-                        return;
-                    }
-                }
+                if (failureThatShouldTriggerBonding(gattStatus)) return;
             }
 
             final byte[] value = copyOf(characteristic.getValue());
@@ -414,16 +407,7 @@ public class BluetoothPeripheral {
             final GattStatus gattStatus = GattStatus.fromValue(status);
             if (gattStatus != GattStatus.SUCCESS) {
                 Timber.e("writing <%s> to characteristic <%s> failed, status '%s'", bytes2String(currentWriteBytes), characteristic.getUuid(), gattStatus);
-
-                if (gattStatus == GattStatus.AUTHORIZATION_FAILED || gattStatus == GattStatus.INSUFFICIENT_AUTHENTICATION) {
-                    // Characteristic encrypted and needs bonding,
-                    // So retry operation after bonding completes
-                    // This only seems to happen on Android 5/6/7
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                        Timber.i("write will be retried after bonding, bonding should be in progress");
-                        return;
-                    }
-                }
+                if (failureThatShouldTriggerBonding(gattStatus)) return;
             }
 
             final byte[] value = copyOf(currentWriteBytes);
@@ -437,6 +421,21 @@ public class BluetoothPeripheral {
                 }
             });
             completedCommand();
+        }
+
+        private boolean failureThatShouldTriggerBonding(GattStatus gattStatus) {
+            if (gattStatus == GattStatus.AUTHORIZATION_FAILED
+                    || gattStatus == GattStatus.INSUFFICIENT_AUTHENTICATION
+                    || gattStatus == GattStatus.INSUFFICIENT_ENCRYPTION) {
+                // Characteristic encrypted and needs bonding,
+                // So retry operation after bonding completes
+                // This only seems to happen on Android 5/6/7
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                    Timber.i("operation will be retried after bonding, bonding should be in progress");
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override
@@ -1047,7 +1046,7 @@ public class BluetoothPeripheral {
      * @return true if the characteristic is notifying or indicating, false if it is not
      */
     public boolean isNotifying(@NotNull BluetoothGattCharacteristic characteristic) {
-        Objects.requireNonNull(characteristic, "no valid characteristic provided");
+        Objects.requireNonNull(characteristic, NO_VALID_CHARACTERISTIC_PROVIDED);
         return notifyingCharacteristics.contains(characteristic.getUuid());
     }
 
@@ -1310,6 +1309,7 @@ public class BluetoothPeripheral {
                 if (isConnected()) {
                     currentWriteBytes = bytesToWrite;
                     descriptor.setValue(bytesToWrite);
+                    adjustWriteTypeIfNeeded(descriptor);
                     if (!bluetoothGatt.writeDescriptor(descriptor)) {
                         Timber.e("writeDescriptor failed for descriptor: %s", descriptor.getUuid());
                         completedCommand();
@@ -1405,12 +1405,7 @@ public class BluetoothPeripheral {
                 // Then write to descriptor
                 currentWriteBytes = finalValue;
                 descriptor.setValue(finalValue);
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-                    // Up to Android 6 there is a bug where Android takes the writeType of the parent characteristic instead of always WRITE_TYPE_DEFAULT
-                    // See: https://android.googlesource.com/platform/frameworks/base/+/942aebc95924ab1e7ea1e92aaf4e7fc45f695a6c%5E%21/#F0
-                    final BluetoothGattCharacteristic parentCharacteristic = descriptor.getCharacteristic();
-                    parentCharacteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
-                }
+                adjustWriteTypeIfNeeded(descriptor);
                 if (!bluetoothGatt.writeDescriptor(descriptor)) {
                     Timber.e("writeDescriptor failed for descriptor: %s", descriptor.getUuid());
                     completedCommand();
@@ -1426,6 +1421,15 @@ public class BluetoothPeripheral {
             Timber.e("could not enqueue setNotify command");
         }
         return result;
+    }
+
+    private void adjustWriteTypeIfNeeded(BluetoothGattDescriptor descriptor) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            // Up to Android 6 there is a bug where Android takes the writeType of the parent characteristic instead of always WRITE_TYPE_DEFAULT
+            // See: https://android.googlesource.com/platform/frameworks/base/+/942aebc95924ab1e7ea1e92aaf4e7fc45f695a6c%5E%21/#F0
+            final BluetoothGattCharacteristic parentCharacteristic = descriptor.getCharacteristic();
+            parentCharacteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+        }
     }
 
     /**
