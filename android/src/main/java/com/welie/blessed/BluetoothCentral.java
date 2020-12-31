@@ -98,6 +98,10 @@ public class BluetoothCentral {
      */
     public static final int SCAN_FAILED_SCANNING_TOO_FREQUENTLY = 6;
 
+    private static final String NO_PERIPHERAL_ADDRESS_PROVIDED = "no peripheral address provided";
+    private static final String NO_VALID_PERIPHERAL_PROVIDED = "no valid peripheral provided";
+    private static final String NO_VALID_PERIPHERAL_CALLBACK_SPECIFIED = "no valid peripheral callback specified";
+
     private @NotNull final Context context;
     private @NotNull final Handler callBackHandler;
     private @NotNull final BluetoothAdapter bluetoothAdapter;
@@ -253,7 +257,7 @@ public class BluetoothCentral {
         }
 
         @Override
-        public void connectFailed(final @NotNull BluetoothPeripheral peripheral, final int status) {
+        public void connectFailed(final @NotNull BluetoothPeripheral peripheral, final HciStatus status) {
             unconnectedPeripherals.remove(peripheral.getAddress());
             scannedPeripherals.remove((peripheral.getAddress()));
 
@@ -265,7 +269,7 @@ public class BluetoothCentral {
             }
 
             // Retry connection or conclude the connection has failed
-            if (nrRetries < MAX_CONNECTION_RETRIES && status != BluetoothPeripheral.GATT_CONN_TIMEOUT) {
+            if (nrRetries < MAX_CONNECTION_RETRIES && status != HciStatus.CONNECTION_FAILED_ESTABLISHMENT) {
                 Timber.i("retrying connection to '%s' (%s)", peripheral.getName(), peripheral.getAddress());
                 nrRetries++;
                 connectionRetries.put(peripheral.getAddress(), nrRetries);
@@ -284,7 +288,7 @@ public class BluetoothCentral {
         }
 
         @Override
-        public void disconnected(final @NotNull BluetoothPeripheral peripheral, final int status) {
+        public void disconnected(final @NotNull BluetoothPeripheral peripheral, final HciStatus status) {
             if (expectingBluetoothOffDisconnects) {
                 cancelDisconnectionTimer();
                 expectingBluetoothOffDisconnects = false;
@@ -593,8 +597,8 @@ public class BluetoothCentral {
      */
     public void connectPeripheral(@NotNull BluetoothPeripheral peripheral, @NotNull BluetoothPeripheralCallback peripheralCallback) {
         synchronized (connectLock) {
-            Objects.requireNonNull(peripheral, "no valid peripheral specified");
-            Objects.requireNonNull(peripheralCallback, "no valid peripheral callback specified");
+            Objects.requireNonNull(peripheral, NO_VALID_PERIPHERAL_PROVIDED);
+            Objects.requireNonNull(peripheralCallback, NO_VALID_PERIPHERAL_CALLBACK_SPECIFIED);
 
             // Check if we are already connected to this peripheral
             if (connectedPeripherals.containsKey(peripheral.getAddress())) {
@@ -632,8 +636,8 @@ public class BluetoothCentral {
      */
     public void autoConnectPeripheral(@NotNull BluetoothPeripheral peripheral, @NotNull BluetoothPeripheralCallback peripheralCallback) {
         synchronized (connectLock) {
-            Objects.requireNonNull(peripheral, "no valid peripheral specified");
-            Objects.requireNonNull(peripheralCallback, "no valid peripheral callback specified");
+            Objects.requireNonNull(peripheral, NO_VALID_PERIPHERAL_PROVIDED);
+            Objects.requireNonNull(peripheralCallback, NO_VALID_PERIPHERAL_CALLBACK_SPECIFIED);
 
             // Check if we are already connected to this peripheral
             if (connectedPeripherals.containsKey(peripheral.getAddress())) {
@@ -693,7 +697,7 @@ public class BluetoothCentral {
      * @param peripheral the peripheral
      */
     public void cancelConnection(@NotNull final BluetoothPeripheral peripheral) {
-        Objects.requireNonNull(peripheral, "no valid peripheral specified");
+        Objects.requireNonNull(peripheral, NO_VALID_PERIPHERAL_PROVIDED);
 
         // First check if we are doing a reconnection scan for this peripheral
         String peripheralAddress = peripheral.getAddress();
@@ -706,7 +710,7 @@ public class BluetoothCentral {
             callBackHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    bluetoothCentralCallback.onDisconnectedPeripheral(peripheral, BluetoothPeripheral.GATT_SUCCESS);
+                    bluetoothCentralCallback.onDisconnectedPeripheral(peripheral, HciStatus.SUCCESS);
                 }
             });
 
@@ -778,7 +782,7 @@ public class BluetoothCentral {
      * @return a BluetoothPeripheral object matching the specified mac address or null if it was not found
      */
     public @NotNull BluetoothPeripheral getPeripheral(@NotNull String peripheralAddress) {
-        Objects.requireNonNull(peripheralAddress, "no valid peripheral address provided");
+        Objects.requireNonNull(peripheralAddress, NO_PERIPHERAL_ADDRESS_PROVIDED);
 
         if (!BluetoothAdapter.checkBluetoothAddress(peripheralAddress)) {
             final String message = String.format("%s is not a valid bluetooth address. Make sure all alphabetic characters are uppercase.", peripheralAddress);
@@ -936,9 +940,10 @@ public class BluetoothCentral {
     }
 
     /**
-     * Set a fixed PIN code for a peripheral that asks fir a PIN code during bonding.
+     * Set a fixed PIN code for a peripheral that asks for a PIN code during bonding.
      * <p>
-     * This PIN code will be used to programmatically bond with the peripheral when it asks for a PIN code.
+     * This PIN code will be used to programmatically bond with the peripheral when it asks for a PIN code. The normal PIN popup will not appear anymore.
+     * </p>
      * Note that this only works for peripherals with a fixed PIN code.
      *
      * @param peripheralAddress the address of the peripheral
@@ -946,7 +951,7 @@ public class BluetoothCentral {
      * @return true if the pin code and peripheral address are valid and stored internally
      */
     public boolean setPinCodeForPeripheral(@NotNull String peripheralAddress, @NotNull String pin) {
-        Objects.requireNonNull(peripheralAddress, "no peripheral address provided");
+        Objects.requireNonNull(peripheralAddress, NO_PERIPHERAL_ADDRESS_PROVIDED);
         Objects.requireNonNull(pin, "no pin provided");
 
         if (!BluetoothAdapter.checkBluetoothAddress(peripheralAddress)) {
@@ -970,15 +975,13 @@ public class BluetoothCentral {
      * @return true if the peripheral was succesfully unpaired or it wasn't paired, false if it was paired and removing it failed
      */
     public boolean removeBond(@NotNull String peripheralAddress) {
-        Objects.requireNonNull(peripheralAddress, "no peripheral address provided");
-
-        boolean result;
-        BluetoothDevice peripheralToUnBond = null;
+        Objects.requireNonNull(peripheralAddress, NO_PERIPHERAL_ADDRESS_PROVIDED);
 
         // Get the set of bonded devices
         Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
 
         // See if the device is bonded
+        BluetoothDevice peripheralToUnBond = null;
         if (bondedDevices.size() > 0) {
             for (BluetoothDevice device : bondedDevices) {
                 if (device.getAddress().equals(peripheralAddress)) {
@@ -993,7 +996,7 @@ public class BluetoothCentral {
         if (peripheralToUnBond != null) {
             try {
                 Method method = peripheralToUnBond.getClass().getMethod("removeBond", (Class[]) null);
-                result = (boolean) method.invoke(peripheralToUnBond, (Object[]) null);
+                boolean result = (boolean) method.invoke(peripheralToUnBond, (Object[]) null);
                 if (result) {
                     Timber.i("Succesfully removed bond for '%s'", peripheralToUnBond.getName());
                 }
@@ -1028,7 +1031,6 @@ public class BluetoothCentral {
             }, 1000);
         }
     }
-
 
     /**
      * Some phones, like Google/Pixel phones, don't automatically disconnect devices so this method does it manually
