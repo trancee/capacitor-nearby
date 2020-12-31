@@ -9,19 +9,21 @@ import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.os.Handler;
 import android.util.Base64;
+import android.util.Log;
 
 import com.welie.blessed.BluetoothBytesParser;
 import com.welie.blessed.BluetoothCentral;
 import com.welie.blessed.BluetoothCentralCallback;
 import com.welie.blessed.BluetoothPeripheral;
 import com.welie.blessed.BluetoothPeripheralCallback;
+import com.welie.blessed.GattStatus;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static com.welie.blessed.BluetoothPeripheral.GATT_SUCCESS;
+import static android.bluetooth.BluetoothGatt.CONNECTION_PRIORITY_HIGH;
 
 class Scanner {
     private final Context context;
@@ -75,25 +77,39 @@ class Scanner {
         }
     }
 
+    class Packet {
+        byte[] data = new byte[]{};
+
+        public void append(byte[] data) {
+            this.data = append(this.data, data);
+        }
+
+        byte[] append(byte[] a, byte[] b) {
+            byte[] result = new byte[a.length + b.length];
+
+            System.arraycopy(a, 0, result, 0, a.length);
+            System.arraycopy(b, 0, result, a.length, b.length);
+
+            return result;
+        }
+    }
+
     private final Map<UUID, Message> messages = new HashMap<>();
+    private final Map<UUID, Packet> packets = new HashMap<>();
 
     // Callback for peripherals
     private final BluetoothPeripheralCallback peripheralCallback = new BluetoothPeripheralCallback() {
-        private int count = 0;
-
         @Override
         public void onServicesDiscovered(BluetoothPeripheral peripheral) {
-//            Log.i(capacitor.getLogTag(),
-//                    String.format(
-//                            "onServicesDiscovered(peripheral=%s)",
-//                            peripheral));
+            Log.i("Scanner",
+                    String.format(
+                            "onServicesDiscovered(peripheral=%s, packets=%s)",
+                            peripheral, packets));
 
-//            peripheral.requestMtu(Constants.GATT_MTU_SIZE);
-//
-//            // Request a new connection priority
-//            peripheral.requestConnectionPriority(CONNECTION_PRIORITY_HIGH);
+            peripheral.requestMtu(Constants.GATT_MTU_SIZE);
 
-            count = 0;
+            // Request a new connection priority
+            peripheral.requestConnectionPriority(CONNECTION_PRIORITY_HIGH);
 
 //            peripheral.readCharacteristic(Constants.SERVICE_UUID, Constants.CHARACTERISTIC_UUID);
 
@@ -109,86 +125,54 @@ class Scanner {
                     if (message != null) {
                         message.alive();
                     } else {
-                        count++;
+                        packets.put(uuid, new Packet());
+
                         peripheral.readDescriptor(descriptor);
                     }
                 }
             }
 
-            if (count == 0) {
+            if (packets.isEmpty()) {
                 central.cancelConnection(peripheral);
             }
         }
 
-//        @Override
-//        public void onCharacteristicWrite(BluetoothPeripheral peripheral, byte[] value, BluetoothGattCharacteristic characteristic, int status) {
-//            Log.i(capacitor.getLogTag(),
-//                    String.format(
-//                            "onCharacteristicWrite(peripheral=%s, value=%s, characteristic=%s, status=%s)",
-//                            peripheral, value, characteristic, status));
-//        }
-
         @Override
-        public void onCharacteristicUpdate(BluetoothPeripheral peripheral, byte[] value, BluetoothGattCharacteristic characteristic, int status) {
-//            Log.i(capacitor.getLogTag(),
-//                    String.format(
-//                            "onCharacteristicUpdate(peripheral=%s, value=%s, characteristic=%s, status=%s)",
-//                            peripheral, value, characteristic, status));
+        public void onDescriptorRead(final BluetoothPeripheral peripheral, byte[] value, final BluetoothGattDescriptor descriptor, final GattStatus status) {
+            Log.i("Scanner",
+                    String.format(
+                            "onDescriptorRead(peripheral=%s, value=%s, descriptor=%s, status=%s)",
+                            peripheral, value.length, descriptor, status));
 
-            if (status != GATT_SUCCESS) {
-                count = 0;
+            if (packets.isEmpty()) {
                 central.cancelConnection(peripheral);
-
-                return;
-            }
-
-            for (BluetoothGattDescriptor descriptor : characteristic.getDescriptors()) {
-                UUID uuid = descriptor.getUuid();
-
-                Message message = messages.get(uuid);
-
-                if (message != null) {
-                    message.alive();
-                } else {
-                    count++;
-                    peripheral.readDescriptor(descriptor);
-                }
-            }
-        }
-
-        @Override
-        public void onDescriptorRead(final BluetoothPeripheral peripheral, byte[] value, final BluetoothGattDescriptor descriptor, final int status) {
-//            Log.i(capacitor.getLogTag(),
-//                    String.format(
-//                            "onDescriptorRead(peripheral=%s, value=%s, descriptor=%s, status=%s)",
-//                            peripheral, value, descriptor, status));
-
-            if (--count <= 0) {
-                central.cancelConnection(peripheral);
-            }
-
-            if (status != GATT_SUCCESS) {
                 return;
             }
 
             UUID uuid = descriptor.getUuid();
 
-            Message message = messages.get(uuid);
+            Packet packet = packets.get(uuid);
 
-            if (message != null) {
-                message.alive();
-            } else {
-                BluetoothBytesParser parser = new BluetoothBytesParser(value);
+            if (packet != null) {
+                if (status == GattStatus.SUCCESS) {
+                    BluetoothBytesParser parser = new BluetoothBytesParser(value);
 
-                callback.onFound(uuid, Base64.encodeToString(parser.getValue(), Base64.DEFAULT | Base64.NO_WRAP));
+                    byte[] data = parser.getValue();
+                    packet.append(data);
 
-                messages.put(uuid, new Message(uuid));
+                    peripheral.readDescriptor(descriptor);
+                } else if (status == GattStatus.INVALID_OFFSET) {
+                    callback.onFound(uuid, Base64.encodeToString(packet.data, Base64.DEFAULT | Base64.NO_WRAP));
+
+                    packets.remove(uuid);
+                    messages.put(uuid, new Message(uuid));
+                }
             }
         }
 
 //        @Override
-//        public void onMtuChanged(BluetoothPeripheral peripheral, int mtu, int status) {
-//            Log.i(capacitor.getLogTag(),
+//        public void onMtuChanged(@NotNull final BluetoothPeripheral peripheral, int mtu, @NotNull GattStatus status) {
+//            Log.i("Scanner",
 //                    String.format(
 //                            "onMtuChanged(peripheral=%s, mtu=%s, status=%s)",
 //                            peripheral, mtu, status));
@@ -197,54 +181,15 @@ class Scanner {
 
     // Callback for central
     private final BluetoothCentralCallback bluetoothCentralCallback = new BluetoothCentralCallback() {
-//        @Override
-//        public void onConnectedPeripheral(BluetoothPeripheral peripheral) {
-//            Log.i(capacitor.getLogTag(),
-//                    String.format(
-//                            "onConnectedPeripheral(peripheral=%s)",
-//                            peripheral));
-//        }
-
-//        @Override
-//        public void onConnectionFailed(BluetoothPeripheral peripheral, final int status) {
-//            Log.e(capacitor.getLogTag(),
-//                    String.format(
-//                            "onConnectionFailed(peripheral=%s, status=%s)",
-//                            peripheral, status));
-//        }
-
-//        @Override
-//        public void onDisconnectedPeripheral(final BluetoothPeripheral peripheral, final int status) {
-//            Log.i(capacitor.getLogTag(),
-//                    String.format(
-//                            "onDisconnectedPeripheral(peripheral=%s, status=%s)",
-//                            peripheral, status));
-//        }
-
         @Override
         public void onDiscoveredPeripheral(BluetoothPeripheral peripheral, ScanResult scanResult) {
-//            Log.i(capacitor.getLogTag(),
-//                    String.format(
-//                            "onDiscoveredPeripheral(peripheral=%s, scanResult=%s)",
-//                            peripheral, scanResult));
-
-//            ScanRecord scanRecord = scanResult.getScanRecord();
-//            byte[] data = scanRecord.getManufacturerSpecificData(Constants.MANUFACTURER_ID);
-//            long timestamp = Constants.fromBytes(data);
-//
-//            Long advertisement = advertisements.get(peripheral.getAddress());
-//
-//            if (advertisement == null || (advertisement != null && advertisement != timestamp)) {
-//                Log.i(capacitor.getLogTag(),
-//                        String.format(
-//                                "scanRecord=%s, timestamp=%s",
-//                                scanRecord, timestamp));
+            Log.i("Scanner",
+                    String.format(
+                            "onDiscoveredPeripheral(peripheral=%s, scanResult=%s)",
+                            peripheral, scanResult));
 
 //                    central.stopScan();
             central.connectPeripheral(peripheral, peripheralCallback);
-
-//                advertisements.put(peripheral.getAddress(), timestamp);
-//            }
         }
 
         @Override

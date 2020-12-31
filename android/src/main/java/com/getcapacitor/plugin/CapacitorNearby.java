@@ -1,14 +1,16 @@
 package com.getcapacitor.plugin;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
-import android.app.Activity;
+
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.AdvertiseCallback;
 import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.bluetooth.le.ScanFilter;
+
+import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
@@ -35,6 +37,7 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.tasks.Task;
+
 import com.welie.blessed.BluetoothCentral;
 
 import java.util.ArrayList;
@@ -59,9 +62,6 @@ interface Constants {
     String PERMISSION_DENIED = "permissions not granted";
     String PUBLISH_MESSAGE = "must provide message";
     String MESSAGE_UUID_NOT_FOUND = "message UUID not found";
-
-    String ERROR_ADD_SERVICE = "add service failed";
-    String ERROR_ADD_CHARACTERISTIC = "add characteristic failed";
 
     int GATT_MTU_SIZE_DEFAULT = 23;
     int GATT_MTU_SIZE = 185;    // iOS always asks for 185
@@ -324,7 +324,9 @@ public class CapacitorNearby extends Plugin {
         }
 
         public void onPermissionChanged(Boolean permissionGranted) {
-            close();
+            if (!permissionGranted) {
+                close();
+            }
 
             JSObject data = new JSObject();
             data.put("permissionGranted", permissionGranted);
@@ -352,6 +354,24 @@ public class CapacitorNearby extends Plugin {
             close();
 
 //            initialize(call);
+            call.success();
+        } catch (Exception e) {
+            call.error(e.getLocalizedMessage(), e);
+        }
+    }
+
+    @PluginMethod()
+    public void pause(PluginCall call) {
+        try {
+            call.success();
+        } catch (Exception e) {
+            call.error(e.getLocalizedMessage(), e);
+        }
+    }
+
+    @PluginMethod()
+    public void resume(PluginCall call) {
+        try {
             call.success();
         } catch (Exception e) {
             call.error(e.getLocalizedMessage(), e);

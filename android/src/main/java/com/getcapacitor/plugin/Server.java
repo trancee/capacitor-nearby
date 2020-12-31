@@ -1,7 +1,5 @@
 package com.getcapacitor.plugin;
 
-import com.getcapacitor.Plugin;
-
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
@@ -11,17 +9,16 @@ import android.bluetooth.BluetoothGattServerCallback;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
+
 import android.content.Context;
 import android.util.Log;
-
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-class Server extends Plugin {
+class Server {
     private BluetoothManager manager;
 
     private static Context context = null;
@@ -30,9 +27,38 @@ class Server extends Plugin {
     private BluetoothGattServer server;
     private BluetoothGattServerCallback serverCallback;
 
+    class Packet {
+        int mtu;
+        int size;
+
+        int offset;
+        int rt;
+
+        boolean available;
+
+        public Packet(int mtu, int size) {
+            this.mtu = mtu;
+            this.size = size;
+
+            this.offset = 0;
+            this.rt = (size + mtu) / mtu;
+
+            this.available = this.offset < this.size;
+        }
+
+        public void next() {
+            this.offset += this.mtu;
+
+            this.available = this.offset < this.size;
+        }
+    }
+
+    private final Map<BluetoothDevice, Integer> mtus = new HashMap<>();
+    private final Map<BluetoothDevice, Packet> packets = new HashMap<>();
+
     private final Map<UUID, byte[]> descriptors = new HashMap<>();
 
-//    private final Map<String, BluetoothDevice> connections = new HashMap<>();
+    //    private final Map<String, BluetoothDevice> connections = new HashMap<>();
 
     public void start() {
         // Check if server is already running.
@@ -40,79 +66,29 @@ class Server extends Plugin {
             if (serverCallback == null) {
                 serverCallback =
                         new BluetoothGattServerCallback() {
-//                            /**
-//                             * Callback indicating when a remote device has been connected or disconnected.
-//                             *
-//                             * @param device Remote device that has been connected or disconnected.
-//                             * @param status Status of the connect or disconnect operation.
-//                             * @param newState Returns the new connection state. Can be one of {@link
-//                             * BluetoothProfile#STATE_DISCONNECTED} or {@link BluetoothProfile#STATE_CONNECTED}
-//                             */
-//                            @Override
-//                            public void onConnectionStateChange(BluetoothDevice device, int status, int newState) {
-//                                super.onConnectionStateChange(device, status, newState);
-//
-//                                Log.i(getLogTag(),
-//                                        String.format(
-//                                                "onConnectionStateChange(device=%s, status=%s, newState=%s)",
-//                                                device, status, newState));
-//
-//                                synchronized (connections) {
-//                                    switch (newState) {
-//                                        case BluetoothProfile.STATE_CONNECTED:
-//                                            // Allow connection to proceed. Mark device connected
-//                                            connections.put(device.getAddress(), device);
-//
-//                                            break;
-//
-//                                        case BluetoothProfile.STATE_DISCONNECTED:
-//                                            // We've disconnected
-//                                            connections.remove(device.getAddress());
-//
-//                                            break;
-//                                    }
-//                                }
-//                            }
-
                             /**
-                             * A remote client has requested to read a local characteristic.
+                             * Callback indicating when a remote device has been connected or disconnected.
                              *
-                             * <p>An application must call {@link BluetoothGattServer#sendResponse}
-                             * to complete the request.
-                             *
-                             * @param device The remote device that has requested the read operation
-                             * @param requestId The Id of the request
-                             * @param offset Offset into the value of the characteristic
-                             * @param characteristic Characteristic to be read
+                             * @param device Remote device that has been connected or disconnected.
+                             * @param status Status of the connect or disconnect operation.
+                             * @param newState Returns the new connection state. Can be one of {@link
+                             * BluetoothProfile#STATE_DISCONNECTED} or {@link BluetoothProfile#STATE_CONNECTED}
                              */
                             @Override
-                            public void onCharacteristicReadRequest(BluetoothDevice device, int requestId, int offset, BluetoothGattCharacteristic characteristic) {
-                                super.onCharacteristicReadRequest(device, requestId, offset, characteristic);
+                            public void onConnectionStateChange(BluetoothDevice device, int status, int newState) {
+                                synchronized (mtus) {
+                                    switch (newState) {
+                                        case BluetoothProfile.STATE_CONNECTED:
+                                            mtus.put(device, Constants.GATT_MTU_SIZE_DEFAULT);
 
-                                Log.i(getLogTag(),
-                                        String.format(
-                                                "onCharacteristicReadRequest(device=%s, requestId=%s, offset=%s, characteristic=%s)",
-                                                device, requestId, offset, characteristic));
+                                            break;
 
-                                int status = BluetoothGatt.GATT_FAILURE;
-                                byte[] value = null;
+                                        case BluetoothProfile.STATE_DISCONNECTED:
+                                            mtus.remove(device);
 
-                                UUID uuid = characteristic.getUuid();
-
-                                BluetoothGattCharacteristic localCharacteristic =
-                                        server.getService(Constants.SERVICE_UUID)
-                                                .getCharacteristic(uuid);
-
-                                if (localCharacteristic != null) {
-                                    // https://stackoverflow.com/questions/46317971/bluetoothgattservercallback-oncharacteristicreadrequest-called-multiple-time
-//                            value = Arrays.copyOfRange(message, offset, message.length);
-
-                                    status = BluetoothGatt.GATT_SUCCESS;
-                                } else {
-                                    // Request for unrecognized characteristic. Send GATT_FAILURE
+                                            break;
+                                    }
                                 }
-
-                                server.sendResponse(device, requestId, status, offset, value);
                             }
 
                             /**
@@ -128,30 +104,60 @@ class Server extends Plugin {
                              */
                             @Override
                             public void onDescriptorReadRequest(BluetoothDevice device, int requestId, int offset, BluetoothGattDescriptor descriptor) {
-                                super.onDescriptorReadRequest(device, requestId, offset, descriptor);
+//                                super.onDescriptorReadRequest(device, requestId, offset, descriptor);
 
-                                Log.i(getLogTag(),
+                                Log.i("Server",
                                         String.format(
                                                 "onDescriptorReadRequest(device=%s, requestId=%s, offset=%s, descriptor=%s)",
                                                 device, requestId, offset, descriptor));
 
                                 int status = BluetoothGatt.GATT_FAILURE;
-                                byte[] value = null;
+                                byte[] value = new byte[]{};
 
                                 UUID uuid = descriptor.getUuid();
+                                byte[] message = descriptors.get(uuid);
 
-                                if (descriptors.containsKey(uuid)) {
-                                    byte[] message = descriptors.get(uuid);
+                                if (message != null) {
+                                    Packet packet = packets.get(device);
 
-                                    // https://stackoverflow.com/questions/46317971/bluetoothgattservercallback-oncharacteristicreadrequest-called-multiple-time
-                                    value = Arrays.copyOfRange(message, offset, message.length);
+                                    if (packet == null) {
+                                        Integer mtu = mtus.get(device);
 
-                                    status = BluetoothGatt.GATT_SUCCESS;
+                                        packet = new Packet(mtu - 3, message.length);
+                                        packets.put(device, packet);
+                                    }
+
+                                    if (packet.available) {
+                                        // https://stackoverflow.com/questions/46317971/bluetoothgattservercallback-oncharacteristicreadrequest-called-multiple-time
+                                        value = Arrays.copyOfRange(message, packet.offset, Math.min(packet.offset + packet.mtu, message.length));
+
+                                        packet.next();
+
+                                        status = BluetoothGatt.GATT_SUCCESS;
+                                    } else {
+                                        status = BluetoothGatt.GATT_INVALID_OFFSET;
+                                    }
                                 } else {
                                     // Descriptor does not exist.
                                 }
 
-                                server.sendResponse(device, requestId, status, offset, value);
+                                boolean success = server.sendResponse(device, requestId, status, offset, value);
+                            }
+
+                            /**
+                             * Callback indicating the MTU for a given device connection has changed.
+                             *
+                             * <p>This callback will be invoked if a remote client has requested to change
+                             * the MTU for a given connection.
+                             *
+                             * @param device The remote device that requested the MTU change
+                             * @param mtu The new MTU size
+                             */
+                            @Override
+                            public void onMtuChanged(BluetoothDevice device, int mtu) {
+                                synchronized (mtus) {
+                                    mtus.put(device, mtu);
+                                }
                             }
                         };
             }
@@ -238,7 +244,7 @@ class Server extends Plugin {
         return server.addService(service);
     }
 
-    public boolean addMessage(@NotNull UUID uuid, @NotNull byte[] message) {
+    public boolean addMessage(UUID uuid, byte[] message) {
         synchronized (descriptors) {
             if (descriptors.containsKey(uuid)) {
                 return false;
@@ -252,7 +258,7 @@ class Server extends Plugin {
         }
     }
 
-    public boolean removeMessage(@NotNull UUID uuid) {
+    public boolean removeMessage(UUID uuid) {
         synchronized (descriptors) {
             if (descriptors.containsKey(uuid)) {
                 descriptors.remove(uuid);
