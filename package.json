@@ -1,6 +1,6 @@
 {
   "name": "capacitor-nearby",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Find devices nearby",
   "main": "dist/plugin.js",
   "module": "dist/esm/index.js",

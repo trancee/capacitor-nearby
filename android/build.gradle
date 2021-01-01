@@ -59,7 +59,7 @@ dependencies {
 
     implementation "com.google.android.gms:play-services-location:$googlePlayServicesLocationVersion"
 
-    implementation "com.google.protobuf:protobuf-java:$googleProtobufVersion"
+    implementation "com.google.protobuf:protobuf-javalite:$googleProtobufVersion"
 
     implementation 'com.jakewharton.timber:timber:4.7.1'
     implementation 'org.jetbrains:annotations:19.0.0'
