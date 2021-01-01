@@ -2,7 +2,9 @@ import { WebPlugin } from '@capacitor/core';
 import { CapacitorNearbyPlugin } from './definitions';
 
 import {
+  Message,
   Status,
+  UUID,
   InitializeOptions,
   PublishOptions,
   PublishResult,
@@ -30,7 +32,7 @@ export class CapacitorNearbyWeb extends WebPlugin implements CapacitorNearbyPlug
 
   async publish(options: {
     // A Message to publish for nearby devices to see
-    message: string,
+    message: Message,
     // A PublishOptions object for this operation
     options?: PublishOptions,
   }): Promise<PublishResult> {
@@ -40,7 +42,7 @@ export class CapacitorNearbyWeb extends WebPlugin implements CapacitorNearbyPlug
 
   // Cancels an existing published message.
   async unpublish(options: {
-    uuid?: string,
+    uuid?: UUID,
   }): Promise<void> {
     console.error('unpublish', options);
     throw new Error("Method not implemented.");

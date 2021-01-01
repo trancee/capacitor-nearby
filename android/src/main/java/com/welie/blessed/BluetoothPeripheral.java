@@ -314,7 +314,7 @@ public class BluetoothPeripheral {
             // Check if this was the Client Configuration Descriptor
             if (descriptor.getUuid().equals(CCC_DESCRIPTOR_UUID)) {
                 if (gattStatus == GattStatus.SUCCESS) {
-                    final byte[] value = copyOf(descriptor.getValue());
+                    final byte[] value = nonnullOf(descriptor.getValue());
                     if (Arrays.equals(value, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) ||
                             Arrays.equals(value, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE)) {
                         notifyingCharacteristics.add(parentCharacteristic.getUuid());
@@ -323,8 +323,6 @@ public class BluetoothPeripheral {
                         }
                     } else if (Arrays.equals(value, BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE)) {
                         notifyingCharacteristics.remove(parentCharacteristic.getUuid());
-                    } else {
-                        Timber.e("unexpected CCC descriptor value");
                     }
                 }
 
@@ -357,7 +355,7 @@ public class BluetoothPeripheral {
                 if (failureThatShouldTriggerBonding(gattStatus)) return;
             }
 
-            final byte[] value = copyOf(descriptor.getValue());
+            final byte[] value = nonnullOf(descriptor.getValue());
             callbackHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -371,7 +369,7 @@ public class BluetoothPeripheral {
 
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt, final BluetoothGattCharacteristic characteristic) {
-            final byte[] value = copyOf(characteristic.getValue());
+            final byte[] value = nonnullOf(characteristic.getValue());
             callbackHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -390,7 +388,7 @@ public class BluetoothPeripheral {
                 if (failureThatShouldTriggerBonding(gattStatus)) return;
             }
 
-            final byte[] value = copyOf(characteristic.getValue());
+            final byte[] value = nonnullOf(characteristic.getValue());
             callbackHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -410,7 +408,7 @@ public class BluetoothPeripheral {
                 if (failureThatShouldTriggerBonding(gattStatus)) return;
             }
 
-            final byte[] value = copyOf(currentWriteBytes);
+            final byte[] value = nonnullOf(currentWriteBytes);
             currentWriteBytes = null;
             callbackHandler.post(new Runnable() {
                 @Override
@@ -427,9 +425,10 @@ public class BluetoothPeripheral {
             if (gattStatus == GattStatus.AUTHORIZATION_FAILED
                     || gattStatus == GattStatus.INSUFFICIENT_AUTHENTICATION
                     || gattStatus == GattStatus.INSUFFICIENT_ENCRYPTION) {
-                // Characteristic encrypted and needs bonding,
-                // So retry operation after bonding completes
-                // This only seems to happen on Android 5/6/7
+                // Characteristic/descriptor is encrypted and needs bonding, bonding should be in progress already
+                // Operation must be retried after bonding is completed.
+                // This only seems to happen on Android 5/6/7.
+                // On newer versions Android will do retry internally
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
                     Timber.i("operation will be retried after bonding, bonding should be in progress");
                     return true;
@@ -1644,32 +1643,6 @@ public class BluetoothPeripheral {
         }
     }
 
-    private String stateToString(final int state) {
-        switch (state) {
-            case BluetoothProfile.STATE_CONNECTED:
-                return "CONNECTED";
-            case BluetoothProfile.STATE_CONNECTING:
-                return "CONNECTING";
-            case BluetoothProfile.STATE_DISCONNECTING:
-                return "DISCONNECTING";
-            default:
-                return "DISCONNECTED";
-        }
-    }
-
-    private String writeTypeToString(final int writeType) {
-        switch (writeType) {
-            case WRITE_TYPE_DEFAULT:
-                return "WRITE_TYPE_DEFAULT";
-            case WRITE_TYPE_NO_RESPONSE:
-                return "WRITE_TYPE_NO_RESPONSE";
-            case WRITE_TYPE_SIGNED:
-                return "WRITE_TYPE_SIGNED";
-            default:
-                return "unknown writeType";
-        }
-    }
-
     private static final int PAIRING_VARIANT_PIN = 0;
     private static final int PAIRING_VARIANT_PASSKEY = 1;
     private static final int PAIRING_VARIANT_PASSKEY_CONFIRMATION = 2;
@@ -1920,5 +1893,16 @@ public class BluetoothPeripheral {
     @NotNull
     byte[] copyOf(@Nullable byte[] source) {
         return (source == null) ? new byte[0] : Arrays.copyOf(source, source.length);
+    }
+
+    /**
+     * Make a byte array nonnull by either returning the original byte array if non-null or an empty bytearray
+     *
+     * @param source byte array to make nonnull
+     * @return the source byte array or an empty array if source was null
+     */
+    @NotNull
+    byte[] nonnullOf(@Nullable byte[] source) {
+        return (source == null) ? new byte[0] : source;
     }
 }

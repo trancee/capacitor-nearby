@@ -6,6 +6,8 @@ declare module '@capacitor/core' {
   }
 }
 
+export type UUID = string;
+
 export enum TTLSeconds {
   // The default time to live in seconds.
   TTL_SECONDS_DEFAULT = 300,
@@ -19,7 +21,7 @@ export enum TTLSeconds {
 export type Status = {
   isPublishing: boolean;
   isSubscribing: boolean;
-  uuids: string[];
+  uuids: UUID[];
 }
 
 export enum ScanMode {
@@ -54,6 +56,19 @@ export enum TxPowerLevel {
   HIGH = 3,
 }
 
+// A message that will be shared with nearby devices.
+export interface Message {
+  // The UUID of the message.
+  readonly uuid: UUID;
+  // The timestamp of the message.
+  readonly timestamp: number;
+
+  // The raw bytes content of the message.
+  content: string;
+  // The type that describes the content of the message.
+  type: string;
+}
+
 export interface InitializeOptions {
   scanMode?: ScanMode;
 
@@ -62,18 +77,19 @@ export interface InitializeOptions {
 }
 
 export interface PublishOptions {
+  // Sets the time to live in seconds for the publish.
   ttlSeconds?: TTLSeconds;
-
-  // Send message as a reply to this one.
-  messageUUID?: string;
 }
 
 export interface SubscribeOptions {
+  // Sets the time to live in seconds for the subscribe.
   ttlSeconds?: TTLSeconds;
 }
 
 export type PublishResult = {
-  uuid: string;
+  // Returns the UUID of the message.
+  uuid: UUID;
+  // Returns the creation timestamp of the message.
   timestamp: number;
 }
 
@@ -86,14 +102,14 @@ export interface CapacitorNearbyPlugin {
 
   publish(options: {
     // A Message to publish for nearby devices to see
-    message: string,
+    message: Message,
     // A PublishOptions object for this operation
     options?: PublishOptions,
   }): Promise<PublishResult>;
 
   // Cancels an existing published message.
   unpublish(options: {
-    uuid?: string,
+    uuid?: UUID,
   }): Promise<void>;
 
   subscribe(options: {
@@ -114,12 +130,12 @@ export interface CapacitorNearbyPlugin {
   addListener(eventName: 'onPermissionChanged', listenerFunc: (permissionGranted: boolean) => void): PluginListenerHandle;
 
   // Called when messages are found.
-  addListener(eventName: 'onFound', listenerFunc: (uuid: string, message: string) => void): PluginListenerHandle;
+  addListener(eventName: 'onFound', listenerFunc: (uuid: UUID, message: Message) => void): PluginListenerHandle;
   // Called when a message is no longer detectable nearby.
-  addListener(eventName: 'onLost', listenerFunc: (uuid: string) => void): PluginListenerHandle;
+  addListener(eventName: 'onLost', listenerFunc: (uuid: UUID) => void): PluginListenerHandle;
 
   // The published message is expired.
-  addListener(eventName: 'onPublishExpired', listenerFunc: (uuid: string) => void): PluginListenerHandle;
+  addListener(eventName: 'onPublishExpired', listenerFunc: (uuid: UUID) => void): PluginListenerHandle;
   // The subscription is expired.
-  addListener(eventName: 'onSubscribeExpired', listenerFunc: (uuid: string) => void): PluginListenerHandle;
+  addListener(eventName: 'onSubscribeExpired', listenerFunc: (uuid: UUID) => void): PluginListenerHandle;
 }

@@ -13,8 +13,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@capacitor/cli": "^2.4.4",
-    "@capacitor/core": "^2.4.4",
+    "@capacitor/cli": "^2.4.5",
+    "@capacitor/core": "^2.4.5",
     "capacitor-nearby": "file:capacitor-nearby"
   }
 }

@@ -40,6 +40,12 @@ import com.google.android.gms.tasks.Task;
 
 import com.welie.blessed.BluetoothCentral;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -60,6 +66,8 @@ interface Constants {
     String NOT_INITIALIZED = "API not initialized";
     String ALREADY_INITIALIZED = "API already initialized";
     String PERMISSION_DENIED = "permissions not granted";
+    String PUBLISH_MESSAGE_CONTENT = "must provide message with content";
+    String PUBLISH_MESSAGE_TYPE = "must provide message with type";
     String PUBLISH_MESSAGE = "must provide message";
     String MESSAGE_UUID_NOT_FOUND = "message UUID not found";
 
@@ -122,7 +130,47 @@ public class CapacitorNearby extends Plugin {
     private boolean mScanning;
     private boolean mAdvertising;
 
-    private final Map<UUID, byte[]> messages = new HashMap<>();
+    class Message implements Serializable {
+        UUID uuid;
+        long timestamp;
+
+        byte[] content;
+        String type;
+
+        public Message(byte[] content, String type) {
+            this.uuid = UUID.randomUUID();
+            this.timestamp = System.currentTimeMillis() / 1000;
+
+            this.content = content;
+            this.type = type;
+        }
+
+        public Message(Message message) {
+            this.uuid = message.uuid;
+            this.timestamp = message.timestamp;
+
+            this.content = message.content;
+            this.type = message.type;
+        }
+
+        public Message(byte[] data) throws IOException, ClassNotFoundException {
+            this((Message) new ObjectInputStream(new ByteArrayInputStream(data)).readObject());
+        }
+
+        public byte[] encode() {
+            try {
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                ObjectOutputStream out = new ObjectOutputStream(bos);
+                out.writeObject(this);
+
+                return bos.toByteArray();
+            } catch (Exception e) {
+                return null;
+            }
+        }
+    }
+
+    private final Map<UUID, Message> messages = new HashMap<>();
 
     private Handler handler = new Handler();
 
@@ -148,10 +196,10 @@ public class CapacitorNearby extends Plugin {
             }
         }
 
-        JSObject data = new JSObject();
-        data.put("permissionGranted", permissionGranted);
-
-        notifyListeners("onPermissionChanged", data);
+        notifyListeners("onPermissionChanged",
+                new JSObject()
+                        .put("permissionGranted", permissionGranted)
+        );
     }
 
     @Override
@@ -161,10 +209,10 @@ public class CapacitorNearby extends Plugin {
         {
             boolean permissionGranted = resultCode == Activity.RESULT_OK;
 
-            JSObject data = new JSObject();
-            data.put("permissionGranted", permissionGranted);
-
-            notifyListeners("onPermissionChanged", data);
+            notifyListeners("onPermissionChanged",
+                    new JSObject()
+                            .put("permissionGranted", permissionGranted)
+            );
         }
 
         PluginCall call = getSavedCall();
@@ -304,22 +352,32 @@ public class CapacitorNearby extends Plugin {
     }
 
     private final Scanner.Callback scannerCallback = new Scanner.Callback() {
-        public void onFound(UUID uuid, String message) {
-            if (mScanning) {
-                JSObject data = new JSObject();
-                data.put("uuid", uuid.toString());
-                data.put("message", message);
+        public void onFound(UUID uuid, byte[] data) {
+            try {
+                Message message = new Message(data);
 
-                notifyListeners("onFound", data);
+                if (mScanning) {
+                    String content = Base64.encodeToString(message.content, Base64.DEFAULT | Base64.NO_WRAP);
+
+                    notifyListeners("onFound",
+                            new JSObject()
+                                    .put("uuid", uuid.toString())
+                                    .put("timestamp", message.timestamp)
+
+                                    .put("content", content)
+                                    .put("type", message.type)
+                    );
+                }
+            } catch (Exception e) {
             }
         }
 
         public void onLost(UUID uuid) {
             if (mScanning) {
-                JSObject data = new JSObject();
-                data.put("uuid", uuid.toString());
-
-                notifyListeners("onLost", data);
+                notifyListeners("onLost",
+                        new JSObject()
+                                .put("uuid", uuid.toString())
+                );
             }
         }
 
@@ -328,16 +386,16 @@ public class CapacitorNearby extends Plugin {
                 close();
             }
 
-            JSObject data = new JSObject();
-            data.put("permissionGranted", permissionGranted);
-
-            notifyListeners("onPermissionChanged", data);
+            notifyListeners("onPermissionChanged",
+                    new JSObject()
+                            .put("permissionGranted", permissionGranted)
+            );
         }
     };
 
     private void close() {
-        for (UUID messageUUID : this.messages.keySet()) {
-            doUnpublish(messageUUID);
+        for (UUID uuid : this.messages.keySet()) {
+            doUnpublish(uuid);
         }
 
         stopAdvertising();
@@ -386,12 +444,29 @@ public class CapacitorNearby extends Plugin {
         }
 
         try {
-            final byte[] message;
+            final Message message;
 
-            String content = call.getString("message", null);
+            JSObject messageObject = call.getObject("message", null);
+            if (messageObject != null) {
+                String content = messageObject.getString("content", null);
+                if (content == null || content.length() == 0) {
+                    call.reject(Constants.PUBLISH_MESSAGE_CONTENT);
+                    return;
+                }
 
-            if (content != null) {
-                message = Base64.decode(content, Base64.DEFAULT);
+                String type = messageObject.getString("type", null);
+                if (type == null || type.length() == 0) {
+                    call.reject(Constants.PUBLISH_MESSAGE_TYPE);
+                    return;
+                }
+
+                // A message that will be shared with nearby devices.
+                message = new Message(
+                        // An arbitrary array holding the content of the message. The maximum content size is MAX_CONTENT_SIZE_BYTES.
+                        Base64.decode(content, Base64.DEFAULT),
+                        // A string that describe what the bytes of the content represent. The maximum type length is MAX_TYPE_LENGTH.
+                        type
+                );
             } else {
                 call.reject(Constants.PUBLISH_MESSAGE);
                 return;
@@ -402,22 +477,7 @@ public class CapacitorNearby extends Plugin {
             JSObject optionsObject = call.getObject("options", null);
             if (optionsObject != null) {
                 ttlSeconds = optionsObject.getInteger("ttlSeconds");
-
-                String messageUUID = optionsObject.getString("messageUUID");
-                if (messageUUID != null) {
-                    UUID uuid = UUID.fromString(messageUUID);
-
-//                    byte[] message = this.messages.containsKey(uuid);
-//                    if (message != null) {
-//
-//                    }
-                }
             }
-
-            // Create UUID to identify this message.
-            final UUID messageUUID = UUID.randomUUID();
-
-            final long timestamp = System.currentTimeMillis() / 1000;
 
             if (!mAdvertising) {
                 if (advertiseCallback == null) {
@@ -428,52 +488,19 @@ public class CapacitorNearby extends Plugin {
                                 @Override
                                 // Callback triggered in response to BluetoothLeAdvertiser#startAdvertising indicating that the advertising has been started successfully.
                                 public void onStartSuccess(AdvertiseSettings settingsInEffect) {
-//                                    // Returns the TX power level for advertising.
-//                                    int txPower = settingsInEffect.getTxPowerLevel();
-//                                    // Returns the advertise mode.
-//                                    int mode = settingsInEffect.getMode();
-//
-//                                    // Returns the advertising time limit in milliseconds.
-//                                    int timeout = settingsInEffect.getTimeout();
-//                                    // Returns whether the advertisement will indicate connectable.
-//                                    boolean isConnectable = settingsInEffect.isConnectable();
-//
-//                                    Log.i(getLogTag(),
-//                                            String.format(
-//                                                    "onStartSuccess(txPower=%s, mode=%s, timeout=%s, isConnectable=%s)",
-//                                                    txPower, mode, timeout, isConnectable));
+                                    startAdvertising(message);
 
-                                    startAdvertising(messageUUID, message);
-
-//                                    JSObject data = new JSObject();
-//                                    data.put("txPower", txPower);
-//                                    data.put("mode", mode);
-//                                    data.put("timeout", timeout);
-//                                    data.put("isConnectable", isConnectable);
-//
-//                                    notifyListeners("onStartSuccess", data);
-
-                                    JSObject data = new JSObject();
-                                    data.put("uuid", messageUUID);
-                                    data.put("timestamp", timestamp);
-
-                                    call.success(data);
+                                    call.success(
+                                            new JSObject()
+                                                    .put("uuid", message.uuid)
+                                                    .put("timestamp", message.timestamp)
+                                    );
                                 }
 
                                 @Override
                                 // Callback when advertising could not be started.
                                 public void onStartFailure(int errorCode) {
-//                                    Log.e(getLogTag(),
-//                                            String.format(
-//                                                    "onStartFailure(errorCode=%s)",
-//                                                    errorCode));
-
                                     stopAdvertising();
-
-//                                    JSObject data = new JSObject();
-//                                    data.put("errorCode", errorCode);
-//
-//                                    notifyListeners("onStartFailure", data);
 
                                     call.error(advertiseFailed(errorCode));
                                 }
@@ -518,19 +545,19 @@ public class CapacitorNearby extends Plugin {
                 advertiser.startAdvertising(advertiseSettings, advertiseData, advertiseCallback);
                 mAdvertising = true;
             } else {
-                startAdvertising(messageUUID, message);
+                startAdvertising(message);
 
-                JSObject data = new JSObject();
-                data.put("uuid", messageUUID);
-                data.put("timestamp", timestamp);
-
-                call.success(data);
+                call.success(
+                        new JSObject()
+                                .put("uuid", message.uuid)
+                                .put("timestamp", message.timestamp)
+                );
             }
 
             if (ttlSeconds != null) {
                 // Sets the time to live in seconds for the publish or subscribe.
                 // Stops scanning after a pre-defined scan period.
-                handler.postDelayed(() -> onPublishExpired(messageUUID), ttlSeconds * 1000);
+                handler.postDelayed(() -> onPublishExpired(message.uuid), ttlSeconds * 1000);
             }
         } catch (Exception e) {
             Log.e(getLogTag(), "publish", e);
@@ -556,24 +583,24 @@ public class CapacitorNearby extends Plugin {
         }
     }
 
-    private void onPublishExpired(UUID messageUUID) {
-        if (this.messages.containsKey(messageUUID)) {
-            JSObject data = new JSObject();
-            data.put("uuid", messageUUID);
-
-            notifyListeners("onPublishExpired", data);
+    private void onPublishExpired(UUID uuid) {
+        if (this.messages.containsKey(uuid)) {
+            notifyListeners("onPublishExpired",
+                    new JSObject()
+                            .put("uuid", uuid)
+            );
         }
 
-        doUnpublish(messageUUID);
+        doUnpublish(uuid);
 
         stopAdvertising();
     }
 
-    private void startAdvertising(UUID messageUUID, byte[] message) {
-        this.messages.put(messageUUID, message);
+    private void startAdvertising(Message message) {
+        this.messages.put(message.uuid, message);
 
         if (server != null) {
-            server.addMessage(messageUUID, message);
+            server.addMessage(message.uuid, message.encode());
 
             server.restart();
 
@@ -615,19 +642,19 @@ public class CapacitorNearby extends Plugin {
         }
 
         try {
-            String uuid = call.getString("uuid", null);
+            String messageUUID = call.getString("uuid", null);
 
-            if (uuid == null || uuid.length() == 0) {
+            if (messageUUID == null || messageUUID.length() == 0) {
                 // Unpublish all messages.
-                for (UUID messageUUID : this.messages.keySet()) {
-                    doUnpublish(messageUUID);
+                for (UUID uuid : this.messages.keySet()) {
+                    doUnpublish(uuid);
                 }
             } else {
                 // Unpublish message.
-                UUID messageUUID = UUID.fromString(uuid);
+                UUID uuid = UUID.fromString(messageUUID);
 
-                if (this.messages.containsKey(messageUUID)) {
-                    doUnpublish(messageUUID);
+                if (this.messages.containsKey(uuid)) {
+                    doUnpublish(uuid);
                 } else {
                     call.reject(Constants.MESSAGE_UUID_NOT_FOUND);
                     return;
@@ -644,12 +671,12 @@ public class CapacitorNearby extends Plugin {
         }
     }
 
-    private void doUnpublish(UUID messageUUID) {
+    private void doUnpublish(UUID uuid) {
         if (server != null) {
-            server.removeMessage(messageUUID);
+            server.removeMessage(uuid);
         }
 
-        this.messages.remove(messageUUID);
+        this.messages.remove(uuid);
     }
 
     @PluginMethod
@@ -775,12 +802,12 @@ public class CapacitorNearby extends Plugin {
                             "status(isPublishing=%s, isSubscribing=%s, uuids=%s)",
                             isPublishing, isSubscribing, uuids));
 
-            JSObject data = new JSObject();
-            data.put("isPublishing", isPublishing);
-            data.put("isSubscribing", isSubscribing);
-            data.put("uuids", new JSArray(uuids));
-
-            call.success(data);
+            call.success(
+                    new JSObject()
+                            .put("isPublishing", isPublishing)
+                            .put("isSubscribing", isSubscribing)
+                            .put("uuids", new JSArray(uuids))
+            );
         } catch (Exception e) {
             call.error(e.getLocalizedMessage(), e);
         }

@@ -162,7 +162,7 @@ class Scanner {
 
                     peripheral.readDescriptor(descriptor);
                 } else if (status == GattStatus.INVALID_OFFSET) {
-                    callback.onFound(uuid, Base64.encodeToString(packet.data, Base64.DEFAULT | Base64.NO_WRAP));
+                    callback.onFound(uuid, packet.data);
 
                     packets.remove(uuid);
                     messages.put(uuid, new Message(uuid));
@@ -276,7 +276,7 @@ class Scanner {
     }
 
     public abstract static class Callback {
-        public void onFound(UUID uuid, String message) {
+        public void onFound(UUID uuid, byte[] data) {
         }
 
         public void onLost(UUID uuid) {
