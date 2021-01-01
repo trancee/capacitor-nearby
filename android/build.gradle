@@ -4,6 +4,10 @@ ext {
     androidxEspressoCoreVersion = project.hasProperty('androidxEspressoCoreVersion') ? rootProject.ext.androidxEspressoCoreVersion : '3.3.0'
 
     googlePlayServicesLocationVersion = project.hasProperty('googlePlayServicesLocationVersion') ? rootProject.ext.googlePlayServicesLocationVersion : '17.1.0'
+
+    googleProtobufVersion = project.hasProperty('googleProtobufVersion') ? rootProject.ext.googleProtobufVersion : '3.14.0'
+
+    bytesVersion = project.hasProperty('bytesVersion') ? rootProject.ext.bytesVersion : '1.4.0'
 }
 
 buildscript {
@@ -55,8 +59,12 @@ dependencies {
 
     implementation "com.google.android.gms:play-services-location:$googlePlayServicesLocationVersion"
 
+    implementation "com.google.protobuf:protobuf-java:$googleProtobufVersion"
+
     implementation 'com.jakewharton.timber:timber:4.7.1'
     implementation 'org.jetbrains:annotations:19.0.0'
+
+    implementation "at.favre.lib:bytes:$bytesVersion"
 
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

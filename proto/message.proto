@@ -1,0 +1,20 @@
+// [START declaration]
+syntax = "proto3";
+
+package proto;
+// [END declaration]
+
+// [START java_declaration]
+option java_package = "com.getcapacitor.plugin";
+option java_outer_classname = "Proto";
+// [END java_declaration]
+
+// [START messages]
+message Message {
+    bytes uuid = 1;
+    uint64 timestamp = 2;
+
+    bytes content = 3;
+    string type = 4;
+}
+// [END messages]

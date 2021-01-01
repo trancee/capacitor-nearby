@@ -8,7 +8,6 @@ import android.bluetooth.le.ScanResult;
 
 import android.content.Context;
 import android.os.Handler;
-import android.util.Base64;
 import android.util.Log;
 
 import com.welie.blessed.BluetoothBytesParser;
@@ -42,19 +41,24 @@ class Scanner {
         Runnable runnable;
 
         UUID uuid;
+        byte[] content;
+
         long lastSeen;
 
-        public Message(UUID uuid) {
+        public Message(UUID uuid, byte[] content) {
             this.runnable = () -> {
                 // Check if we are still alive.
-                if (messages.containsKey(this.uuid)) {
-                    callback.onLost(this.uuid);
+                Message message = messages.get(this.uuid);
+                if (message != null) {
+                    callback.onLost(this.uuid, message.content);
                 }
 
                 this.kill();
             };
 
             this.uuid = uuid;
+            this.content = content;
+
             this.alive();
         }
 
@@ -165,7 +169,7 @@ class Scanner {
                     callback.onFound(uuid, packet.data);
 
                     packets.remove(uuid);
-                    messages.put(uuid, new Message(uuid));
+                    messages.put(uuid, new Message(uuid, packet.data));
                 }
             }
         }
@@ -183,10 +187,10 @@ class Scanner {
     private final BluetoothCentralCallback bluetoothCentralCallback = new BluetoothCentralCallback() {
         @Override
         public void onDiscoveredPeripheral(BluetoothPeripheral peripheral, ScanResult scanResult) {
-            Log.i("Scanner",
-                    String.format(
-                            "onDiscoveredPeripheral(peripheral=%s, scanResult=%s)",
-                            peripheral, scanResult));
+//            Log.i("Scanner",
+//                    String.format(
+//                            "onDiscoveredPeripheral(peripheral=%s, scanResult=%s)",
+//                            peripheral, scanResult));
 
 //                    central.stopScan();
             central.connectPeripheral(peripheral, peripheralCallback);
@@ -279,7 +283,7 @@ class Scanner {
         public void onFound(UUID uuid, byte[] data) {
         }
 
-        public void onLost(UUID uuid) {
+        public void onLost(UUID uuid, byte[] data) {
         }
 
         public void onPermissionChanged(Boolean permissionGranted) {

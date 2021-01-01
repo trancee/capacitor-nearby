@@ -38,14 +38,6 @@ import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.tasks.Task;
 
-import com.welie.blessed.BluetoothCentral;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -53,9 +45,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-interface Constants {
-    int MANUFACTURER_ID = 0;
+import com.google.protobuf.ByteString;
 
+import com.welie.blessed.BluetoothCentral;
+
+import at.favre.lib.bytes.Bytes;
+
+interface Constants {
     // v5 (Name-based | SHA1 hash) UUID (winkee.app)
     UUID SERVICE_UUID = UUID.fromString("1c2cceae-66cd-55cd-8769-d961a7412368");
     // v5 (Name-based | SHA1 hash) UUID (profile.winkee.app)
@@ -74,24 +70,6 @@ interface Constants {
     int GATT_MTU_SIZE_DEFAULT = 23;
     int GATT_MTU_SIZE = 185;    // iOS always asks for 185
     int GATT_MAX_MTU_SIZE = 517;
-
-    static byte[] toBytes(int l) {
-        byte[] result = new byte[Integer.BYTES];
-        for (int i = Integer.BYTES - 1; i >= 0; i--) {
-            result[i] = (byte) (l & 0xFF);
-            l >>= Byte.SIZE;
-        }
-        return result;
-    }
-
-    static int fromBytes(final byte[] b) {
-        int result = 0;
-        for (int i = 0; i < Integer.BYTES; i++) {
-            result <<= Byte.SIZE;
-            result |= (b[i] & 0xFF);
-        }
-        return result;
-    }
 }
 
 @NativePlugin(
@@ -130,47 +108,7 @@ public class CapacitorNearby extends Plugin {
     private boolean mScanning;
     private boolean mAdvertising;
 
-    class Message implements Serializable {
-        UUID uuid;
-        long timestamp;
-
-        byte[] content;
-        String type;
-
-        public Message(byte[] content, String type) {
-            this.uuid = UUID.randomUUID();
-            this.timestamp = System.currentTimeMillis() / 1000;
-
-            this.content = content;
-            this.type = type;
-        }
-
-        public Message(Message message) {
-            this.uuid = message.uuid;
-            this.timestamp = message.timestamp;
-
-            this.content = message.content;
-            this.type = message.type;
-        }
-
-        public Message(byte[] data) throws IOException, ClassNotFoundException {
-            this((Message) new ObjectInputStream(new ByteArrayInputStream(data)).readObject());
-        }
-
-        public byte[] encode() {
-            try {
-                ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                ObjectOutputStream out = new ObjectOutputStream(bos);
-                out.writeObject(this);
-
-                return bos.toByteArray();
-            } catch (Exception e) {
-                return null;
-            }
-        }
-    }
-
-    private final Map<UUID, Message> messages = new HashMap<>();
+    private final Map<UUID, Proto.Message> messages = new HashMap<>();
 
     private Handler handler = new Handler();
 
@@ -354,30 +292,43 @@ public class CapacitorNearby extends Plugin {
     private final Scanner.Callback scannerCallback = new Scanner.Callback() {
         public void onFound(UUID uuid, byte[] data) {
             try {
-                Message message = new Message(data);
+                Proto.Message message = Proto.Message.parseFrom(data);
 
                 if (mScanning) {
-                    String content = Base64.encodeToString(message.content, Base64.DEFAULT | Base64.NO_WRAP);
+                    String content = Base64.encodeToString(message.getContent().toByteArray(), Base64.DEFAULT | Base64.NO_WRAP);
 
                     notifyListeners("onFound",
                             new JSObject()
                                     .put("uuid", uuid.toString())
-                                    .put("timestamp", message.timestamp)
+                                    .put("timestamp", message.getTimestamp())
 
                                     .put("content", content)
-                                    .put("type", message.type)
+                                    .put("type", message.getType())
                     );
                 }
             } catch (Exception e) {
+                Log.e(getLogTag(), "onFound", e);
             }
         }
 
-        public void onLost(UUID uuid) {
-            if (mScanning) {
-                notifyListeners("onLost",
-                        new JSObject()
-                                .put("uuid", uuid.toString())
-                );
+        public void onLost(UUID uuid, byte[] data) {
+            try {
+                Proto.Message message = Proto.Message.parseFrom(data);
+
+                if (mScanning) {
+                    String content = Base64.encodeToString(message.getContent().toByteArray(), Base64.DEFAULT | Base64.NO_WRAP);
+
+                    notifyListeners("onLost",
+                            new JSObject()
+                                    .put("uuid", uuid.toString())
+                                    .put("timestamp", message.getTimestamp())
+
+                                    .put("content", content)
+                                    .put("type", message.getType())
+                    );
+                }
+            } catch (Exception e) {
+                Log.e(getLogTag(), "onLost", e);
             }
         }
 
@@ -444,7 +395,7 @@ public class CapacitorNearby extends Plugin {
         }
 
         try {
-            final Message message;
+            Proto.Message message;
 
             JSObject messageObject = call.getObject("message", null);
             if (messageObject != null) {
@@ -461,12 +412,21 @@ public class CapacitorNearby extends Plugin {
                 }
 
                 // A message that will be shared with nearby devices.
-                message = new Message(
+                message = Proto.Message.newBuilder()
+                        .setUuid(
+                                ByteString.copyFrom(
+                                        Bytes.from(
+                                                UUID.randomUUID()
+                                        ).array()
+                                )
+                        )
+                        .setTimestamp(System.currentTimeMillis())
+
                         // An arbitrary array holding the content of the message. The maximum content size is MAX_CONTENT_SIZE_BYTES.
-                        Base64.decode(content, Base64.DEFAULT),
+                        .setContent(ByteString.copyFrom(Base64.decode(content, Base64.DEFAULT)))
                         // A string that describe what the bytes of the content represent. The maximum type length is MAX_TYPE_LENGTH.
-                        type
-                );
+                        .setType(type)
+                        .build();
             } else {
                 call.reject(Constants.PUBLISH_MESSAGE);
                 return;
@@ -492,8 +452,8 @@ public class CapacitorNearby extends Plugin {
 
                                     call.success(
                                             new JSObject()
-                                                    .put("uuid", message.uuid)
-                                                    .put("timestamp", message.timestamp)
+                                                    .put("uuid", Bytes.wrap(message.getUuid().toByteArray()).toUUID())
+                                                    .put("timestamp", message.getTimestamp())
                                     );
                                 }
 
@@ -524,20 +484,12 @@ public class CapacitorNearby extends Plugin {
                 // This represents the data to be advertised as well as the scan response data for active scans.
                 AdvertiseData advertiseData =
                         new AdvertiseData.Builder()
-//                                .addServiceData(
-//                                        new ParcelUuid(Constants.SERVICE_UUID),
-//                                        new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF}
-//                                )
                                 // Add a service UUID to advertise data.
                                 .addServiceUuid(new ParcelUuid(Constants.SERVICE_UUID))
                                 // Whether the transmission power level should be included in the advertise packet.
                                 .setIncludeTxPowerLevel(false)
                                 // Set whether the device name should be included in advertise packet.
                                 .setIncludeDeviceName(false)
-//                                .addManufacturerData(
-//                                        Constants.MANUFACTURER_ID,
-//                                        Constants.toBytes((int) timestamp)
-//                                )
                                 .build();
 
                 // java.lang.IllegalArgumentException: Legacy advertising data too big
@@ -549,15 +501,15 @@ public class CapacitorNearby extends Plugin {
 
                 call.success(
                         new JSObject()
-                                .put("uuid", message.uuid)
-                                .put("timestamp", message.timestamp)
+                                .put("uuid", Bytes.wrap(message.getUuid().toByteArray()).toUUID())
+                                .put("timestamp", message.getTimestamp())
                 );
             }
 
             if (ttlSeconds != null) {
                 // Sets the time to live in seconds for the publish or subscribe.
                 // Stops scanning after a pre-defined scan period.
-                handler.postDelayed(() -> onPublishExpired(message.uuid), ttlSeconds * 1000);
+                handler.postDelayed(() -> onPublishExpired(Bytes.wrap(message.getUuid().toByteArray()).toUUID()), ttlSeconds * 1000);
             }
         } catch (Exception e) {
             Log.e(getLogTag(), "publish", e);
@@ -596,11 +548,13 @@ public class CapacitorNearby extends Plugin {
         stopAdvertising();
     }
 
-    private void startAdvertising(Message message) {
-        this.messages.put(message.uuid, message);
+    private void startAdvertising(Proto.Message message) {
+        UUID uuid = Bytes.wrap(message.getUuid().toByteArray()).toUUID();
+
+        this.messages.put(uuid, message);
 
         if (server != null) {
-            server.addMessage(message.uuid, message.encode());
+            server.addMessage(uuid, message.toByteArray());
 
             server.restart();
 
