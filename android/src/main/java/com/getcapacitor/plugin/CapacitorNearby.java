@@ -47,7 +47,7 @@ import java.util.UUID;
 
 import com.google.protobuf.ByteString;
 
-import com.welie.blessed.BluetoothCentral;
+import com.welie.blessed.BluetoothCentralManager;
 
 import at.favre.lib.bytes.Bytes;
 
@@ -694,17 +694,17 @@ public class CapacitorNearby extends Plugin {
 
     private String scanFailed(int errorCode) {
         switch (errorCode) {
-            case BluetoothCentral.SCAN_FAILED_ALREADY_STARTED:
+            case BluetoothCentralManager.SCAN_FAILED_ALREADY_STARTED:
                 return "Fails to start scan as BLE scan with the same settings is already started by the app.";
-            case BluetoothCentral.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED:
+            case BluetoothCentralManager.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED:
                 return "Fails to start scan as app cannot be registered.";
-            case BluetoothCentral.SCAN_FAILED_INTERNAL_ERROR:
+            case BluetoothCentralManager.SCAN_FAILED_INTERNAL_ERROR:
                 return "Fails to start scan due an internal error.";
-            case BluetoothCentral.SCAN_FAILED_FEATURE_UNSUPPORTED:
+            case BluetoothCentralManager.SCAN_FAILED_FEATURE_UNSUPPORTED:
                 return "Fails to start power optimized scan as this feature is not supported.";
-            case BluetoothCentral.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES:
+            case BluetoothCentralManager.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES:
                 return "Failed to start scan as it is out of hardware resources.";
-            case BluetoothCentral.SCAN_FAILED_SCANNING_TOO_FREQUENTLY:
+            case BluetoothCentralManager.SCAN_FAILED_SCANNING_TOO_FREQUENTLY:
                 return "Failed to start scan as application tries to scan too frequently.";
             default:
                 return "Unknown error.";

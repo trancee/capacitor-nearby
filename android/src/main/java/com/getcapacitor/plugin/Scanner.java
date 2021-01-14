@@ -11,8 +11,8 @@ import android.os.Handler;
 import android.util.Log;
 
 import com.welie.blessed.BluetoothBytesParser;
-import com.welie.blessed.BluetoothCentral;
-import com.welie.blessed.BluetoothCentralCallback;
+import com.welie.blessed.BluetoothCentralManager;
+import com.welie.blessed.BluetoothCentralManagerCallback;
 import com.welie.blessed.BluetoothPeripheral;
 import com.welie.blessed.BluetoothPeripheralCallback;
 import com.welie.blessed.GattStatus;
@@ -31,7 +31,7 @@ class Scanner {
 
     private static Scanner instance = null;
 
-    private BluetoothCentral central;
+    private BluetoothCentralManager central;
 
     private ScanCallback scanCallback;
 
@@ -110,7 +110,7 @@ class Scanner {
                             "onServicesDiscovered(peripheral=%s, packets=%s)",
                             peripheral, packets));
 
-            peripheral.requestMtu(Constants.GATT_MTU_SIZE);
+            peripheral.requestMtu(Constants.GATT_MAX_MTU_SIZE);
 
             // Request a new connection priority
             peripheral.requestConnectionPriority(CONNECTION_PRIORITY_HIGH);
@@ -184,7 +184,7 @@ class Scanner {
     };
 
     // Callback for central
-    private final BluetoothCentralCallback bluetoothCentralCallback = new BluetoothCentralCallback() {
+    private final BluetoothCentralManagerCallback bluetoothCentralManagerCallback = new BluetoothCentralManagerCallback() {
         @Override
         public void onDiscoveredPeripheral(BluetoothPeripheral peripheral, ScanResult scanResult) {
 //            Log.i("Scanner",
@@ -272,7 +272,7 @@ class Scanner {
         this.handler = handler;
 
         // Create BluetoothCentral
-        this.central = new BluetoothCentral(context, bluetoothCentralCallback, handler);
+        this.central = new BluetoothCentralManager(context, bluetoothCentralManagerCallback, handler);
 
         if (scanMode != null) {
             this.central.setScanMode(scanMode);

@@ -65,12 +65,7 @@ import static android.bluetooth.BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER;
 import static android.bluetooth.BluetoothGattCharacteristic.PROPERTY_INDICATE;
 import static android.bluetooth.BluetoothGattCharacteristic.PROPERTY_NOTIFY;
 import static android.bluetooth.BluetoothGattCharacteristic.PROPERTY_READ;
-import static android.bluetooth.BluetoothGattCharacteristic.PROPERTY_SIGNED_WRITE;
-import static android.bluetooth.BluetoothGattCharacteristic.PROPERTY_WRITE;
-import static android.bluetooth.BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE;
-import static android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT;
-import static android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE;
-import static android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_SIGNED;
+import static com.welie.blessed.BluetoothBytesParser.bytes2String;
 
 /**
  * Represents a remote Bluetooth peripheral and replaces BluetoothDevice and BluetoothGatt
@@ -193,7 +188,7 @@ public class BluetoothPeripheral {
     private static final String NO_VALID_WRITE_TYPE_PROVIDED = "no valid writeType provided";
     private static final String NO_VALID_VALUE_PROVIDED = "no valid value provided";
     private static final String NO_VALID_DESCRIPTOR_PROVIDED = "no valid descriptor provided";
-    private static final String PERIPHERAL_NOT_CONNECTECTED = "peripheral not connectected";
+    private static final String PERIPHERAL_NOT_CONNECTED = "peripheral not connectected";
     private static final String VALUE_BYTE_ARRAY_IS_EMPTY = "value byte array is empty";
     private static final String VALUE_BYTE_ARRAY_IS_TOO_LONG = "value byte array is too long";
 
@@ -704,7 +699,7 @@ public class BluetoothPeripheral {
      *
      * @param context  Android application environment.
      * @param device   Wrapped Android bluetooth device.
-     * @param listener Callback to {@link BluetoothCentral}.
+     * @param listener Callback to {@link BluetoothCentralManager}.
      */
     BluetoothPeripheral(@NotNull Context context, @NotNull BluetoothDevice device, @NotNull InternalCallback listener, @Nullable BluetoothPeripheralCallback peripheralCallback, @Nullable Handler callbackHandler) {
         this.context = Objects.requireNonNull(context, "no valid context provided");
@@ -874,7 +869,7 @@ public class BluetoothPeripheral {
     /**
      * Disconnect the bluetooth peripheral.
      *
-     * <p>When the disconnection has been completed {@link BluetoothCentralCallback#onDisconnectedPeripheral(BluetoothPeripheral, HciStatus)} will be called.
+     * <p>When the disconnection has been completed {@link BluetoothCentralManagerCallback#onDisconnectedPeripheral(BluetoothPeripheral, HciStatus)} will be called.
      */
     private void disconnect() {
         if (state == BluetoothProfile.STATE_CONNECTED || state == BluetoothProfile.STATE_CONNECTING) {
@@ -971,7 +966,7 @@ public class BluetoothPeripheral {
 
     /**
      * Get the services supported by the connected bluetooth peripheral.
-     * Only services that are also supported by {@link BluetoothCentral} are included.
+     * Only services that are also supported by {@link BluetoothCentralManager} are included.
      *
      * @return Supported services.
      */
@@ -1091,7 +1086,7 @@ public class BluetoothPeripheral {
         Objects.requireNonNull(characteristicUUID, NO_VALID_CHARACTERISTIC_UUID_PROVIDED);
 
         if (!isConnected()) {
-            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            Timber.e(PERIPHERAL_NOT_CONNECTED);
             return false;
         }
 
@@ -1116,12 +1111,11 @@ public class BluetoothPeripheral {
         Objects.requireNonNull(characteristic, NO_VALID_CHARACTERISTIC_PROVIDED);
 
         if (!isConnected()) {
-            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            Timber.e(PERIPHERAL_NOT_CONNECTED);
             return false;
         }
 
-        // Check if this characteristic actually has READ property
-        if ((characteristic.getProperties() & PROPERTY_READ) == 0) {
+        if (doesNotSupportReading(characteristic)) {
             Timber.e("characteristic does not have read property");
             return false;
         }
@@ -1151,6 +1145,10 @@ public class BluetoothPeripheral {
         return result;
     }
 
+    private boolean doesNotSupportReading(@NotNull BluetoothGattCharacteristic characteristic) {
+        return (characteristic.getProperties() & PROPERTY_READ) == 0;
+    }
+
     /**
      * Write a value to a characteristic using the specified write type.
      *
@@ -1170,7 +1168,7 @@ public class BluetoothPeripheral {
         Objects.requireNonNull(writeType, NO_VALID_WRITE_TYPE_PROVIDED);
 
         if (!isConnected()) {
-            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            Timber.e(PERIPHERAL_NOT_CONNECTED);
             return false;
         }
 
@@ -1201,7 +1199,7 @@ public class BluetoothPeripheral {
         Objects.requireNonNull(writeType, NO_VALID_WRITE_TYPE_PROVIDED);
 
         if (!isConnected()) {
-            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            Timber.e(PERIPHERAL_NOT_CONNECTED);
             return false;
         }
 
@@ -1213,8 +1211,12 @@ public class BluetoothPeripheral {
             throw new IllegalArgumentException(VALUE_BYTE_ARRAY_IS_TOO_LONG);
         }
 
-        // See if a Long Write is being triggered because of the byte array length
-        if (value.length > currentMtu - 3 && writeType == WriteType.WITH_RESPONSE) {
+        if (doesNotSupportWriteType(characteristic, writeType)) {
+            Timber.e("characteristic <%s> does not support writeType '%s'", characteristic.getUuid(), writeType);
+            return false;
+        }
+
+        if (willCauseLongWrite(value, writeType)) {
             // Android will turn this into a Long Write because it is larger than the MTU - 3.
             // When doing a Long Write the byte array will be automatically split in chunks of size MTU - 3.
             // However, the peripheral's firmware must also support it, so it is not guaranteed to work.
@@ -1227,38 +1229,12 @@ public class BluetoothPeripheral {
         // Copy the value to avoid race conditions
         final byte[] bytesToWrite = copyOf(value);
 
-        // Check if this characteristic actually supports this writeType
-        int writeProperty;
-        final int writeTypeInternal;
-        switch (writeType) {
-            case WITH_RESPONSE:
-                writeProperty = PROPERTY_WRITE;
-                writeTypeInternal = WRITE_TYPE_DEFAULT;
-                break;
-            case WITHOUT_RESPONSE:
-                writeProperty = PROPERTY_WRITE_NO_RESPONSE;
-                writeTypeInternal = WRITE_TYPE_NO_RESPONSE;
-                break;
-            case SIGNED:
-                writeProperty = PROPERTY_SIGNED_WRITE;
-                writeTypeInternal = WRITE_TYPE_SIGNED;
-                break;
-            default:
-                writeProperty = 0;
-                writeTypeInternal = 0;
-                break;
-        }
-        if ((characteristic.getProperties() & writeProperty) == 0) {
-            Timber.e("characteristic <%s> does not support writeType '%s'", characteristic.getUuid(), writeType);
-            return false;
-        }
-
         boolean result = commandQueue.add(new Runnable() {
             @Override
             public void run() {
                 if (isConnected()) {
                     currentWriteBytes = bytesToWrite;
-                    characteristic.setWriteType(writeTypeInternal);
+                    characteristic.setWriteType(writeType.getWriteType());
                     characteristic.setValue(bytesToWrite);
                     if (!bluetoothGatt.writeCharacteristic(characteristic)) {
                         Timber.e("writeCharacteristic failed for characteristic: %s", characteristic.getUuid());
@@ -1281,6 +1257,14 @@ public class BluetoothPeripheral {
         return result;
     }
 
+    private boolean willCauseLongWrite(@NotNull byte[] value, @NotNull WriteType writeType) {
+        return value.length > currentMtu - 3 && writeType == WriteType.WITH_RESPONSE;
+    }
+
+    private boolean doesNotSupportWriteType(@NotNull BluetoothGattCharacteristic characteristic, @NotNull WriteType writeType) {
+        return (characteristic.getProperties() & writeType.getProperty()) == 0;
+    }
+
     /**
      * Read the value of a descriptor.
      *
@@ -1291,7 +1275,7 @@ public class BluetoothPeripheral {
         Objects.requireNonNull(descriptor, NO_VALID_DESCRIPTOR_PROVIDED);
 
         if (!isConnected()) {
-            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            Timber.e(PERIPHERAL_NOT_CONNECTED);
             return false;
         }
 
@@ -1333,7 +1317,7 @@ public class BluetoothPeripheral {
         Objects.requireNonNull(value, NO_VALID_VALUE_PROVIDED);
 
         if (!isConnected()) {
-            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            Timber.e(PERIPHERAL_NOT_CONNECTED);
             return false;
         }
 
@@ -1389,7 +1373,7 @@ public class BluetoothPeripheral {
         Objects.requireNonNull(characteristicUUID, NO_VALID_CHARACTERISTIC_UUID_PROVIDED);
 
         if (!isConnected()) {
-            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            Timber.e(PERIPHERAL_NOT_CONNECTED);
             return false;
         }
 
@@ -1413,7 +1397,7 @@ public class BluetoothPeripheral {
         Objects.requireNonNull(characteristic, NO_VALID_CHARACTERISTIC_PROVIDED);
 
         if (!isConnected()) {
-            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            Timber.e(PERIPHERAL_NOT_CONNECTED);
             return false;
         }
 
@@ -1489,7 +1473,7 @@ public class BluetoothPeripheral {
      */
     public boolean readRemoteRssi() {
         if (!isConnected()) {
-            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            Timber.e(PERIPHERAL_NOT_CONNECTED);
             return false;
         }
 
@@ -1534,7 +1518,7 @@ public class BluetoothPeripheral {
         }
 
         if (!isConnected()) {
-            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            Timber.e(PERIPHERAL_NOT_CONNECTED);
             return false;
         }
 
@@ -1576,7 +1560,7 @@ public class BluetoothPeripheral {
         }
 
         if (!isConnected()) {
-            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            Timber.e(PERIPHERAL_NOT_CONNECTED);
             return false;
         }
 
@@ -1732,22 +1716,6 @@ public class BluetoothPeripheral {
             default:
                 return "UNKNOWN";
         }
-    }
-
-    /**
-     * Converts byte array to hex string
-     *
-     * @param bytes the byte array to convert
-     * @return String representing the byte array as a HEX string
-     */
-    @NotNull
-    private static String bytes2String(@Nullable final byte[] bytes) {
-        if (bytes == null) return "";
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b & 0xff));
-        }
-        return sb.toString();
     }
 
     interface InternalCallback {
