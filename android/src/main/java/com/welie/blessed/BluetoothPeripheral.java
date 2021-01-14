@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2020 Martijn van Welie
+ *   Copyright (c) 2021 Martijn van Welie
  *
  *   Permission is hereby granted, free of charge, to any person obtaining a copy
  *   of this software and associated documentation files (the "Software"), to deal
@@ -193,6 +193,9 @@ public class BluetoothPeripheral {
     private static final String NO_VALID_WRITE_TYPE_PROVIDED = "no valid writeType provided";
     private static final String NO_VALID_VALUE_PROVIDED = "no valid value provided";
     private static final String NO_VALID_DESCRIPTOR_PROVIDED = "no valid descriptor provided";
+    private static final String PERIPHERAL_NOT_CONNECTECTED = "peripheral not connectected";
+    private static final String VALUE_BYTE_ARRAY_IS_EMPTY = "value byte array is empty";
+    private static final String VALUE_BYTE_ARRAY_IS_TOO_LONG = "value byte array is too long";
 
     @NotNull
     private final Context context;
@@ -311,7 +314,7 @@ public class BluetoothPeripheral {
                 if (failureThatShouldTriggerBonding(gattStatus)) return;
             }
 
-            // Check if this was the Client Configuration Descriptor
+            // Check if this was the Client Characteristic Configuration Descriptor
             if (descriptor.getUuid().equals(CCC_DESCRIPTOR_UUID)) {
                 if (gattStatus == GattStatus.SUCCESS) {
                     final byte[] value = nonnullOf(descriptor.getValue());
@@ -606,7 +609,6 @@ public class BluetoothPeripheral {
                 });
                 break;
             case BOND_BONDED:
-                // Bonding succeeded
                 Timber.d("bonded with '%s' (%s)", getName(), getAddress());
                 callbackHandler.post(new Runnable() {
                     @Override
@@ -619,7 +621,7 @@ public class BluetoothPeripheral {
 
                 // If bonding was started at connection time, we may still have to discover the services
                 // Also make sure we are not starting a discovery while another one is already in progress
-                if (bluetoothGatt.getServices().isEmpty() && !discoveryStarted) {
+                if (getServices().isEmpty() && !discoveryStarted) {
                     delayedDiscoverServices(0);
                 }
 
@@ -923,7 +925,8 @@ public class BluetoothPeripheral {
      *
      * @return Address of the bluetooth peripheral
      */
-    public @NotNull String getAddress() {
+    @NotNull
+    public String getAddress() {
         return device.getAddress();
     }
 
@@ -941,7 +944,8 @@ public class BluetoothPeripheral {
      *
      * @return name of the bluetooth peripheral
      */
-    public @Nullable String getName() {
+    @Nullable
+    public String getName() {
         String name = device.getName();
         if (name != null) {
             // Cache the name so that we even know it when bluetooth is switched off
@@ -972,7 +976,8 @@ public class BluetoothPeripheral {
      * @return Supported services.
      */
     @SuppressWarnings("WeakerAccess")
-    public @NotNull List<BluetoothGattService> getServices() {
+    @NotNull
+    public List<BluetoothGattService> getServices() {
         if (bluetoothGatt != null) {
             return bluetoothGatt.getServices();
         }
@@ -985,7 +990,8 @@ public class BluetoothPeripheral {
      * @param serviceUUID the UUID of the service
      * @return the BluetoothGattService object for the service UUID or null if the peripheral does not have a service with the specified UUID
      */
-    public @Nullable BluetoothGattService getService(@NotNull UUID serviceUUID) {
+    @Nullable
+    public BluetoothGattService getService(@NotNull UUID serviceUUID) {
         Objects.requireNonNull(serviceUUID, NO_VALID_SERVICE_UUID_PROVIDED);
 
         if (bluetoothGatt != null) {
@@ -1002,7 +1008,8 @@ public class BluetoothPeripheral {
      * @param characteristicUUID the UUID of the chararacteristic
      * @return the BluetoothGattCharacteristic object for the characteristic UUID or null if the peripheral does not have a characteristic with the specified UUID
      */
-    public @Nullable BluetoothGattCharacteristic getCharacteristic(@NotNull UUID serviceUUID, @NotNull UUID characteristicUUID) {
+    @Nullable
+    public BluetoothGattCharacteristic getCharacteristic(@NotNull UUID serviceUUID, @NotNull UUID characteristicUUID) {
         Objects.requireNonNull(serviceUUID, NO_VALID_SERVICE_UUID_PROVIDED);
         Objects.requireNonNull(characteristicUUID, NO_VALID_CHARACTERISTIC_UUID_PROVIDED);
 
@@ -1039,6 +1046,23 @@ public class BluetoothPeripheral {
     }
 
     /**
+     * Get maximum length of byte array that can be written depending on WriteType
+     *
+     * <p>
+     * This value is derived from the current negotiated MTU or the maximum characteristic length (512)
+     */
+    public int getMaximumWriteValueLength(WriteType writeType) {
+        switch (writeType) {
+            case WITH_RESPONSE:
+                return 512;
+            case SIGNED:
+                return currentMtu - 15;
+            default:
+                return currentMtu - 3;
+        }
+    }
+
+    /**
      * Boolean to indicate if the specified characteristic is currently notifying or indicating.
      *
      * @param characteristic the characteristic to check
@@ -1066,6 +1090,11 @@ public class BluetoothPeripheral {
         Objects.requireNonNull(serviceUUID, NO_VALID_SERVICE_UUID_PROVIDED);
         Objects.requireNonNull(characteristicUUID, NO_VALID_CHARACTERISTIC_UUID_PROVIDED);
 
+        if (!isConnected()) {
+            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            return false;
+        }
+
         BluetoothGattCharacteristic characteristic = getCharacteristic(serviceUUID, characteristicUUID);
         if (characteristic != null) {
             return readCharacteristic(characteristic);
@@ -1086,9 +1115,8 @@ public class BluetoothPeripheral {
     public boolean readCharacteristic(@NotNull final BluetoothGattCharacteristic characteristic) {
         Objects.requireNonNull(characteristic, NO_VALID_CHARACTERISTIC_PROVIDED);
 
-        // Check if gatt object is valid
-        if (bluetoothGatt == null) {
-            Timber.e("gatt is 'null', ignoring read request");
+        if (!isConnected()) {
+            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
             return false;
         }
 
@@ -1098,7 +1126,6 @@ public class BluetoothPeripheral {
             return false;
         }
 
-        // Enqueue the read command now that all checks have been passed
         boolean result = commandQueue.add(new Runnable() {
             @Override
             public void run() {
@@ -1142,6 +1169,11 @@ public class BluetoothPeripheral {
         Objects.requireNonNull(value, NO_VALID_VALUE_PROVIDED);
         Objects.requireNonNull(writeType, NO_VALID_WRITE_TYPE_PROVIDED);
 
+        if (!isConnected()) {
+            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            return false;
+        }
+
         BluetoothGattCharacteristic characteristic = getCharacteristic(serviceUUID, characteristicUUID);
         if (characteristic != null) {
             return writeCharacteristic(characteristic, value, writeType);
@@ -1154,12 +1186,13 @@ public class BluetoothPeripheral {
      *
      * <p>All parameters must have a valid value in order for the operation
      * to be enqueued. If the characteristic does not support writing with the specified writeType, the operation will not be enqueued.
+     * The length of the byte array to write must be between 1 and getMaximumWriteValueLength(writeType).
      *
      * <p>{@link BluetoothPeripheralCallback#onCharacteristicWrite(BluetoothPeripheral, byte[], BluetoothGattCharacteristic, GattStatus)} will be triggered as a result of this call.
      *
      * @param characteristic the characteristic to write to
      * @param value          the byte array to write
-     * @param writeType      the write type to use when writing. Must be WRITE_TYPE_DEFAULT, WRITE_TYPE_NO_RESPONSE or WRITE_TYPE_SIGNED
+     * @param writeType      the write type to use when writing.
      * @return true if a write operation was succesfully enqueued, otherwise false
      */
     public boolean writeCharacteristic(@NotNull final BluetoothGattCharacteristic characteristic, @NotNull final byte[] value, @NotNull final WriteType writeType) {
@@ -1167,18 +1200,32 @@ public class BluetoothPeripheral {
         Objects.requireNonNull(value, NO_VALID_VALUE_PROVIDED);
         Objects.requireNonNull(writeType, NO_VALID_WRITE_TYPE_PROVIDED);
 
-        // Check if gatt object is valid
-        if (bluetoothGatt == null) {
-            Timber.e("gatt is 'null', ignoring write request");
+        if (!isConnected()) {
+            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
             return false;
+        }
+
+        if (value.length == 0) {
+            throw new IllegalArgumentException(VALUE_BYTE_ARRAY_IS_EMPTY);
+        }
+
+        if (value.length > getMaximumWriteValueLength(writeType)) {
+            throw new IllegalArgumentException(VALUE_BYTE_ARRAY_IS_TOO_LONG);
+        }
+
+        // See if a Long Write is being triggered because of the byte array length
+        if (value.length > currentMtu - 3 && writeType == WriteType.WITH_RESPONSE) {
+            // Android will turn this into a Long Write because it is larger than the MTU - 3.
+            // When doing a Long Write the byte array will be automatically split in chunks of size MTU - 3.
+            // However, the peripheral's firmware must also support it, so it is not guaranteed to work.
+            // Long writes are also very inefficient because of the confirmation of each write operation.
+            // So it is better to increase MTU if possible. Hence a warning if this write becomes a long write...
+            // See https://stackoverflow.com/questions/48216517/rxandroidble-write-only-sends-the-first-20b
+            Timber.w("value byte array is longer than allowed by MTU, write will fail if peripheral does not support long writes");
         }
 
         // Copy the value to avoid race conditions
         final byte[] bytesToWrite = copyOf(value);
-        if (bytesToWrite.length == 0) {
-            Timber.e("value byte array is empty, ignoring write request");
-            return false;
-        }
 
         // Check if this characteristic actually supports this writeType
         int writeProperty;
@@ -1206,7 +1253,6 @@ public class BluetoothPeripheral {
             return false;
         }
 
-        // Enqueue the write command now that all checks have been passed
         boolean result = commandQueue.add(new Runnable() {
             @Override
             public void run() {
@@ -1244,13 +1290,11 @@ public class BluetoothPeripheral {
     public boolean readDescriptor(@NotNull final BluetoothGattDescriptor descriptor) {
         Objects.requireNonNull(descriptor, NO_VALID_DESCRIPTOR_PROVIDED);
 
-        // Check if gatt object is valid
-        if (bluetoothGatt == null) {
-            Timber.e("gatt is 'null', ignoring read request");
+        if (!isConnected()) {
+            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
             return false;
         }
 
-        // Enqueue the read command now that all checks have been passed
         boolean result = commandQueue.add(new Runnable() {
             @Override
             public void run() {
@@ -1288,20 +1332,22 @@ public class BluetoothPeripheral {
         Objects.requireNonNull(descriptor, NO_VALID_DESCRIPTOR_PROVIDED);
         Objects.requireNonNull(value, NO_VALID_VALUE_PROVIDED);
 
-        // Check if gatt object is valid
-        if (bluetoothGatt == null) {
-            Timber.e("gatt is 'null', ignoring write descriptor request");
+        if (!isConnected()) {
+            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
             return false;
+        }
+
+        if (value.length == 0) {
+            throw new IllegalArgumentException(VALUE_BYTE_ARRAY_IS_EMPTY);
+        }
+
+        if (value.length > getMaximumWriteValueLength(WriteType.WITH_RESPONSE)) {
+            throw new IllegalArgumentException(VALUE_BYTE_ARRAY_IS_TOO_LONG);
         }
 
         // Copy the value to avoid race conditions
         final byte[] bytesToWrite = copyOf(value);
-        if (bytesToWrite.length == 0) {
-            Timber.e("value byte array is empty, ignoring write request");
-            return false;
-        }
 
-        // Enqueue the write command now that all checks have been passed
         boolean result = commandQueue.add(new Runnable() {
             @Override
             public void run() {
@@ -1342,6 +1388,11 @@ public class BluetoothPeripheral {
         Objects.requireNonNull(serviceUUID, NO_VALID_SERVICE_UUID_PROVIDED);
         Objects.requireNonNull(characteristicUUID, NO_VALID_CHARACTERISTIC_UUID_PROVIDED);
 
+        if (!isConnected()) {
+            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            return false;
+        }
+
         BluetoothGattCharacteristic characteristic = getCharacteristic(serviceUUID, characteristicUUID);
         if (characteristic != null) {
             return setNotify(characteristic, enable);
@@ -1361,13 +1412,12 @@ public class BluetoothPeripheral {
     public boolean setNotify(@NotNull final BluetoothGattCharacteristic characteristic, final boolean enable) {
         Objects.requireNonNull(characteristic, NO_VALID_CHARACTERISTIC_PROVIDED);
 
-        // Check if gatt object is valid
-        if (bluetoothGatt == null) {
-            Timber.e("gatt is 'null', ignoring set notify request");
+        if (!isConnected()) {
+            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
             return false;
         }
 
-        // Get the Client Configuration Descriptor for the characteristic
+        // Get the Client Characteristic Configuration Descriptor for the characteristic
         final BluetoothGattDescriptor descriptor = characteristic.getDescriptor(CCC_DESCRIPTOR_UUID);
         if (descriptor == null) {
             Timber.e("could not get CCC descriptor for characteristic %s", characteristic.getUuid());
@@ -1387,7 +1437,6 @@ public class BluetoothPeripheral {
         }
         final byte[] finalValue = enable ? value : BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE;
 
-        // Queue Runnable to turn on/off the notification now that all checks have been passed
         boolean result = commandQueue.add(new Runnable() {
             @Override
             public void run() {
@@ -1432,26 +1481,6 @@ public class BluetoothPeripheral {
     }
 
     /**
-     * Asynchronous method to clear the services cache. Make sure to add a delay when using this!
-     *
-     * @return true if the method was executed, false if not executed
-     */
-    public boolean clearServicesCache() {
-        if (bluetoothGatt == null) return false;
-
-        boolean result = false;
-        try {
-            Method refreshMethod = bluetoothGatt.getClass().getMethod("refresh");
-            if (refreshMethod != null) {
-                result = (boolean) refreshMethod.invoke(bluetoothGatt);
-            }
-        } catch (Exception e) {
-            Timber.e("could not invoke refresh method");
-        }
-        return result;
-    }
-
-    /**
      * Read the RSSI for a connected remote peripheral.
      *
      * <p>{@link BluetoothPeripheralCallback#onReadRemoteRssi(BluetoothPeripheral, int, GattStatus)} will be triggered as a result of this call.
@@ -1459,6 +1488,11 @@ public class BluetoothPeripheral {
      * @return true if the operation was enqueued, false otherwise
      */
     public boolean readRemoteRssi() {
+        if (!isConnected()) {
+            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            return false;
+        }
+
         boolean result = commandQueue.add(new Runnable() {
             @Override
             public void run() {
@@ -1495,9 +1529,13 @@ public class BluetoothPeripheral {
      * @return true if the operation was enqueued, false otherwise
      */
     public boolean requestMtu(final int mtu) {
-        // Make sure mtu is valid
         if (mtu < DEFAULT_MTU || mtu > MAX_MTU) {
             throw new IllegalArgumentException("mtu must be between 23 and 517");
+        }
+
+        if (!isConnected()) {
+            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            return false;
         }
 
         boolean result = commandQueue.add(new Runnable() {
@@ -1533,12 +1571,15 @@ public class BluetoothPeripheral {
      * @return true if request was enqueued, false if not
      */
     public boolean requestConnectionPriority(final int priority) {
-        // Make sure priority is valid
         if (priority < CONNECTION_PRIORITY_BALANCED || priority > CONNECTION_PRIORITY_LOW_POWER) {
             throw new IllegalArgumentException("connection priority not valid");
         }
 
-        // Enqueue the request connection priority command and complete is immediately as there is no callback for it
+        if (!isConnected()) {
+            Timber.e(PERIPHERAL_NOT_CONNECTECTED);
+            return false;
+        }
+
         boolean result = commandQueue.add(new Runnable() {
             @Override
             public void run() {
@@ -1548,6 +1589,7 @@ public class BluetoothPeripheral {
                     } else {
                         Timber.d("requesting connection priority %d", priority);
                     }
+                    // complete command immediately as there is no callback for it
                     completedCommand();
                 }
             }
@@ -1557,6 +1599,26 @@ public class BluetoothPeripheral {
             nextCommand();
         } else {
             Timber.e("could not enqueue request connection priority command");
+        }
+        return result;
+    }
+
+    /**
+     * Asynchronous method to clear the services cache. Make sure to add a delay when using this!
+     *
+     * @return true if the method was executed, false if not executed
+     */
+    public boolean clearServicesCache() {
+        if (bluetoothGatt == null) return false;
+
+        boolean result = false;
+        try {
+            Method refreshMethod = bluetoothGatt.getClass().getMethod("refresh");
+            if (refreshMethod != null) {
+                result = (boolean) refreshMethod.invoke(bluetoothGatt);
+            }
+        } catch (Exception e) {
+            Timber.e("could not invoke refresh method");
         }
         return result;
     }
@@ -1772,15 +1834,13 @@ public class BluetoothPeripheral {
     private BluetoothGatt connectGattCompat(BluetoothGattCallback bluetoothGattCallback, BluetoothDevice device, boolean autoConnect) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             return device.connectGatt(context, autoConnect, bluetoothGattCallback, TRANSPORT_LE);
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+        } else {
             // Try to call connectGatt with TRANSPORT_LE parameter using reflection
             try {
                 Method connectGattMethod = device.getClass().getMethod("connectGatt", Context.class, boolean.class, BluetoothGattCallback.class, int.class);
                 try {
                     return (BluetoothGatt) connectGattMethod.invoke(device, context, autoConnect, bluetoothGattCallback, TRANSPORT_LE);
-                } catch (IllegalAccessException e) {
-                    e.printStackTrace();
-                } catch (InvocationTargetException e) {
+                } catch (IllegalAccessException | InvocationTargetException e) {
                     e.printStackTrace();
                 }
             } catch (NoSuchMethodException e) {
