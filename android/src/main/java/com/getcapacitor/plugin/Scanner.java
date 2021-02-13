@@ -15,7 +15,9 @@ import com.welie.blessed.BluetoothCentralManager;
 import com.welie.blessed.BluetoothCentralManagerCallback;
 import com.welie.blessed.BluetoothPeripheral;
 import com.welie.blessed.BluetoothPeripheralCallback;
+import com.welie.blessed.ConnectionPriority;
 import com.welie.blessed.GattStatus;
+import com.welie.blessed.ScanFailure;
 
 import java.util.HashMap;
 import java.util.List;
@@ -113,7 +115,7 @@ class Scanner {
             peripheral.requestMtu(Constants.GATT_MAX_MTU_SIZE);
 
             // Request a new connection priority
-            peripheral.requestConnectionPriority(CONNECTION_PRIORITY_HIGH);
+            peripheral.requestConnectionPriority(ConnectionPriority.HIGH);
 
 //            peripheral.readCharacteristic(Constants.SERVICE_UUID, Constants.CHARACTERISTIC_UUID);
 
@@ -221,15 +223,15 @@ class Scanner {
         }
 
         @Override
-        public void onScanFailed(int errorCode) {
+        public void onScanFailed(final ScanFailure scanFailure) {
 //            Log.i(capacitor.getLogTag(),
 //                    String.format(
 //                            "onScanFailed(state=%s)",
-//                            errorCode));
+//                            scanFailure));
 
             stop();
 
-            scanCallback.onFailed(errorCode);
+            scanCallback.onFailed(scanFailure);
         }
     };
 
@@ -291,7 +293,7 @@ class Scanner {
     }
 
     public abstract static class ScanCallback {
-        public void onFailed(int errorCode) {
+        public void onFailed(final ScanFailure scanFailure) {
         }
     }
 }

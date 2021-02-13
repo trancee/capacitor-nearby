@@ -28,6 +28,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
@@ -394,6 +395,17 @@ public class BluetoothBytesParser {
         return mValue;
     }
 
+    /*
+     * Read bytes and return the ByteArray of the length passed in.  This will increment the offset
+     *
+     * @return The DateTime read from the bytes. This will cause an exception if bytes run past end. Will return 0 epoch if unparsable
+     */
+    public byte[] getByteArray(final int length) {
+        byte[] array = Arrays.copyOfRange(mValue, offset, offset + length);
+        offset += length;
+        return array;
+    }
+
     /**
      * Set the locally stored value of this byte array
      *
@@ -728,6 +740,21 @@ public class BluetoothBytesParser {
             sb.append(String.format("%02x", b & 0xff));
         }
         return sb.toString();
+    }
+
+    /**
+     * Convert a hex string to byte array
+     *
+     */
+    @NotNull
+    public static byte[] string2bytes(@Nullable final String hexString) {
+        if (hexString == null) return new byte[0];
+        byte[] result = new byte[hexString.length() / 2];
+        for (int i=0; i < result.length ; i++) {
+            int index = i * 2;
+            result[i] = (byte) Integer.parseInt(hexString.substring(index, index + 2), 16);
+        }
+        return result;
     }
 
     /**

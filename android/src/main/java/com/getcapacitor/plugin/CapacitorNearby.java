@@ -9,13 +9,13 @@ import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.bluetooth.le.ScanFilter;
 
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.ParcelUuid;
 import android.provider.Settings;
@@ -48,6 +48,7 @@ import java.util.UUID;
 import com.google.protobuf.ByteString;
 
 import com.welie.blessed.BluetoothCentralManager;
+import com.welie.blessed.ScanFailure;
 
 import at.favre.lib.bytes.Bytes;
 
@@ -195,7 +196,6 @@ public class CapacitorNearby extends Plugin {
         return bluetoothAdapter.isEnabled();
     }
 
-    @SuppressLint("NewApi")
     @PluginMethod
     public void initialize(PluginCall call) {
         try {
@@ -235,17 +235,32 @@ public class CapacitorNearby extends Plugin {
                 final LocationManager locationManager =
                         (LocationManager) getContext().getSystemService(Context.LOCATION_SERVICE);
 
-                if (!locationManager.isLocationEnabled()) {
-                    saveCall(call);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    if (!locationManager.isLocationEnabled()) {
+                        saveCall(call);
 
-                    if (isGooglePlayServicesAvailable()) {
-                        showEnableLocationSetting();
-                    } else {
-                        Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-                        startActivityForResult(call, intent, REQUEST_LOCATION_SERVICE);
+                        if (isGooglePlayServicesAvailable()) {
+                            showEnableLocationSetting();
+                        } else {
+                            Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                            startActivityForResult(call, intent, REQUEST_LOCATION_SERVICE);
+                        }
+
+                        return;
                     }
+                } else {
+                    if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                        saveCall(call);
 
-                    return;
+                        if (isGooglePlayServicesAvailable()) {
+                            showEnableLocationSetting();
+                        } else {
+                            Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                            startActivityForResult(call, intent, REQUEST_LOCATION_SERVICE);
+                        }
+
+                        return;
+                    }
                 }
 
                 Integer scanMode = null;
@@ -665,8 +680,8 @@ public class CapacitorNearby extends Plugin {
 
                 scanner.start(filters, new Scanner.ScanCallback() {
                     @Override
-                    public void onFailed(int errorCode) {
-                        call.error(scanFailed(errorCode));
+                    public void onFailed(ScanFailure scanFailure) {
+                        call.error(scanFailed(scanFailure));
                     }
                 });
 
@@ -692,19 +707,19 @@ public class CapacitorNearby extends Plugin {
         call.success();
     }
 
-    private String scanFailed(int errorCode) {
+    private String scanFailed(ScanFailure errorCode) {
         switch (errorCode) {
-            case BluetoothCentralManager.SCAN_FAILED_ALREADY_STARTED:
-                return "Fails to start scan as BLE scan with the same settings is already started by the app.";
-            case BluetoothCentralManager.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED:
-                return "Fails to start scan as app cannot be registered.";
-            case BluetoothCentralManager.SCAN_FAILED_INTERNAL_ERROR:
-                return "Fails to start scan due an internal error.";
-            case BluetoothCentralManager.SCAN_FAILED_FEATURE_UNSUPPORTED:
-                return "Fails to start power optimized scan as this feature is not supported.";
-            case BluetoothCentralManager.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES:
+            case ALREADY_STARTED:
+                return "Failed to start scan as BLE scan with the same settings is already started by the app.";
+            case APPLICATION_REGISTRATION_FAILED:
+                return "Failed to start scan as app cannot be registered.";
+            case INTERNAL_ERROR:
+                return "Failed to start scan due an internal error.";
+            case FEATURE_UNSUPPORTED:
+                return "Failed to start power optimized scan as this feature is not supported.";
+            case OUT_OF_HARDWARE_RESOURCES:
                 return "Failed to start scan as it is out of hardware resources.";
-            case BluetoothCentralManager.SCAN_FAILED_SCANNING_TOO_FREQUENTLY:
+            case SCANNING_TOO_FREQUENTLY:
                 return "Failed to start scan as application tries to scan too frequently.";
             default:
                 return "Unknown error.";

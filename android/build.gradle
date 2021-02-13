@@ -3,10 +3,13 @@ ext {
     androidxJunitVersion = project.hasProperty('androidxJunitVersion') ? rootProject.ext.androidxJunitVersion : '1.1.2'
     androidxEspressoCoreVersion = project.hasProperty('androidxEspressoCoreVersion') ? rootProject.ext.androidxEspressoCoreVersion : '3.3.0'
 
+    // https://developers.google.com/android/guides/releases
     googlePlayServicesLocationVersion = project.hasProperty('googlePlayServicesLocationVersion') ? rootProject.ext.googlePlayServicesLocationVersion : '17.1.0'
 
+    // https://mvnrepository.com/artifact/com.google.protobuf/protobuf-javalite
     googleProtobufVersion = project.hasProperty('googleProtobufVersion') ? rootProject.ext.googleProtobufVersion : '3.14.0'
 
+    // https://github.com/patrickfav/bytes-java
     bytesVersion = project.hasProperty('bytesVersion') ? rootProject.ext.bytesVersion : '1.4.0'
 }
 
@@ -16,7 +19,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.1.1'
+        classpath 'com.android.tools.build:gradle:4.1.2'
     }
 }
 
