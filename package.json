@@ -1,6 +1,6 @@
 {
   "name": "capacitor-nearby",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Find devices nearby",
   "main": "dist/plugin.js",
   "module": "dist/esm/index.js",
@@ -60,5 +60,8 @@
   },
   "bugs": {
     "url": "https://www.github.com/trancee/capacitor-nearby.git/issues"
+  },
+  "dependencies": {
+    "capacitor-nearby": "^0.1.7"
   }
 }

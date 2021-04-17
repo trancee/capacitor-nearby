@@ -42,43 +42,83 @@ class Scanner {
     private class Message {
         Runnable runnable;
 
+        BluetoothPeripheral peripheral;
+
         UUID uuid;
         byte[] content;
 
         long lastSeen;
 
-        public Message(UUID uuid, byte[] content) {
+        public Message(BluetoothPeripheral peripheral, UUID uuid, byte[] content) {
             this.runnable = () -> {
+                Log.i("Scanner::Message",
+                        String.format(
+                                "Runnable(uuid=%s)",
+                                this.uuid));
+
                 // Check if we are still alive.
-                Message message = messages.get(this.uuid);
-                if (message != null) {
-                    callback.onLost(this.uuid, message.content);
+                synchronized (messages) {
+                    Message message = messages.get(this.uuid);
+                    if (message != null) {
+                        callback.onLost(this.uuid, message.content);
+                    }
                 }
 
                 this.kill();
             };
 
-            this.uuid = uuid;
-            this.content = content;
+            synchronized (peripherals) {
+                this.peripheral = peripheral;
 
-            this.alive();
+                this.uuid = uuid;
+                this.content = content;
+
+                this.lastSeen = System.currentTimeMillis();
+
+                handler.postDelayed(this.runnable, ttlSeconds * 1000);
+
+                peripherals.put(this.peripheral, this);
+            }
         }
 
         public void kill() {
+            Log.i("Scanner::Message::kill",
+                    String.format(
+                            "Runnable(uuid=%s)",
+                            this.uuid));
+
             handler.removeCallbacks(this.runnable);
 
             // Kill yourself.
-            messages.remove(this.uuid);
+            synchronized (peripherals) {
+                peripherals.remove(this.peripheral);
+            }
+
+            synchronized (messages) {
+                messages.remove(this.uuid);
+            }
         }
 
         public void alive() {
             this.lastSeen = System.currentTimeMillis();
 
+            Log.i("Scanner::Message::alive",
+                    String.format(
+                            "Runnable(uuid=%s)",
+                            this.uuid));
+
             handler.removeCallbacks(this.runnable);
 
             // Check if we are still alive.
-            if (messages.containsKey(this.uuid)) {
-                handler.postDelayed(this.runnable, ttlSeconds * 1000);
+            synchronized (messages) {
+                if (messages.containsKey(this.uuid)) {
+                    Log.i("Scanner::Message::post",
+                            String.format(
+                                    "Runnable(uuid=%s, ttlSeconds=%d)",
+                                    this.uuid, ttlSeconds));
+
+                    handler.postDelayed(this.runnable, ttlSeconds * 1000);
+                }
             }
         }
     }
@@ -102,6 +142,7 @@ class Scanner {
 
     private final Map<UUID, Message> messages = new HashMap<>();
     private final Map<UUID, Packet> packets = new HashMap<>();
+    private final Map<BluetoothPeripheral, Message> peripherals = new HashMap<>();
 
     // Callback for peripherals
     private final BluetoothPeripheralCallback peripheralCallback = new BluetoothPeripheralCallback() {
@@ -112,7 +153,7 @@ class Scanner {
                             "onServicesDiscovered(peripheral=%s, packets=%s)",
                             peripheral, packets));
 
-            peripheral.requestMtu(Constants.GATT_MAX_MTU_SIZE);
+            peripheral.requestMtu(Constants.GATT_MTU_SIZE);
 
             // Request a new connection priority
             peripheral.requestConnectionPriority(ConnectionPriority.HIGH);
@@ -126,19 +167,23 @@ class Scanner {
                 for (BluetoothGattDescriptor descriptor : characteristic.getDescriptors()) {
                     UUID uuid = descriptor.getUuid();
 
-                    Message message = messages.get(uuid);
+                    synchronized (messages) {
+                        Message message = messages.get(uuid);
 
-                    if (message != null) {
-                        message.alive();
-                    } else {
-                        packets.put(uuid, new Packet());
+                        if (message != null) {
+                            message.alive();
+                        } else {
+                            packets.put(uuid, new Packet());
 
-                        peripheral.readDescriptor(descriptor);
+                            peripheral.readDescriptor(descriptor);
+                        }
                     }
                 }
             }
 
             if (packets.isEmpty()) {
+                peripheral.refreshDeviceCache();
+
                 central.cancelConnection(peripheral);
             }
         }
@@ -151,6 +196,8 @@ class Scanner {
                             peripheral, value.length, descriptor, status));
 
             if (packets.isEmpty()) {
+                peripheral.refreshDeviceCache();
+
                 central.cancelConnection(peripheral);
                 return;
             }
@@ -168,10 +215,14 @@ class Scanner {
 
                     peripheral.readDescriptor(descriptor);
                 } else if (status == GattStatus.INVALID_OFFSET) {
-                    callback.onFound(uuid, packet.data);
+                    synchronized (messages) {
+                        callback.onFound(uuid, packet.data);
 
-                    packets.remove(uuid);
-                    messages.put(uuid, new Message(uuid, packet.data));
+                        packets.remove(uuid);
+
+                        Message message = new Message(peripheral, uuid, packet.data);
+                        messages.put(uuid, message);
+                    }
                 }
             }
         }
@@ -189,12 +240,19 @@ class Scanner {
     private final BluetoothCentralManagerCallback bluetoothCentralManagerCallback = new BluetoothCentralManagerCallback() {
         @Override
         public void onDiscoveredPeripheral(BluetoothPeripheral peripheral, ScanResult scanResult) {
-//            Log.i("Scanner",
-//                    String.format(
-//                            "onDiscoveredPeripheral(peripheral=%s, scanResult=%s)",
-//                            peripheral, scanResult));
+            Log.i("Scanner",
+                    String.format(
+                            "onDiscoveredPeripheral(peripheral=%s, scanResult=%s)",
+                            peripheral, scanResult));
 
-//                    central.stopScan();
+            synchronized (peripherals) {
+                Message message = peripherals.get(peripheral);
+                if (message != null) {
+                    message.alive();
+                }
+            }
+
+            //                    central.stopScan();
             central.connectPeripheral(peripheral, peripheralCallback);
         }
 
@@ -224,10 +282,10 @@ class Scanner {
 
         @Override
         public void onScanFailed(final ScanFailure scanFailure) {
-//            Log.i(capacitor.getLogTag(),
-//                    String.format(
-//                            "onScanFailed(state=%s)",
-//                            scanFailure));
+            Log.i("Scanner",
+                    String.format(
+                            "onScanFailed(state=%s)",
+                            scanFailure));
 
             stop();
 
@@ -256,8 +314,13 @@ class Scanner {
             }
         }
 
-        // Note: existing messages might time out and emit onLost events.
-        messages.clear();
+        synchronized (peripherals) {
+            peripherals.clear();
+        }
+        synchronized (messages) {
+            // Note: existing messages might time out and emit onLost events.
+            messages.clear();
+        }
     }
 
     public static synchronized Scanner getInstance(Context context, Callback callback, Handler handler, Integer scanMode) {

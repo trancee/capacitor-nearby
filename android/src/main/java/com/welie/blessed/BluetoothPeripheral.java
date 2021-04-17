@@ -117,6 +117,7 @@ public class BluetoothPeripheral {
     private static final String NO_VALID_VALUE_PROVIDED = "no valid value provided";
     private static final String NO_VALID_DESCRIPTOR_PROVIDED = "no valid descriptor provided";
     private static final String PERIPHERAL_NOT_CONNECTED = "peripheral not connectected";
+    private static final String PERIPHERAL_REFRESH_DEVICE_CACHE = "exception occured while refreshing device cache";
     private static final String VALUE_BYTE_ARRAY_IS_EMPTY = "value byte array is empty";
     private static final String VALUE_BYTE_ARRAY_IS_TOO_LONG = "value byte array is too long";
     private static final String PRIORITY_IS_NULL = "priority is null";
@@ -1008,6 +1009,21 @@ public class BluetoothPeripheral {
         return !isConnected();
     }
 
+    public boolean refreshDeviceCache() {
+        if (bluetoothGatt != null) {
+            try {
+                final Method refresh = bluetoothGatt.getClass().getMethod("refresh");
+                if (refresh != null) {
+                    refresh.invoke(bluetoothGatt);
+                    return true;
+                }
+            } catch (Exception localException) {
+                Timber.e(PERIPHERAL_REFRESH_DEVICE_CACHE);
+            }
+        }
+        return false;
+    }
+
     /**
      * Read the value of a characteristic.
      *
@@ -1032,7 +1048,6 @@ public class BluetoothPeripheral {
         }
         return false;
     }
-
 
 
     /**
@@ -1532,8 +1547,8 @@ public class BluetoothPeripheral {
      * {@link BluetoothPeripheralCallback#onPhyUpdate} will be triggered as a result of this call, even
      * if no PHY change happens. It is also triggered when remote device updates the PHY.
      *
-     * @param txPhy the desired TX PHY
-     * @param rxPhy the desired RX PHY
+     * @param txPhy      the desired TX PHY
+     * @param rxPhy      the desired RX PHY
      * @param phyOptions the desired optional sub-type for PHY_LE_CODED
      * @return true if request was enqueued, false if not
      */

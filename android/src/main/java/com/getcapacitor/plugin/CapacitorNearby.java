@@ -51,6 +51,7 @@ import com.welie.blessed.BluetoothCentralManager;
 import com.welie.blessed.ScanFailure;
 
 import at.favre.lib.bytes.Bytes;
+import timber.log.Timber;
 
 interface Constants {
     // v5 (Name-based | SHA1 hash) UUID (winkee.app)
@@ -109,9 +110,17 @@ public class CapacitorNearby extends Plugin {
     private boolean mScanning;
     private boolean mAdvertising;
 
+    private UUID messageUUID;
     private final Map<UUID, Proto.Message> messages = new HashMap<>();
 
     private Handler handler = new Handler();
+
+    @Override
+    protected void handleOnNewIntent(Intent intent) {
+//        if (BuildConfig.DEBUG) {
+        Timber.plant(new Timber.DebugTree());
+//        }
+    }
 
     @Override
     protected void handleRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
@@ -360,11 +369,13 @@ public class CapacitorNearby extends Plugin {
     };
 
     private void close() {
-        for (UUID uuid : this.messages.keySet()) {
-            doUnpublish(uuid);
-        }
+        synchronized (this.messages) {
+            for (UUID uuid : this.messages.keySet()) {
+                doUnpublish(uuid, true);
+            }
 
-        stopAdvertising();
+            stopAdvertising();
+        }
 
         advertiser = null;
         advertiseCallback = null;
@@ -386,7 +397,22 @@ public class CapacitorNearby extends Plugin {
 
     @PluginMethod()
     public void pause(PluginCall call) {
+        if (advertiser == null) {
+            call.reject(Constants.NOT_INITIALIZED);
+            return;
+        }
+
         try {
+            synchronized (this.messages) {
+                for (UUID uuid : this.messages.keySet()) {
+                    doUnpublish(uuid, false);
+                }
+
+                stopAdvertising();
+            }
+
+            doUnsubscribe();
+
             call.success();
         } catch (Exception e) {
             call.error(e.getLocalizedMessage(), e);
@@ -395,7 +421,30 @@ public class CapacitorNearby extends Plugin {
 
     @PluginMethod()
     public void resume(PluginCall call) {
+        if (advertiser == null) {
+            call.reject(Constants.NOT_INITIALIZED);
+            return;
+        }
+
         try {
+            if (!this.messages.isEmpty()) {
+                synchronized (this.messages) {
+                    for (Proto.Message message : this.messages.values()) {
+                        doPublish(message);
+                    }
+
+                    startAdvertising(call, this.messages.get(this.messageUUID));
+                }
+
+                if (server != null) {
+                    server.restart();
+
+//                mAdvertising = true;
+                }
+
+                startScanning(call);
+            }
+
             call.success();
         } catch (Exception e) {
             call.error(e.getLocalizedMessage(), e);
@@ -455,64 +504,11 @@ public class CapacitorNearby extends Plugin {
             }
 
             if (!mAdvertising) {
-                if (advertiseCallback == null) {
-                    // Bluetooth LE advertising callbacks, used to deliver advertising operation status.
-                    // https://developer.android.com/reference/android/bluetooth/le/AdvertiseCallback
-                    advertiseCallback =
-                            new AdvertiseCallback() {
-                                @Override
-                                // Callback triggered in response to BluetoothLeAdvertiser#startAdvertising indicating that the advertising has been started successfully.
-                                public void onStartSuccess(AdvertiseSettings settingsInEffect) {
-                                    startAdvertising(message);
+                messageUUID = Bytes.wrap(message.getUuid().toByteArray()).toUUID();
 
-                                    call.success(
-                                            new JSObject()
-                                                    .put("uuid", Bytes.wrap(message.getUuid().toByteArray()).toUUID())
-                                                    .put("timestamp", message.getTimestamp())
-                                    );
-                                }
-
-                                @Override
-                                // Callback when advertising could not be started.
-                                public void onStartFailure(int errorCode) {
-                                    stopAdvertising();
-
-                                    call.error(advertiseFailed(errorCode));
-                                }
-                            };
-                }
-
-                // The AdvertiseSettings provide a way to adjust advertising preferences for each Bluetooth LE advertisement instance.
-                AdvertiseSettings advertiseSettings =
-                        new AdvertiseSettings.Builder()
-                                // Set advertise mode to control the advertising power and latency.
-                                .setAdvertiseMode(advertiseMode)
-                                // Set advertise TX power level to control the transmission power level for the advertising.
-                                .setTxPowerLevel(txPowerLevel)
-                                // Limit advertising to a given amount of time.
-//                            .setTimeout(30 * 1000)  // May not exceed 180000 milliseconds. A value of 0 will disable the time limit.
-                                // Set whether the advertisement type should be connectable or non-connectable.
-                                .setConnectable(true)
-                                .build();
-
-                // Advertise data packet container for Bluetooth LE advertising.
-                // This represents the data to be advertised as well as the scan response data for active scans.
-                AdvertiseData advertiseData =
-                        new AdvertiseData.Builder()
-                                // Add a service UUID to advertise data.
-                                .addServiceUuid(new ParcelUuid(Constants.SERVICE_UUID))
-                                // Whether the transmission power level should be included in the advertise packet.
-                                .setIncludeTxPowerLevel(false)
-                                // Set whether the device name should be included in advertise packet.
-                                .setIncludeDeviceName(false)
-                                .build();
-
-                // java.lang.IllegalArgumentException: Legacy advertising data too big
-                // java.lang.IllegalArgumentException: Advertising data too big
-                advertiser.startAdvertising(advertiseSettings, advertiseData, advertiseCallback);
-                mAdvertising = true;
+                startAdvertising(call, message);
             } else {
-                startAdvertising(message);
+                doPublish(message);
 
                 call.success(
                         new JSObject()
@@ -551,19 +547,21 @@ public class CapacitorNearby extends Plugin {
     }
 
     private void onPublishExpired(UUID uuid) {
-        if (this.messages.containsKey(uuid)) {
-            notifyListeners("onPublishExpired",
-                    new JSObject()
-                            .put("uuid", uuid)
-            );
+        if (mAdvertising) {
+            if (this.messages.containsKey(uuid)) {
+                notifyListeners("onPublishExpired",
+                        new JSObject()
+                                .put("uuid", uuid)
+                );
+            }
         }
 
-        doUnpublish(uuid);
+        doUnpublish(uuid, true);
 
         stopAdvertising();
     }
 
-    private void startAdvertising(Proto.Message message) {
+    private void doPublish(Proto.Message message) {
         UUID uuid = Bytes.wrap(message.getUuid().toByteArray()).toUUID();
 
         this.messages.put(uuid, message);
@@ -575,6 +573,73 @@ public class CapacitorNearby extends Plugin {
 
             mAdvertising = true;
         }
+    }
+
+    private void startAdvertising(PluginCall call, Proto.Message message) {
+        if (mAdvertising || message == null) {
+            return;
+        }
+
+        if (advertiseCallback == null) {
+            // Bluetooth LE advertising callbacks, used to deliver advertising operation status.
+            // https://developer.android.com/reference/android/bluetooth/le/AdvertiseCallback
+            advertiseCallback =
+                    new AdvertiseCallback() {
+                        @Override
+                        // Callback triggered in response to BluetoothLeAdvertiser#startAdvertising indicating that the advertising has been started successfully.
+                        public void onStartSuccess(AdvertiseSettings settingsInEffect) {
+                            doPublish(message);
+
+                            call.success(
+                                    new JSObject()
+                                            .put("uuid", Bytes.wrap(message.getUuid().toByteArray()).toUUID())
+                                            .put("timestamp", message.getTimestamp())
+                            );
+                        }
+
+                        @Override
+                        // Callback when advertising could not be started.
+                        public void onStartFailure(int errorCode) {
+                            Log.e(getLogTag(), "onStartFailure = " + errorCode);
+
+                            stopAdvertising();
+
+                            call.error(advertiseFailed(errorCode));
+                        }
+                    };
+        }
+
+        // The AdvertiseSettings provide a way to adjust advertising preferences for each Bluetooth LE advertisement instance.
+        AdvertiseSettings advertiseSettings =
+                new AdvertiseSettings.Builder()
+                        // Set advertise mode to control the advertising power and latency.
+                        .setAdvertiseMode(advertiseMode)
+                        // Set advertise TX power level to control the transmission power level for the advertising.
+                        .setTxPowerLevel(txPowerLevel)
+                        // Limit advertising to a given amount of time.
+//                            .setTimeout(30 * 1000)  // May not exceed 180000 milliseconds. A value of 0 will disable the time limit.
+                        // Set whether the advertisement type should be connectable or non-connectable.
+                        .setConnectable(true)
+                        .build();
+
+        // Advertise data packet container for Bluetooth LE advertising.
+        // This represents the data to be advertised as well as the scan response data for active scans.
+        AdvertiseData advertiseData =
+                new AdvertiseData.Builder()
+                        // Add a service UUID to advertise data.
+//                        .addServiceUuid(new ParcelUuid(Constants.SERVICE_UUID))
+                        .addServiceData(new ParcelUuid(Constants.SERVICE_UUID), new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
+                        // Whether the transmission power level should be included in the advertise packet.
+                        .setIncludeTxPowerLevel(false)
+                        // Set whether the device name should be included in advertise packet.
+                        .setIncludeDeviceName(false)
+                        .build();
+
+        // java.lang.IllegalArgumentException: Legacy advertising data too big
+        // java.lang.IllegalArgumentException: Advertising data too big
+        advertiser.startAdvertising(advertiseSettings, advertiseData, advertiseCallback);
+
+//        mAdvertising = true;
     }
 
     private void stopAdvertising() {
@@ -616,14 +681,14 @@ public class CapacitorNearby extends Plugin {
             if (messageUUID == null || messageUUID.length() == 0) {
                 // Unpublish all messages.
                 for (UUID uuid : this.messages.keySet()) {
-                    doUnpublish(uuid);
+                    doUnpublish(uuid, true);
                 }
             } else {
                 // Unpublish message.
                 UUID uuid = UUID.fromString(messageUUID);
 
                 if (this.messages.containsKey(uuid)) {
-                    doUnpublish(uuid);
+                    doUnpublish(uuid, true);
                 } else {
                     call.reject(Constants.MESSAGE_UUID_NOT_FOUND);
                     return;
@@ -640,12 +705,14 @@ public class CapacitorNearby extends Plugin {
         }
     }
 
-    private void doUnpublish(UUID uuid) {
+    private void doUnpublish(UUID uuid, boolean hasExpired) {
         if (server != null) {
             server.removeMessage(uuid);
         }
 
-        this.messages.remove(uuid);
+        if (hasExpired) {
+            this.messages.remove(uuid);
+        }
     }
 
     @PluginMethod
@@ -664,30 +731,7 @@ public class CapacitorNearby extends Plugin {
                     ttlSeconds = optionsObject.getInteger("ttlSeconds");
                 }
 
-                List<ScanFilter> filters = new ArrayList<>();
-                ScanFilter filter = new ScanFilter.Builder()
-                        .setServiceUuid(new ParcelUuid(Constants.SERVICE_UUID))
-                        // Set partial filter on service data.
-                        // For any bit in the mask, set it to 1 if it needs to match the one in service data,
-                        // otherwise set it to 0 to ignore that bit.
-//                        .setServiceData(
-//                                new ParcelUuid(Constants.SERVICE_UUID),
-//                                new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF},
-//                                new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00}
-//                        )
-                        .build();
-                filters.add(filter);
-
-                scanner.start(filters, new Scanner.ScanCallback() {
-                    @Override
-                    public void onFailed(ScanFailure scanFailure) {
-                        call.error(scanFailed(scanFailure));
-                    }
-                });
-
-                // Start Bluetooth LE scan.
-//                scanner.startScan(filters, settings, scanCallback);
-                mScanning = true;
+                startScanning(call);
 
                 if (ttlSeconds != null) {
                     // Sets the time to live in seconds for the publish or subscribe.
@@ -707,8 +751,40 @@ public class CapacitorNearby extends Plugin {
         call.success();
     }
 
-    private String scanFailed(ScanFailure errorCode) {
-        switch (errorCode) {
+    private void startScanning(final PluginCall call) {
+        if (mScanning) {
+            // We are already scanning.
+            return;
+        }
+
+        List<ScanFilter> filters = new ArrayList<>();
+        ScanFilter filter = new ScanFilter.Builder()
+                .setServiceUuid(new ParcelUuid(Constants.SERVICE_UUID))
+                // Set partial filter on service data.
+                // For any bit in the mask, set it to 1 if it needs to match the one in service data,
+                // otherwise set it to 0 to ignore that bit.
+//                        .setServiceData(
+//                                new ParcelUuid(Constants.SERVICE_UUID),
+//                                new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF},
+//                                new byte[]{(byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00}
+//                        )
+                .build();
+        filters.add(filter);
+
+        scanner.start(filters, new Scanner.ScanCallback() {
+            @Override
+            public void onFailed(ScanFailure scanFailure) {
+                if (call != null) call.error(scanFailed(scanFailure));
+            }
+        });
+
+        // Start Bluetooth LE scan.
+//                scanner.startScan(filters, settings, scanCallback);
+        mScanning = true;
+    }
+
+    private String scanFailed(ScanFailure scanFailure) {
+        switch (scanFailure) {
             case ALREADY_STARTED:
                 return "Failed to start scan as BLE scan with the same settings is already started by the app.";
             case APPLICATION_REGISTRATION_FAILED:
