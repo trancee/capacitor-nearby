@@ -1,1 +1,0 @@
-/home/phil/Projects/capacitor-nearby/example/node_modules/capacitor-nearby/dist/plugin.js

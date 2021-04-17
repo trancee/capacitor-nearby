@@ -1,5 +1,5 @@
 import { WebPlugin } from '@capacitor/core';
-import { CapacitorNearbyPlugin } from './definitions';
+import { NearbyPlugin } from './definitions';
 
 import {
   Message,
@@ -11,10 +11,10 @@ import {
   SubscribeOptions,
 } from './definitions';
 
-export class CapacitorNearbyWeb extends WebPlugin implements CapacitorNearbyPlugin {
+export class NearbyWeb extends WebPlugin implements NearbyPlugin {
   constructor() {
     super({
-      name: 'CapacitorNearby',
+      name: 'Nearby',
       platforms: ['web'],
     });
   }
@@ -39,7 +39,6 @@ export class CapacitorNearbyWeb extends WebPlugin implements CapacitorNearbyPlug
     console.error('publish', options);
     throw new Error("Method not implemented.");
   }
-
   // Cancels an existing published message.
   async unpublish(options: {
     uuid?: UUID,
@@ -55,7 +54,6 @@ export class CapacitorNearbyWeb extends WebPlugin implements CapacitorNearbyPlug
     console.error('subscribe', options);
     throw new Error("Method not implemented.");
   }
-
   // Cancels an existing subscription.
   async unsubscribe(options: {
   }): Promise<void> {
@@ -78,9 +76,9 @@ export class CapacitorNearbyWeb extends WebPlugin implements CapacitorNearbyPlug
   }
 }
 
-const CapacitorNearby = new CapacitorNearbyWeb();
+const Nearby = new NearbyWeb();
 
-export { CapacitorNearby };
+export { Nearby };
 
 import { registerWebPlugin } from '@capacitor/core';
-registerWebPlugin(CapacitorNearby);
+registerWebPlugin(Nearby);
