@@ -66,9 +66,9 @@ public class Scanner {
     }
 
     public void start(Callback callback) {
-        Log.i("Scanner",
-                String.format(
-                        "start()"));
+        // Log.i("Scanner",
+        //         String.format(
+        //                 "start()"));
 
         if (mScanning) {
             stop();
@@ -104,10 +104,10 @@ public class Scanner {
                         @Override
                         // Callback when a BLE advertisement has been found.
                         public void onScanResult(int callbackType, ScanResult result) {
-                            Log.i("ScanCallback",
-                                    String.format(
-                                            "onScanResult(callbackType=%d, result=%s)",
-                                            callbackType, result));
+                            // Log.i("ScanCallback",
+                            //         String.format(
+                            //                 "onScanResult(callbackType=%d, result=%s)",
+                            //                 callbackType, result));
 
                             super.onScanResult(callbackType, result);
 
@@ -116,15 +116,15 @@ public class Scanner {
                             // Represents a scan record from Bluetooth LE scan.
                             ScanRecord record = result.getScanRecord();
 
-                            Log.i("ScanCallback",
-                                    String.format(
-                                            "onScanResult(device=%s, record=%s)",
-                                            device, record));
+                            // Log.i("ScanCallback",
+                            //         String.format(
+                            //                 "onScanResult(device=%s, record=%s)",
+                            //                 device, record));
 
-                            Log.i("ScanCallback",
-                                    String.format(
-                                            "ScanRecord(rawBytes=%s)",
-                                            bytesToHex(record.getBytes())));
+                            // Log.i("ScanCallback",
+                            //         String.format(
+                            //                 "ScanRecord(rawBytes=%s)",
+                            //                 bytesToHex(record.getBytes())));
 
                             UUID uuid = null;
                             byte[] data = null;
@@ -136,10 +136,10 @@ public class Scanner {
                             }
 
                             if (uuid != null) {
-                                Log.i("ScanCallback",
-                                        String.format(
-                                                "UUID=%s",
-                                                uuid.toString()));
+                                // Log.i("ScanCallback",
+                                //         String.format(
+                                //                 "UUID=%s",
+                                //                 uuid.toString()));
 
                                 synchronized (beacons) {
                                     Beacon beacon = beacons.get(uuid);
@@ -158,10 +158,10 @@ public class Scanner {
 
                         @Override
                         public void onBatchScanResults(List<ScanResult> results) {
-                            Log.i("ScanCallback",
-                                    String.format(
-                                            "onBatchScanResults(results=%s)",
-                                            results));
+                            // Log.i("ScanCallback",
+                            //         String.format(
+                            //                 "onBatchScanResults(results=%s)",
+                            //                 results));
 
                             super.onBatchScanResults(results);
                         }
@@ -297,10 +297,10 @@ public class Scanner {
             this.timestamp = System.currentTimeMillis();
 
             this.runnable = () -> {
-                Log.i("Scanner::Beacon",
-                        String.format(
-                                "Runnable(uuid=%s)",
-                                this.uuid));
+                // Log.i("Scanner::Beacon",
+                //         String.format(
+                //                 "Runnable(uuid=%s)",
+                //                 this.uuid));
 
                 // Check if we are still alive.
                 synchronized (beacons) {
@@ -339,10 +339,10 @@ public class Scanner {
         }
 
         public void kill() {
-            Log.i("Scanner::Beacon::kill",
-                    String.format(
-                            "Runnable(uuid=%s)",
-                            this.uuid));
+            // Log.i("Scanner::Beacon::kill",
+            //         String.format(
+            //                 "Runnable(uuid=%s)",
+            //                 this.uuid));
 
             handler.removeCallbacks(this.runnable);
 
@@ -355,20 +355,20 @@ public class Scanner {
         public void alive() {
             this.lastSeen = System.currentTimeMillis();
 
-            Log.i("Scanner::Beacon::alive",
-                    String.format(
-                            "Runnable(uuid=%s)",
-                            this.uuid));
+            // Log.i("Scanner::Beacon::alive",
+            //         String.format(
+            //                 "Runnable(uuid=%s)",
+            //                 this.uuid));
 
             handler.removeCallbacks(this.runnable);
 
             // Check if we are still alive.
             synchronized (beacons) {
                 if (beacons.containsKey(this.uuid)) {
-                    Log.i("Scanner::Beacon::post",
-                            String.format(
-                                    "Runnable(uuid=%s, ttlSeconds=%d)",
-                                    this.uuid, ttlSeconds));
+                    // Log.i("Scanner::Beacon::post",
+                    //         String.format(
+                    //                 "Runnable(uuid=%s, ttlSeconds=%d)",
+                    //                 this.uuid, ttlSeconds));
 
                     handler.postDelayed(this.runnable, ttlSeconds * 1000);
                 }

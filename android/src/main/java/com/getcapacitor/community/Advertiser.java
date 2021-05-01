@@ -51,10 +51,10 @@ public class Advertiser {
     }
 
     public void start(Beacon beacon, Callback callback) {
-        Log.i("Advertiser",
-                String.format(
-                        "start(beacon={uuid=%s, data=%s})",
-                        beacon.uuid(), bytesToHex(beacon.data())));
+        // Log.i("Advertiser",
+        //         String.format(
+        //                 "start(beacon={uuid=%s, data=%s})",
+        //                 beacon.uuid(), bytesToHex(beacon.data())));
 
         if (mAdvertising) {
             stop();
@@ -106,10 +106,10 @@ public class Advertiser {
                         @Override
                         // Callback triggered in response to BluetoothLeAdvertiser#startAdvertising indicating that the advertising has been started successfully.
                         public void onStartSuccess(AdvertiseSettings settingsInEffect) {
-                            Log.i("AdvertiseCallback",
-                                    String.format(
-                                            "onStartSuccess(settingsInEffect=%s)",
-                                            settingsInEffect));
+                            // Log.i("AdvertiseCallback",
+                            //         String.format(
+                            //                 "onStartSuccess(settingsInEffect=%s)",
+                            //                 settingsInEffect));
 
                             super.onStartSuccess(settingsInEffect);
 

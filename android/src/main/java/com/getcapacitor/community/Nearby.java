@@ -365,7 +365,7 @@ public class Nearby extends Plugin {
             stop();
 
 //            initialize(call);
-            
+
             uuid = null;
             data = null;
 
@@ -602,10 +602,10 @@ public class Nearby extends Plugin {
 
             Set<UUID> uuids = null;// = this.beacons.keySet();
 
-            Log.i(getLogTag(),
-                    String.format(
-                            "status(isPublishing=%s, isSubscribing=%s, uuids=%s)",
-                            isPublishing, isSubscribing, uuids));
+            // Log.i(getLogTag(),
+            //         String.format(
+            //                 "status(isPublishing=%s, isSubscribing=%s, uuids=%s)",
+            //                 isPublishing, isSubscribing, uuids));
 
             call.success(
                     new JSObject()
