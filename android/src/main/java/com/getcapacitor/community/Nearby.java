@@ -94,6 +94,7 @@ public class Nearby extends Plugin {
 
     private UUID uuid;
     private byte[] data;
+    private Integer ttlSeconds;
 
     private Handler handler = new Handler();
 
@@ -368,6 +369,7 @@ public class Nearby extends Plugin {
 
             uuid = null;
             data = null;
+            ttlSeconds = null;
 
             call.success();
         } catch (Exception e) {
@@ -448,6 +450,8 @@ public class Nearby extends Plugin {
                 mAdvertiser.start(
                         beacon,
 
+                        ttlSeconds,
+
                         new Advertiser.Callback() {
                             @Override
                             public void onSuccess(AdvertiseSettings settings) {
@@ -461,6 +465,11 @@ public class Nearby extends Plugin {
                             public void onFailure(int errorCode, String errorMessage) {
                                 call.error(errorMessage, String.valueOf(errorCode), null);
                             }
+
+                            @Override
+                            public void onExpired() {
+                                onPublishExpired(/*uuid*/);
+                            }
                         }
                 );
             } else {
@@ -468,12 +477,6 @@ public class Nearby extends Plugin {
 //                        new JSObject()
 //                                .put("uuid", uuid)
                 );
-            }
-
-            if (ttlSeconds != null) {
-                // Sets the time to live in seconds for the publish or subscribe.
-                // Stops scanning after a pre-defined scan period.
-                handler.postDelayed(() -> onPublishExpired(/*uuid*/), ttlSeconds * 1000);
             }
         } catch (Exception e) {
             Log.e(getLogTag(), "publish", e);
@@ -508,6 +511,7 @@ public class Nearby extends Plugin {
 
             uuid = null;
             data = null;
+            ttlSeconds = null;
 
             call.success();
         } catch (Exception e) {

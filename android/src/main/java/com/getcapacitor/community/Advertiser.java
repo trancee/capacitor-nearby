@@ -6,6 +6,7 @@ import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
 
+import android.os.Handler;
 import android.os.ParcelUuid;
 import android.util.Log;
 
@@ -25,6 +26,9 @@ public class Advertiser {
     private AdvertiseCallback advertiseCallback;
 
     private boolean mAdvertising;
+
+    private Handler handler = new Handler();
+    private Runnable runnable;
 
     public static synchronized Advertiser getInstance(BluetoothAdapter adapter) {
         if (instance == null) {
@@ -51,10 +55,16 @@ public class Advertiser {
     }
 
     public void start(Beacon beacon, Callback callback) {
+        start(beacon, null, callback);
+    }
+
+    public void start(Beacon beacon, Integer ttlSeconds, Callback callback) {
         // Log.i("Advertiser",
         //         String.format(
         //                 "start(beacon={uuid=%s, data=%s})",
         //                 beacon.uuid(), bytesToHex(beacon.data())));
+
+        stopTimer();
 
         if (mAdvertising) {
             stop();
@@ -115,6 +125,10 @@ public class Advertiser {
 
                             mAdvertising = true;
 
+                            if (ttlSeconds != null) {
+                                startTimer(ttlSeconds);
+                            }
+
                             callback.onSuccess(settingsInEffect);
                         }
 
@@ -143,6 +157,8 @@ public class Advertiser {
     }
 
     public void stop() {
+        stopTimer();
+
         if (advertiser != null && advertiseCallback != null) {
             advertiser.stopAdvertising(advertiseCallback);
 
@@ -174,6 +190,31 @@ public class Advertiser {
     }
 
     /**
+     * Timer
+     */
+    public void startTimer(Integer ttlSeconds) {
+        if (ttlSeconds != null) {
+            runnable = new Runnable() {
+                public void run() {
+                    callback.onExpired();
+                }
+            };
+
+            // Sets the time to live in seconds for the publish or subscribe.
+            // Stops scanning after a pre-defined scan period.
+            handler.postDelayed(runnable, ttlSeconds * 1000);
+        }
+    }
+
+    public void stopTimer() {
+        if (runnable != null) {
+            handler.removeCallbacks(runnable);
+
+            runnable = null;
+        }
+    }
+
+    /**
      * Callback
      */
 
@@ -182,6 +223,9 @@ public class Advertiser {
         }
 
         public void onFailure(int errorCode, String errorMessage) {
+        }
+
+        public void onExpired() {
         }
     }
 
