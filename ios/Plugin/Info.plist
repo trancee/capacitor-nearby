@@ -20,5 +20,14 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSPrincipalClass</key>
 	<string></string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Always allow Bluetooth?</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Send and receive messages with Bluetooth</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+		<string>bluetooth-peripheral</string>
+	</array>
 </dict>
 </plist>
