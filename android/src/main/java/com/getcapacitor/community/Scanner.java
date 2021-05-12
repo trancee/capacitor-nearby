@@ -155,6 +155,10 @@ public class Scanner {
                                 //                 "UUID=%s",
                                 //                 uuid.toString()));
 
+                                if (uuid.compareTo(Constants.SERVICE_UUID) == 0) {
+                                    continue;
+                                }
+
                                 synchronized (beacons) {
                                     Beacon beacon = beacons.get(uuid);
                                     if (beacon != null) {
@@ -177,6 +181,10 @@ public class Scanner {
                                 //         String.format(
                                 //                 "UUID=%s",
                                 //                 uuid.toString()));
+
+                                if (uuid.compareTo(Constants.SERVICE_UUID) == 0) {
+                                    continue;
+                                }
 
                                 synchronized (beacons) {
                                     Beacon beacon = beacons.get(uuid);
