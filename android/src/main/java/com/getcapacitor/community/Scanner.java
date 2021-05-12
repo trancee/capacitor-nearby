@@ -1,9 +1,7 @@
 package com.getcapacitor.community;
 
 import android.bluetooth.BluetoothAdapter;
-//import android.bluetooth.BluetoothAdapter.LeScanCallback;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
@@ -12,11 +10,9 @@ import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 
 import android.os.Handler;
-import android.os.Parcel;
 import android.os.ParcelUuid;
 import android.util.Log;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,9 +29,11 @@ public class Scanner {
 
     private BluetoothLeScanner scanner;
     private ScanCallback scanCallback;
-//    private LeScanCallback leScanCallback;
 
     private boolean mScanning;
+
+    private Handler handler = new Handler();
+    private Runnable runnable;
 
     private static long ttlSeconds = 10;
 
@@ -53,22 +51,40 @@ public class Scanner {
         this.beaconCallback = beaconCallback;
     }
 
-    private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
+    public Integer getScanMode() {
+        return scanMode;
+    }
 
-    private static String bytesToHex(byte[] bytes) {
-        char[] hexChars = new char[bytes.length * 2];
-        for (int j = 0; j < bytes.length; j++) {
-            int v = bytes[j] & 0xFF;
-            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
-            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
-        }
-        return new String(hexChars);
+    public void setScanMode(Integer scanMode) {
+        this.scanMode = scanMode;
+    }
+
+//    private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
+//
+//    private static String bytesToHex(byte[] bytes) {
+//        char[] hexChars = new char[bytes.length * 2];
+//        for (int j = 0; j < bytes.length; j++) {
+//            int v = bytes[j] & 0xFF;
+//            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
+//            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
+//        }
+//        return new String(hexChars);
+//    }
+
+    public void start() {
+        start(null, null);
     }
 
     public void start(Callback callback) {
+        start(null, callback);
+    }
+
+    public void start(Integer ttlSeconds, Callback callback) {
         // Log.i("Scanner",
         //         String.format(
         //                 "start()"));
+
+        stopTimer();
 
         if (mScanning) {
             stop();
@@ -80,7 +96,10 @@ public class Scanner {
         if (scanner == null) {
             int errorCode = android.bluetooth.le.ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED;
 
-            callback.onFailure(errorCode, scanFailed(errorCode));
+            if (callback != null) {
+                callback.onFailure(errorCode, scanFailed(errorCode));
+            }
+
             return;
         }
 
@@ -126,16 +145,11 @@ public class Scanner {
                             //                 "ScanRecord(rawBytes=%s)",
                             //                 bytesToHex(record.getBytes())));
 
-                            UUID uuid = null;
-                            byte[] data = null;
-
                             Map<ParcelUuid, byte[]> map = record.getServiceData();
                             for (ParcelUuid key : map.keySet()) {
-                                uuid = key.getUuid();
-                                data = map.get(key);
-                            }
+                                UUID uuid = key.getUuid();
+                                byte[] data = map.get(key);
 
-                            if (uuid != null) {
                                 // Log.i("ScanCallback",
                                 //         String.format(
                                 //                 "UUID=%s",
@@ -150,6 +164,29 @@ public class Scanner {
 
                                         if (beaconCallback != null) {
                                             beaconCallback.onFound(uuid, data);
+                                        }
+                                    }
+                                }
+                            }
+
+                            List<ParcelUuid> serviceUuids = record.getServiceUuids();
+                            for (ParcelUuid serviceUuid : serviceUuids) {
+                                UUID uuid = serviceUuid.getUuid();
+
+                                // Log.i("ScanCallback",
+                                //         String.format(
+                                //                 "UUID=%s",
+                                //                 uuid.toString()));
+
+                                synchronized (beacons) {
+                                    Beacon beacon = beacons.get(uuid);
+                                    if (beacon != null) {
+                                        beacon.alive();
+                                    } else {
+                                        beacons.put(uuid, new Beacon(uuid));
+
+                                        if (beaconCallback != null) {
+                                            beaconCallback.onFound(uuid, null);
                                         }
                                     }
                                 }
@@ -178,7 +215,9 @@ public class Scanner {
 
                             stop();
 
-                            callback.onFailure(errorCode, scanFailed(errorCode));
+                            if (callback != null) {
+                                callback.onFailure(errorCode, scanFailed(errorCode));
+                            }
                         }
                     };
         }
@@ -192,44 +231,21 @@ public class Scanner {
                 scanCallback
         );
 
-//        if (leScanCallback == null) {
-//            leScanCallback =
-//                    new LeScanCallback() {
-//                        @Override
-//                        public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
-//                            Log.i("startLeScan",
-//                                    String.format(
-//                                            "onLeScan(device=%s, device=%d, scanRecord=%s)",
-//                                            device, rssi, scanRecord));
-//                        }
-//                    };
-//        }
-//
-//        // Starts a scan for Bluetooth LE devices, looking for devices that advertise given services.
-//        // https://developer.android.com/reference/android/bluetooth/BluetoothAdapter
-//        boolean result = adapter.startLeScan(
-//                new UUID[]{
-//                        Constants.SERVICE_UUID,
-//                },
-//
-//                leScanCallback
-//        );
+        if (ttlSeconds != null) {
+            startTimer(ttlSeconds, callback);
+        }
 
         mScanning = true;
     }
 
     public void stop() {
+        stopTimer();
+
         if (scanner != null && scanCallback != null) {
             scanner.stopScan(scanCallback);
 
             scanCallback = null;
         }
-
-//        if (adapter != null && leScanCallback != null) {
-//            adapter.stopLeScan(leScanCallback);
-//
-//            leScanCallback = null;
-//        }
 
         mScanning = false;
     }
@@ -254,6 +270,28 @@ public class Scanner {
     }
 
     /**
+     * Timer
+     */
+
+    public void startTimer(Integer ttlSeconds, Scanner.Callback callback) {
+        if (ttlSeconds != null && callback != null) {
+            runnable = () -> callback.onExpired();
+
+            // Sets the time to live in seconds for the publish or subscribe.
+            // Stops scanning after a pre-defined scan period.
+            handler.postDelayed(runnable, ttlSeconds * 1000);
+        }
+    }
+
+    public void stopTimer() {
+        if (runnable != null) {
+            handler.removeCallbacks(runnable);
+
+            runnable = null;
+        }
+    }
+
+    /**
      * Callback
      */
 
@@ -268,13 +306,14 @@ public class Scanner {
     public abstract static class Callback {
         public void onFailure(int errorCode, String errorMessage) {
         }
+
+        public void onExpired() {
+        }
     }
 
     /**
      * Beacon
      */
-
-    private Handler handler = new Handler();
 
     private final Map<UUID, Beacon> beacons = new HashMap<>();
 

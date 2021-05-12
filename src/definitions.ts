@@ -59,7 +59,7 @@ export enum TxPowerLevel {
 // A message that will be shared with nearby devices.
 export interface Message {
   // The UUID of the message.
-  readonly uuid: UUID;
+  uuid: UUID;
 
   // The raw bytes content of the message.
   data?: string;
@@ -82,11 +82,6 @@ export interface SubscribeOptions {
   ttlSeconds?: TTLSeconds;
 }
 
-export type PublishResult = {
-  // Returns the UUID of the message.
-  uuid: UUID;
-}
-
 export interface NearbyPlugin {
   initialize(options: {
     // A InitializeOptions object for this operation
@@ -99,7 +94,7 @@ export interface NearbyPlugin {
     message: Message,
     // A PublishOptions object for this operation
     options?: PublishOptions,
-  }): Promise<PublishResult>;
+  }): Promise<void>;
   // Cancels an existing published message.
   unpublish(options: {
     uuid?: UUID,

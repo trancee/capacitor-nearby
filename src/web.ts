@@ -7,7 +7,6 @@ import {
   UUID,
   InitializeOptions,
   PublishOptions,
-  PublishResult,
   SubscribeOptions,
 } from './definitions';
 
@@ -35,7 +34,7 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
     message: Message,
     // A PublishOptions object for this operation
     options?: PublishOptions,
-  }): Promise<PublishResult> {
+  }): Promise<void> {
     console.error('publish', options);
     throw new Error("Method not implemented.");
   }

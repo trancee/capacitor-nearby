@@ -89,12 +89,16 @@ public class Nearby extends Plugin {
     private Scanner mScanner;
     private Advertiser mAdvertiser;
 
+    Integer scanMode = ScanSettings.SCAN_MODE_BALANCED;
+
     Integer advertiseMode = AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY;
     Integer txPowerLevel = AdvertiseSettings.ADVERTISE_TX_POWER_HIGH;
 
     private UUID uuid;
     private byte[] data;
-    private Integer ttlSeconds;
+
+    private Integer scanTimeout;
+    private Integer advertiseTimeout;
 
     private Handler handler = new Handler();
 
@@ -233,7 +237,7 @@ public class Nearby extends Plugin {
                     }
                 }
 
-                Integer scanMode = null;
+                scanMode = ScanSettings.SCAN_MODE_BALANCED;
 
                 advertiseMode = AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY;
                 txPowerLevel = AdvertiseSettings.ADVERTISE_TX_POWER_HIGH;
@@ -293,9 +297,20 @@ public class Nearby extends Plugin {
                         }
                 );
 
+                if (scanMode != null) {
+                    mScanner.setScanMode(scanMode);
+                }
+
                 mAdvertiser = new Advertiser(
                         this.mAdapter
                 );
+
+                if (advertiseMode != null) {
+                    mAdvertiser.setAdvertiseMode(advertiseMode);
+                }
+                if (txPowerLevel != null) {
+                    mAdvertiser.setTxPowerLevel(txPowerLevel);
+                }
 
                 call.success();
             } else {
@@ -323,12 +338,14 @@ public class Nearby extends Plugin {
             mAdvertiser.start(
                     beacon,
 
+                    advertiseTimeout,
+
                     new Advertiser.Callback() {
                         @Override
                         public void onSuccess(AdvertiseSettings settings) {
                             call.success(
-                                    new JSObject()
-                                            .put("uuid", uuid)
+//                                    new JSObject()
+//                                            .put("uuid", uuid)
                             );
                         }
 
@@ -342,6 +359,8 @@ public class Nearby extends Plugin {
 
         if (mScanner != null) {
             mScanner.start(
+                    scanTimeout,
+
                     new Scanner.Callback() {
                         @Override
                         public void onFailure(int errorCode, String errorMessage) {
@@ -369,7 +388,9 @@ public class Nearby extends Plugin {
 
             uuid = null;
             data = null;
-            ttlSeconds = null;
+
+            scanTimeout = null;
+            advertiseTimeout = null;
 
             call.success();
         } catch (Exception e) {
@@ -437,11 +458,11 @@ public class Nearby extends Plugin {
                 }
             }
 
-            Integer ttlSeconds = null;
+            advertiseTimeout = null;
 
             JSObject optionsObject = call.getObject("options", null);
             if (optionsObject != null) {
-                ttlSeconds = optionsObject.getInteger("ttlSeconds");
+                advertiseTimeout = optionsObject.getInteger("ttlSeconds");
             }
 
             if (!mAdvertiser.isAdvertising()) {
@@ -450,7 +471,7 @@ public class Nearby extends Plugin {
                 mAdvertiser.start(
                         beacon,
 
-                        ttlSeconds,
+                        advertiseTimeout,
 
                         new Advertiser.Callback() {
                             @Override
@@ -511,7 +532,9 @@ public class Nearby extends Plugin {
 
             uuid = null;
             data = null;
-            ttlSeconds = null;
+
+            scanTimeout = null;
+            advertiseTimeout = null;
 
             call.success();
         } catch (Exception e) {
@@ -534,27 +557,28 @@ public class Nearby extends Plugin {
 
         if (!mScanner.isScanning()) {
             try {
-                Integer ttlSeconds = null;
+                scanTimeout = null;
 
                 JSObject optionsObject = call.getObject("options", null);
                 if (optionsObject != null) {
-                    ttlSeconds = optionsObject.getInteger("ttlSeconds");
+                    scanTimeout = optionsObject.getInteger("ttlSeconds");
                 }
 
                 mScanner.start(
+                        scanTimeout,
+
                         new Scanner.Callback() {
                             @Override
                             public void onFailure(int errorCode, String errorMessage) {
                                 call.error(errorMessage, String.valueOf(errorCode), null);
                             }
+
+                            @Override
+                            public void onExpired() {
+                                onSubscribeExpired();
+                            }
                         }
                 );
-
-                if (ttlSeconds != null) {
-                    // Sets the time to live in seconds for the publish or subscribe.
-                    // Stops scanning after a pre-defined scan period.
-                    handler.postDelayed(() -> onSubscribeExpired(), ttlSeconds * 1000);
-                }
             } catch (Exception e) {
                 Log.e(getLogTag(), "scan", e);
 

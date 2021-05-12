@@ -10,7 +10,6 @@ import android.os.Handler;
 import android.os.ParcelUuid;
 import android.util.Log;
 
-import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
@@ -42,16 +41,36 @@ public class Advertiser {
         this.adapter = adapter;
     }
 
-    private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
+    public Integer getAdvertiseMode() {
+        return advertiseMode;
+    }
 
-    private static String bytesToHex(byte[] bytes) {
-        char[] hexChars = new char[bytes.length * 2];
-        for (int j = 0; j < bytes.length; j++) {
-            int v = bytes[j] & 0xFF;
-            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
-            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
-        }
-        return new String(hexChars);
+    public void setAdvertiseMode(Integer advertiseMode) {
+        this.advertiseMode = advertiseMode;
+    }
+
+    public Integer getTxPowerLevel() {
+        return txPowerLevel;
+    }
+
+    public void setTxPowerLevel(Integer txPowerLevel) {
+        this.txPowerLevel = txPowerLevel;
+    }
+
+//    private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
+//
+//    private static String bytesToHex(byte[] bytes) {
+//        char[] hexChars = new char[bytes.length * 2];
+//        for (int j = 0; j < bytes.length; j++) {
+//            int v = bytes[j] & 0xFF;
+//            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
+//            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
+//        }
+//        return new String(hexChars);
+//    }
+
+    public void start(Beacon beacon) {
+        start(beacon, null, null);
     }
 
     public void start(Beacon beacon, Callback callback) {
@@ -76,7 +95,10 @@ public class Advertiser {
         if (advertiser == null) {
             int errorCode = AdvertiseCallback.ADVERTISE_FAILED_FEATURE_UNSUPPORTED;
 
-            callback.onFailure(errorCode, advertiseFailed(errorCode));
+            if (callback != null) {
+                callback.onFailure(errorCode, advertiseFailed(errorCode));
+            }
+
             return;
         }
 
@@ -99,8 +121,9 @@ public class Advertiser {
                 new AdvertiseData.Builder()
                         // Add a service UUID to advertise data.
                         .addServiceUuid(new ParcelUuid(Constants.SERVICE_UUID))
+                        .addServiceUuid(new ParcelUuid(beacon.uuid()))
 //                        .addServiceData(new ParcelUuid(Constants.SERVICE_UUID), new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21})
-                        .addServiceData(new ParcelUuid(beacon.uuid()), beacon.data())
+//                        .addServiceData(new ParcelUuid(beacon.uuid()), beacon.data())
 //                        .addServiceData(new ParcelUuid(serviceUUID), bb.array())
                         // Whether the transmission power level should be included in the advertise packet.
                         .setIncludeTxPowerLevel(false)
@@ -126,10 +149,12 @@ public class Advertiser {
                             mAdvertising = true;
 
                             if (ttlSeconds != null) {
-                                startTimer(ttlSeconds);
+                                startTimer(ttlSeconds, callback);
                             }
 
-                            callback.onSuccess(settingsInEffect);
+                            if (callback != null) {
+                                callback.onSuccess(settingsInEffect);
+                            }
                         }
 
                         @Override
@@ -144,7 +169,9 @@ public class Advertiser {
 
                             stop();
 
-                            callback.onFailure(errorCode, advertiseFailed(errorCode));
+                            if (callback != null) {
+                                callback.onFailure(errorCode, advertiseFailed(errorCode));
+                            }
                         }
                     };
         }
@@ -192,13 +219,10 @@ public class Advertiser {
     /**
      * Timer
      */
-    public void startTimer(Integer ttlSeconds) {
-        if (ttlSeconds != null) {
-            runnable = new Runnable() {
-                public void run() {
-                    callback.onExpired();
-                }
-            };
+
+    public void startTimer(Integer ttlSeconds, Callback callback) {
+        if (ttlSeconds != null && callback != null) {
+            runnable = () -> callback.onExpired();
 
             // Sets the time to live in seconds for the publish or subscribe.
             // Stops scanning after a pre-defined scan period.
