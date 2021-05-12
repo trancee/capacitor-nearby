@@ -33,9 +33,13 @@ public class Nearby: CAPPlugin {
      */
     @objc func initialize(_ call: CAPPluginCall) {
         self.scanner = Scanner() { [self] result in
+            guard let scanner = self.scanner else {
+                return
+            }
+            
             switch result {
             case .found(let uuid, let data, let rssi):
-                if (self.scanner.isScanning()) {
+                if (scanner.isScanning()) {
                     var jsData: [String : Any] = [
                         "uuid": uuid.uuidString.lowercased(),
                     ]
@@ -52,7 +56,7 @@ public class Nearby: CAPPlugin {
                 
                 break
             case .lost(let uuid, let data, let rssi):
-                if (self.scanner.isScanning()) {
+                if (scanner.isScanning()) {
                     var jsData: [String : Any] = [
                         "uuid": uuid.uuidString.lowercased(),
                     ]
@@ -93,6 +97,11 @@ public class Nearby: CAPPlugin {
     }
     
     @objc func publish(_ call: CAPPluginCall) {
+        guard let advertiser = self.advertiser else {
+            call.reject(Constants.NOT_INITIALIZED);
+            return
+        }
+        
         if let messageObject = call.getObject("message") {
             guard let messageUUID = messageObject["uuid"] as? String else {
                 call.reject(Constants.UUID_NOT_FOUND)
@@ -118,7 +127,7 @@ public class Nearby: CAPPlugin {
             self.advertiseTimeout = optionsObject["ttlSeconds"] as? TimeInterval
         }
         
-        if (!self.advertiser.isAdvertising()) {
+        if (!advertiser.isAdvertising()) {
             let beacon = Advertiser.Beacon(self.uuid!, data: self.data)
             
             advertiser.start(beacon, timeout: self.advertiseTimeout) { result in
@@ -153,6 +162,11 @@ public class Nearby: CAPPlugin {
         }
     }
     @objc func unpublish(_ call: CAPPluginCall) {
+        guard let advertiser = self.advertiser else {
+            call.reject(Constants.NOT_INITIALIZED);
+            return
+        }
+
         advertiser.stop()
         
         self.advertiseTimeout = nil
@@ -164,12 +178,17 @@ public class Nearby: CAPPlugin {
     }
     
     @objc func subscribe(_ call: CAPPluginCall) {
+        guard let scanner = self.scanner else {
+            call.reject(Constants.NOT_INITIALIZED);
+            return
+        }
+        
         self.scanTimeout = nil
         if let optionsObject = call.getObject("options") {
             self.scanTimeout = optionsObject["ttlSeconds"] as? TimeInterval
         }
         
-        if (!self.scanner.isScanning()) {
+        if (!scanner.isScanning()) {
             scanner.start(timeout: self.scanTimeout) { result in
                 switch result {
                 case .success(let result):
@@ -202,6 +221,11 @@ public class Nearby: CAPPlugin {
         }
     }
     @objc func unsubscribe(_ call: CAPPluginCall) {
+        guard let scanner = self.scanner else {
+            call.reject(Constants.NOT_INITIALIZED);
+            return
+        }
+
         scanner.stop()
         
         self.scanTimeout = nil
@@ -221,8 +245,8 @@ public class Nearby: CAPPlugin {
     }
     
     @objc func status(_ call: CAPPluginCall) {
-        let isPublishing = advertiser.isAdvertising()
-        let isSubscribing = scanner.isScanning()
+        let isPublishing = (self.advertiser != nil) ? advertiser.isAdvertising() : false
+        let isSubscribing = (self.scanner != nil) ? scanner.isScanning() : false
         
         call.success([
             "isPublishing": isPublishing,
@@ -237,7 +261,39 @@ public class Nearby: CAPPlugin {
         if (self.uuid != nil) {
             let beacon = Advertiser.Beacon(self.uuid!, data: self.data)
             
-            advertiser.start(beacon, timeout: self.advertiseTimeout) { result in
+            if let advertiser = self.advertiser {
+                advertiser.start(beacon, timeout: self.advertiseTimeout) { result in
+                    switch result {
+                    case .success(let result):
+                        switch result {
+                        case .started:
+                            call.success()
+                            
+                            break
+                        case .stopped(let e):
+                            if let e = e {
+                                call.error(e.localizedDescription, e)
+                            }
+                            
+                            break
+                        case .expired:
+                            self.publishExpired()
+                            
+                            break
+                        }
+                        
+                        break
+                    case .failure(let e):
+                        call.error(e.localizedDescription, e)
+                        
+                        break
+                    }
+                }
+            }
+        }
+        
+        if let scanner = self.scanner {
+            scanner.start(timeout: self.scanTimeout) { result in
                 switch result {
                 case .success(let result):
                     switch result {
@@ -252,7 +308,7 @@ public class Nearby: CAPPlugin {
                         
                         break
                     case .expired:
-                        self.publishExpired()
+                        self.subscribeExpired()
                         
                         break
                     }
@@ -265,42 +321,21 @@ public class Nearby: CAPPlugin {
                 }
             }
         }
-        
-        scanner.start(timeout: self.scanTimeout) { result in
-            switch result {
-            case .success(let result):
-                switch result {
-                case .started:
-                    call.success()
-                    
-                    break
-                case .stopped(let e):
-                    if let e = e {
-                        call.error(e.localizedDescription, e)
-                    }
-                    
-                    break
-                case .expired:
-                    self.subscribeExpired()
-                    
-                    break
-                }
-                
-                break
-            case .failure(let e):
-                call.error(e.localizedDescription, e)
-                
-                break
-            }
-        }
     }
+    
     private func stop() {
-        self.scanner.stop()
+        if let scanner = self.scanner {
+            scanner.stop()
+        }
         
-        self.advertiser.stop()
+        if let advertiser = self.advertiser {
+            advertiser.stop()
+        }
     }
     
     private func publishExpired() {
+        guard let advertiser = self.advertiser else { return }
+        
         if (advertiser.isAdvertising()) {
             notifyListeners("onPublishExpired", data: nil)
         }
@@ -309,6 +344,8 @@ public class Nearby: CAPPlugin {
     }
     
     private func subscribeExpired() {
+        guard let scanner = self.scanner else { return }
+        
         if (scanner.isScanning()) {
             notifyListeners("onSubscribeExpired", data: nil)
         }
