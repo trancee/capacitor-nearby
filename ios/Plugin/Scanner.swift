@@ -8,66 +8,74 @@
 
 import CoreBluetooth
 
-public typealias ScanCallback = (_ result: Result<ScanResult, Error>) -> Void
+public typealias ScanCallback = (ScanResult) -> Void
 
 public enum ScanResult {
     case started
-    case stopped(error: Error?)
+    case stopped(_ error: Error? = nil)
     case expired
 }
 
 public typealias BeaconCallback = (BeaconResult) -> Void
 
 public enum BeaconResult {
-    case found(_ uuid: CBUUID, data: Data?, rssi: NSNumber?)
-    case lost(_ uuid: CBUUID, data: Data?, rssi: NSNumber?)
+    case found(_ uuid: CBUUID, data: Data? = nil, rssi: NSNumber? = nil)
+    case lost(_ uuid: CBUUID, data: Data? = nil, rssi: NSNumber? = nil)
 }
 
 public final class Scanner: NSObject {
     // An object that scans for, discovers, connects to, and manages peripherals.
     private var centralManager: CBCentralManager?
     private var callback: ScanCallback?
-
+    
     private var timer: Timer?
+    
+    private static var stateCallback: StateCallback?
     
     private static var beaconCallback: BeaconCallback?
     private static var beacons: [CBUUID: Beacon] = [:]
     
-    init(beaconCallback: @escaping BeaconCallback) {
+    init(stateCallback: @escaping StateCallback,
+         beaconCallback: @escaping BeaconCallback) {
         super.init()
-
+        
+        Scanner.stateCallback = stateCallback
         Scanner.beaconCallback = beaconCallback
-
+        
         // Keys used to pass options when initializing a central manager.
         let options: [String : Any] = [
             // A Boolean value that specifies whether the system warns the user if the app instantiates the central manager when Bluetooth service isn’t available.
             CBCentralManagerOptionShowPowerAlertKey: true,
         ]
-
-        centralManager = CBCentralManager(delegate: self, queue: nil, options: options)
-        callback = nil
         
-        timer = nil
+        self.centralManager = CBCentralManager(delegate: self, queue: nil, options: options)
+        self.callback = nil
+        
+        self.timer = nil
         
         Scanner.beacons = [:]
     }
     deinit {
-        stopTimer()
+        stop()
     }
 }
 
 extension Scanner {
     // Start scanning for peripherals
     public func start(
-        timeout: TimeInterval?,
-        completion: @escaping ScanCallback)
+        withTimeout timeout: TimeInterval?,
+        callback: @escaping ScanCallback)
     {
-        self.callback = completion
+        self.callback = callback
         
-        stopTimer()
+        stop()
         
-        if (isScanning()) {
-            stop()
+        guard let centralManager = self.centralManager else {
+            if let callback = self.callback {
+                callback(.stopped())
+            }
+            
+            return
         }
         
         // Keys used to pass options when scanning for peripherals.
@@ -75,44 +83,50 @@ extension Scanner {
             // A Boolean value that specifies whether the scan should run without duplicate filtering.
             CBCentralManagerScanOptionAllowDuplicatesKey: true,
         ]
-
+        
         // Scans for peripherals that are advertising services.
-        centralManager?.scanForPeripherals(
+        centralManager.scanForPeripherals(
             withServices: [
                 Constants.SERVICE_UUID,
             ],
             
             options: options
         )
-
-        if let callback = callback {
-            callback(.success(.started))
+        
+        if let callback = self.callback {
+            callback(.started)
         }
-
+        
         if let timeout = timeout {
             startTimer(timeout)
         }
     }
-
-    public func stop()
+    
+    public func stop(_ error: Error? = nil)
     {
-        // Asks the central manager to stop scanning for peripherals.
-        centralManager?.stopScan()
+        stopTimer()
 
-        if let callback = callback {
-            callback(.success(.stopped(error: nil)))
+        if let centralManager = self.centralManager {
+            // Asks the central manager to stop scanning for peripherals.
+            centralManager.stopScan()
+        }
+        
+        if let callback = self.callback {
+            callback(.stopped(error))
         }
     }
     
     public func isScanning() -> Bool
     {
+        guard let centralManager = self.centralManager else { return false }
+        
         // A Boolean value that indicates whether the central is currently scanning.
-        return ((centralManager?.isScanning) != nil)
+        return centralManager.isScanning
     }
     
     private func startTimer(_ timeout: TimeInterval) {
         stopTimer()
-
+        
         self.timer = Timer.scheduledTimer(
             timeInterval: timeout,
             target: self,
@@ -128,12 +142,12 @@ extension Scanner {
             self.timer = nil
         }
     }
-
+    
     @objc fileprivate func onTimer(_ timer: Timer) {
         stopTimer()
         
-        if let callback = callback {
-            callback(.success(.expired))
+        if let callback = self.callback {
+            callback(.expired)
         }
     }
 }
@@ -142,7 +156,24 @@ extension Scanner {
 extension Scanner: CBCentralManagerDelegate {
     // Tells the delegate the central manager’s state updated.
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        guard central.state == .poweredOn else { return }
+        if let callback = Scanner.stateCallback {
+            switch central.state {
+            case .unknown:
+                callback(.unknown)
+            case .resetting:
+                callback(.resetting)
+            case .unsupported:
+                callback(.unsupported)
+            case .unauthorized:
+                callback(.unauthorized)
+            case .poweredOff:
+                callback(.poweredOff)
+            case .poweredOn:
+                callback(.poweredOn)
+            @unknown default:
+                callback(.unknown)
+            }
+        }
     }
     
     // Tells the delegate the central manager discovered a peripheral while scanning for devices.
@@ -151,36 +182,36 @@ extension Scanner: CBCentralManagerDelegate {
                                advertisementData: [String: Any],
                                rssi RSSI: NSNumber) {
         let rssi = RSSI.intValue != Int8.max ? RSSI : nil
-
-        if let advertisementDataServiceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? Array<CBUUID> {
+        
+        if let advertisementDataServiceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] {
             for uuid in advertisementDataServiceUUIDs {
                 if uuid == Constants.SERVICE_UUID {
                     continue
                 }
-
+                
                 if let beacon = Scanner.beacons[uuid] {
                     beacon.alive()
                 } else {
-                    Scanner.beacons[uuid] = Beacon(uuid, data: nil, rssi: rssi)
-
+                    Scanner.beacons[uuid] = Beacon(uuid, rssi: rssi)
+                    
                     if let beaconCallback = Scanner.beaconCallback {
-                        beaconCallback(.found(uuid, data: nil, rssi: rssi))
+                        beaconCallback(.found(uuid, rssi: rssi))
                     }
                 }
             }
         }
-
+        
         if let advertisementDataServiceData = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data] {
             for (uuid, data) in advertisementDataServiceData {
                 if uuid == Constants.SERVICE_UUID {
                     continue
                 }
-
+                
                 if let beacon = Scanner.beacons[uuid] {
                     beacon.alive()
                 } else {
                     Scanner.beacons[uuid] = Beacon(uuid, data: data, rssi: rssi)
-
+                    
                     if let beaconCallback = Scanner.beaconCallback {
                         beaconCallback(.found(uuid, data: data, rssi: rssi))
                     }
@@ -191,59 +222,55 @@ extension Scanner: CBCentralManagerDelegate {
 }
 
 extension Scanner {
-    private static let ttlSeconds: TimeInterval? = 10
-
+    private static let ttlSeconds: TimeInterval = 10
+    
     public final class Beacon {
         let uuid: CBUUID
         let data: Data?
         let rssi: NSNumber?
-
+        
         let timestamp: Date
-
+        
         private var timer: Timer?
-
+        
         private var lastSeen: Date
-
-        init(_ uuid: CBUUID, data: Data?, rssi: NSNumber?) {
+        
+        init(_ uuid: CBUUID, data: Data? = nil, rssi: NSNumber? = nil) {
             self.uuid = uuid
             self.data = data
             self.rssi = rssi
             
             self.timestamp = Date()
-
+            
             self.lastSeen = Date()
             
-            if let ttlSeconds = ttlSeconds {
-                startTimer(ttlSeconds)
-            }
-
+            startTimer(Scanner.ttlSeconds)
+            
             Scanner.beacons[self.uuid] = self
         }
         deinit {
-            stopTimer()
+            kill()
         }
-
+        
         public func kill() {
             stopTimer()
             
             Scanner.beacons[self.uuid] = nil
         }
-
+        
         public func alive() {
             self.lastSeen = Date()
             
             stopTimer()
             
             if Scanner.beacons[self.uuid] != nil {
-                if let ttlSeconds = ttlSeconds {
-                    startTimer(ttlSeconds)
-                }
+                startTimer(Scanner.ttlSeconds)
             }
         }
-
+        
         private func startTimer(_ timeout: TimeInterval) {
             stopTimer()
-
+            
             self.timer = Timer.scheduledTimer(
                 timeInterval: timeout,
                 target: self,
@@ -259,9 +286,9 @@ extension Scanner {
                 self.timer = nil
             }
         }
-
+        
         @objc fileprivate func onTimer(_ timer: Timer) {
-            stopTimer()
+            kill()
             
             if let beaconCallback = Scanner.beaconCallback {
                 beaconCallback(.lost(self.uuid, data: self.data, rssi: self.rssi))
