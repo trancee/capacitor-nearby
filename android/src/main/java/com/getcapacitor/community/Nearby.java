@@ -3,28 +3,27 @@ package com.getcapacitor.community;
 import android.Manifest;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.le.AdvertiseCallback;
-import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.AdvertiseSettings;
-import android.bluetooth.le.BluetoothLeAdvertiser;
-import android.bluetooth.le.BluetoothLeScanner;
-import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanFilter;
-import android.bluetooth.le.ScanRecord;
-import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Handler;
-import android.os.ParcelUuid;
 import android.provider.Settings;
 import android.util.Base64;
 import android.util.Log;
+
+import androidx.annotation.StringDef;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.util.Set;
+import java.util.UUID;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -42,16 +41,6 @@ import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.tasks.Task;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-
-import static android.bluetooth.le.ScanCallback.SCAN_FAILED_ALREADY_STARTED;
-
 interface Constants {
     // v5 (Name-based | SHA1 hash) UUID (winkee.app)
 //    UUID SERVICE_UUID = UUID.fromString("1c2cceae-66cd-55cd-8769-d961a7412368");
@@ -63,6 +52,30 @@ interface Constants {
     String PERMISSION_DENIED = "permission denied";
 
     String UUID_NOT_FOUND = "UUID not found";
+
+    @StringDef({
+            BluetoothState.UNKNOWN,
+            BluetoothState.RESETTING,
+            BluetoothState.UNSUPPORTED,
+            BluetoothState.UNAUTHORIZED,
+            BluetoothState.POWERED_OFF,
+            BluetoothState.POWERED_ON,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    @interface BluetoothState {
+        // The manager’s state is unknown.
+        String UNKNOWN = "unknown";
+        // A state that indicates the connection with the system service was momentarily lost.
+        String RESETTING = "resetting";
+        // A state that indicates this device doesn’t support the Bluetooth low energy central or client role.
+        String UNSUPPORTED = "unsupported";
+        // A state that indicates the application isn’t authorized to use the Bluetooth low energy role.
+        String UNAUTHORIZED = "unauthorized";
+        // A state that indicates Bluetooth is currently powered off.
+        String POWERED_OFF = "poweredOff";
+        // A state that indicates Bluetooth is currently powered on and available to use.
+        String POWERED_ON = "poweredOn";
+    }
 }
 
 @NativePlugin(
@@ -99,8 +112,6 @@ public class Nearby extends Plugin {
 
     private Integer scanTimeout;
     private Integer advertiseTimeout;
-
-    private Handler handler = new Handler();
 
     @Override
     protected void handleRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
@@ -159,6 +170,10 @@ public class Nearby extends Plugin {
     protected void handleOnDestroy() {
         super.handleOnDestroy();
 
+        if (isBluetoothSupported()) {
+            getContext().unregisterReceiver(BluetoothStateBroadcastReceiver);
+        }
+
         stop();
     }
 
@@ -204,6 +219,9 @@ public class Nearby extends Plugin {
 
                 return;
             }
+
+            IntentFilter filter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+            getContext().registerReceiver(BluetoothStateBroadcastReceiver, filter);
 
             if (hasRequiredPermissions()) {
                 final LocationManager locationManager =
@@ -646,6 +664,10 @@ public class Nearby extends Plugin {
         }
     }
 
+    private static boolean isBluetoothSupported() {
+        return BluetoothAdapter.getDefaultAdapter() != null;
+    }
+
     private boolean isBluetoothEnabled() {
         BluetoothAdapter bluetoothAdapter =
                 BluetoothAdapter.getDefaultAdapter();
@@ -708,4 +730,37 @@ public class Nearby extends Plugin {
             }
         });
     }
+
+    private final BroadcastReceiver BluetoothStateBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+
+            if (action != null && action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+                final int state = intent.getIntExtra(
+                        BluetoothAdapter.EXTRA_STATE,
+                        BluetoothAdapter.ERROR
+                );
+
+                notifyListeners("onBluetoothStateChanged",
+                        new JSObject()
+                                .put("state", fromBluetoothState(state))
+                );
+            }
+        }
+
+        private String fromBluetoothState(int bluetoothState) {
+            switch (bluetoothState) {
+                case BluetoothAdapter.STATE_ON:
+                    return Constants.BluetoothState.POWERED_ON;
+                case BluetoothAdapter.STATE_OFF:
+                    return Constants.BluetoothState.POWERED_OFF;
+                case BluetoothAdapter.STATE_TURNING_ON:
+                case BluetoothAdapter.STATE_TURNING_OFF:
+                    return Constants.BluetoothState.RESETTING;
+                default:
+                    return Constants.BluetoothState.UNKNOWN;
+            }
+        }
+    };
 }

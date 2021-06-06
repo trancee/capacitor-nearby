@@ -22,7 +22,7 @@ export type Status = {
   isPublishing: boolean;
   isSubscribing: boolean;
   uuids: UUID[];
-}
+};
 
 export enum ScanMode {
   // Perform Bluetooth LE scan in low power mode.
@@ -82,31 +82,43 @@ export interface SubscribeOptions {
   ttlSeconds?: TTLSeconds;
 }
 
+export enum BluetoothState {
+  // The manager’s state is unknown.
+  UNKNOWN = 'unknown',
+  // A state that indicates the connection with the system service was momentarily lost.
+  RESETTING = 'resetting',
+  // A state that indicates this device doesn’t support the Bluetooth low energy central or client role.
+  UNSUPPORTED = 'unsupported',
+  // A state that indicates the application isn’t authorized to use the Bluetooth low energy role.
+  UNAUTHORIZED = 'unauthorized',
+  // A state that indicates Bluetooth is currently powered off.
+  POWERED_OFF = 'poweredOff',
+  // A state that indicates Bluetooth is currently powered on and available to use.
+  POWERED_ON = 'poweredOn',
+}
+
 export interface NearbyPlugin {
   initialize(options: {
     // A InitializeOptions object for this operation
-    options?: InitializeOptions,
+    options?: InitializeOptions;
   }): Promise<void>;
   reset(): Promise<void>;
 
   publish(options: {
     // A Message to publish for nearby devices to see
-    message: Message,
+    message: Message;
     // A PublishOptions object for this operation
-    options?: PublishOptions,
+    options?: PublishOptions;
   }): Promise<void>;
   // Cancels an existing published message.
-  unpublish(options: {
-    uuid?: UUID,
-  }): Promise<void>;
+  unpublish(options: { uuid?: UUID }): Promise<void>;
 
   subscribe(options: {
     // A SubscribeOptions object for this operation
-    options?: SubscribeOptions,
+    options?: SubscribeOptions;
   }): Promise<void>;
   // Cancels an existing subscription.
-  unsubscribe(options: {
-  }): Promise<void>;
+  unsubscribe(options: {}): Promise<void>;
 
   pause(): Promise<void>;
   resume(): Promise<void>;
@@ -114,15 +126,35 @@ export interface NearbyPlugin {
   status(): Promise<Status>;
 
   // Called when permission is granted or revoked for this app to use Nearby.
-  addListener(eventName: 'onPermissionChanged', listenerFunc: (permissionGranted: boolean) => void): PluginListenerHandle;
+  addListener(
+    eventName: 'onPermissionChanged',
+    listenerFunc: (permissionGranted: boolean) => void,
+  ): PluginListenerHandle;
+  // Called when state of Bluetooth has changed.
+  addListener(
+    eventName: 'onBluetoothStateChanged',
+    listenerFunc: (state: BluetoothState) => void,
+  ): PluginListenerHandle;
 
   // Called when messages are found.
-  addListener(eventName: 'onFound', listenerFunc: (uuid: UUID, content: string) => void): PluginListenerHandle;
+  addListener(
+    eventName: 'onFound',
+    listenerFunc: (uuid: UUID, content: string) => void,
+  ): PluginListenerHandle;
   // Called when a message is no longer detectable nearby.
-  addListener(eventName: 'onLost', listenerFunc: (uuid: UUID) => void): PluginListenerHandle;
+  addListener(
+    eventName: 'onLost',
+    listenerFunc: (uuid: UUID) => void,
+  ): PluginListenerHandle;
 
   // The published message is expired.
-  addListener(eventName: 'onPublishExpired', listenerFunc: (uuid: UUID) => void): PluginListenerHandle;
+  addListener(
+    eventName: 'onPublishExpired',
+    listenerFunc: (uuid: UUID) => void,
+  ): PluginListenerHandle;
   // The subscription is expired.
-  addListener(eventName: 'onSubscribeExpired', listenerFunc: (uuid: UUID) => void): PluginListenerHandle;
+  addListener(
+    eventName: 'onSubscribeExpired',
+    listenerFunc: (uuid: UUID) => void,
+  ): PluginListenerHandle;
 }
