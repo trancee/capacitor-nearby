@@ -66,6 +66,8 @@ export interface Message {
 }
 
 export interface InitializeOptions {
+  serviceUUID: UUID;
+
   scanMode?: ScanMode;
 
   advertiseMode?: AdvertiseMode;

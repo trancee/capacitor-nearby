@@ -13,7 +13,6 @@ import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.Build;
-import android.os.Handler;
 import android.provider.Settings;
 import android.util.Base64;
 import android.util.Log;
@@ -44,7 +43,7 @@ import com.google.android.gms.tasks.Task;
 interface Constants {
     // v5 (Name-based | SHA1 hash) UUID (winkee.app)
 //    UUID SERVICE_UUID = UUID.fromString("1c2cceae-66cd-55cd-8769-d961a7412368");
-    UUID SERVICE_UUID = UUID.fromString("1c2cceae-0000-1000-8000-00805f9b34fb");
+//    UUID SERVICE_UUID = UUID.fromString("1c2cceae-0000-1000-8000-00805f9b34fb");
 
     String BLUETOOTH_NOT_SUPPORTED = "Bluetooth not supported";
     String BLE_NOT_SUPPORTED = "Bluetooth Low Energy not supported";
@@ -89,6 +88,9 @@ interface Constants {
                 Manifest.permission.BLUETOOTH,
                 // Allows applications to discover and pair bluetooth devices.
                 Manifest.permission.BLUETOOTH_ADMIN,
+        },
+        requestCodes = {
+                Nearby.REQUEST_BLUETOOTH_SERVICE,
         }
 )
 public class Nearby extends Plugin {
@@ -101,6 +103,8 @@ public class Nearby extends Plugin {
 
     private Scanner mScanner;
     private Advertiser mAdvertiser;
+
+    UUID serviceUUID;
 
     Integer scanMode = ScanSettings.SCAN_MODE_BALANCED;
 
@@ -130,9 +134,9 @@ public class Nearby extends Plugin {
                 }
             }
 
-            if (permissionGranted) {
-                initialize(call);
-            }
+            permissionGranted = true;
+
+            initialize(call);
         }
 
         notifyListeners("onPermissionChanged",
@@ -142,8 +146,8 @@ public class Nearby extends Plugin {
     }
 
     @Override
-    protected void handleOnActivityResult(int requestCode, int resultCode, Intent intentData) {
-        super.handleOnActivityResult(requestCode, resultCode, intentData);
+    protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
+        super.handleOnActivityResult(requestCode, resultCode, data);
 
         {
             boolean permissionGranted = resultCode == Activity.RESULT_OK;
@@ -195,8 +199,7 @@ public class Nearby extends Plugin {
         try {
             if (!getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH)) {
                 Log.i(getLogTag(),
-                        String.format(
-                                Constants.BLUETOOTH_NOT_SUPPORTED));
+                        Constants.BLUETOOTH_NOT_SUPPORTED);
 
                 call.error(Constants.BLUETOOTH_NOT_SUPPORTED);
                 return;
@@ -204,8 +207,7 @@ public class Nearby extends Plugin {
 
             if (!getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
                 Log.i(getLogTag(),
-                        String.format(
-                                Constants.BLE_NOT_SUPPORTED));
+                        Constants.BLE_NOT_SUPPORTED);
 
                 call.error(Constants.BLE_NOT_SUPPORTED);
                 return;
@@ -262,6 +264,14 @@ public class Nearby extends Plugin {
 
                 JSObject optionsObject = call.getObject("options", null);
                 if (optionsObject != null) {
+                    String serviceUUID = optionsObject.getString("serviceUUID", null);
+                    if (serviceUUID != null && serviceUUID.length() > 0)
+                        this.serviceUUID = UUID.fromString(serviceUUID);
+                    else {
+                        call.reject(Constants.UUID_NOT_FOUND);
+                        return;
+                    }
+
                     scanMode = optionsObject.getInteger("scanMode");
 
                     advertiseMode = optionsObject.getInteger("advertiseMode");
@@ -271,8 +281,10 @@ public class Nearby extends Plugin {
                 mAdapter =
                         BluetoothAdapter.getDefaultAdapter();
 
-                mScanner = new Scanner(
+                mScanner = Scanner.getInstance(
                         this.mAdapter,
+
+                        this.serviceUUID,
 
                         new Scanner.BeaconCallback() {
                             @Override
@@ -319,8 +331,10 @@ public class Nearby extends Plugin {
                     mScanner.setScanMode(scanMode);
                 }
 
-                mAdvertiser = new Advertiser(
-                        this.mAdapter
+                mAdvertiser = Advertiser.getInstance(
+                        this.mAdapter,
+
+                        this.serviceUUID
                 );
 
                 if (advertiseMode != null) {
@@ -646,12 +660,7 @@ public class Nearby extends Plugin {
             boolean isPublishing = mAdvertiser.isAdvertising();
             boolean isSubscribing = mScanner.isScanning();
 
-            Set<UUID> uuids = null;// = this.beacons.keySet();
-
-            // Log.i(getLogTag(),
-            //         String.format(
-            //                 "status(isPublishing=%s, isSubscribing=%s, uuids=%s)",
-            //                 isPublishing, isSubscribing, uuids));
+            Set<UUID> uuids = mScanner.getBeacons();
 
             call.success(
                     new JSObject()
@@ -665,7 +674,10 @@ public class Nearby extends Plugin {
     }
 
     private static boolean isBluetoothSupported() {
-        return BluetoothAdapter.getDefaultAdapter() != null;
+        BluetoothAdapter bluetoothAdapter =
+                BluetoothAdapter.getDefaultAdapter();
+
+        return bluetoothAdapter != null;
     }
 
     private boolean isBluetoothEnabled() {
