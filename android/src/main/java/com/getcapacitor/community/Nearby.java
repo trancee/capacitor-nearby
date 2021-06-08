@@ -41,10 +41,6 @@ import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.tasks.Task;
 
 interface Constants {
-    // v5 (Name-based | SHA1 hash) UUID (winkee.app)
-//    UUID SERVICE_UUID = UUID.fromString("1c2cceae-66cd-55cd-8769-d961a7412368");
-//    UUID SERVICE_UUID = UUID.fromString("1c2cceae-0000-1000-8000-00805f9b34fb");
-
     String BLUETOOTH_NOT_SUPPORTED = "Bluetooth not supported";
     String BLE_NOT_SUPPORTED = "Bluetooth Low Energy not supported";
     String NOT_INITIALIZED = "not initialized";
@@ -265,9 +261,16 @@ public class Nearby extends Plugin {
                 JSObject optionsObject = call.getObject("options", null);
                 if (optionsObject != null) {
                     String serviceUUID = optionsObject.getString("serviceUUID", null);
-                    if (serviceUUID != null && serviceUUID.length() > 0)
+                    if (serviceUUID != null && serviceUUID.length() > 0) {
+                        switch (serviceUUID.length()) {
+                            case 4:
+                                serviceUUID = "0000" + serviceUUID;
+                            case 8:
+                                serviceUUID = serviceUUID + "-" + "0000-1000-8000-00805f9b34fb";
+                        }
+
                         this.serviceUUID = UUID.fromString(serviceUUID);
-                    else {
+                    } else {
                         call.reject(Constants.UUID_NOT_FOUND);
                         return;
                     }

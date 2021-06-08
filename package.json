@@ -1,6 +1,6 @@
 {
   "name": "capacitor-nearby",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Uses Bluetooth LE to scan and advertise for nearby devices",
   "main": "dist/plugin.js",
   "module": "dist/esm/index.js",
