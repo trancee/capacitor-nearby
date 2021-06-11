@@ -229,8 +229,14 @@ extension Scanner: CBCentralManagerDelegate {
 extension Scanner {
     private static let ttlSeconds: TimeInterval = 10
     
-    public func getBeacons() -> [CBUUID] {
-        return Array(Scanner.beacons.keys)
+    public func getBeacons() -> [String] {
+        var result: [String] = []
+
+        for key in Scanner.beacons.keys {
+            result.append(key.uuidString.lowercased())
+        }
+        
+        return result
     }
     
     public final class Beacon {

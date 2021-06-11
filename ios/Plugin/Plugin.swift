@@ -294,7 +294,7 @@ public class Nearby: CAPPlugin {
         let isPublishing = (self.advertiser != nil) ? self.advertiser.isAdvertising() : false
         let isSubscribing = (self.scanner != nil) ? self.scanner.isScanning() : false
         
-        let uuids = scanner.getBeacons()
+        let uuids = (self.scanner != nil) ? scanner.getBeacons() : []
 
         call.success([
             "isPublishing": isPublishing,
