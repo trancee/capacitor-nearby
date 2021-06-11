@@ -7,8 +7,6 @@ import CoreBluetooth
  * here: https://capacitorjs.com/docs/plugins/ios
  */
 struct Constants {
-    static let SERVICE_UUID = CBUUID(string: "1c2cceae")
-    
     static let BLUETOOTH_NOT_SUPPORTED = "Bluetooth not supported"
     static let BLE_NOT_SUPPORTED = "Bluetooth Low Energy not supported"
     static let NOT_INITIALIZED = "not initialized"
@@ -37,7 +35,9 @@ public class Nearby: CAPPlugin {
     private var advertiserAvailable = false
     private var advertiser: Advertiser!
     private var advertiseTimeout: TimeInterval?
-    
+
+    private var serviceUUID: CBUUID?
+
     private var uuid: CBUUID?
     private var data: Data?
     
@@ -45,34 +45,41 @@ public class Nearby: CAPPlugin {
      * Public functions
      */
     @objc func initialize(_ call: CAPPluginCall) {
+        if let optionsObject = call.getObject("options") {
+            guard let serviceUUID = optionsObject["serviceUUID"] as? String else {
+                call.reject(Constants.UUID_NOT_FOUND)
+                return
+            }
+            
+            if (serviceUUID.count > 0) {
+                self.serviceUUID = CBUUID(string: serviceUUID)
+            }
+        }
+        
+        guard self.serviceUUID != nil else {
+            call.reject(Constants.UUID_NOT_FOUND)
+            return
+        }
+        
         self.scannerAvailable = false
         self.advertiserAvailable = false
         
-        self.scanner = Scanner() { [self] result in
+        self.scanner = Scanner(self.serviceUUID!) { [self] result in
             switch result {
-            case .unknown,
-                 .resetting,
-                 .unsupported,
-                 .unauthorized,
-                 .poweredOff:
-                if self.scannerAvailable {
-                    notifyListeners("onPermissionChanged", data: [
-                        "permissionGranted": false,
-                    ])
-                } else {
-                    call.reject(Constants.PERMISSION_DENIED)
-                }
             case .poweredOn:
                 if self.scannerAvailable {
-                    notifyListeners("onPermissionChanged", data: [
-                        "permissionGranted": true,
-                    ])
                 } else {
                     self.scannerAvailable = true
                     
                     call.success()
                 }
+            default:
+                self.scannerAvailable = false
             }
+
+            notifyListeners("onBluetoothStateChanged", data: [
+                "state": result,
+            ])
         } beaconCallback: { [self] result in
             guard let scanner = self.scanner else {
                 return
@@ -117,31 +124,22 @@ public class Nearby: CAPPlugin {
         }
         self.scanTimeout = nil
         
-        self.advertiser = Advertiser() { [self] result in
+        self.advertiser = Advertiser(self.serviceUUID!) { [self] result in
             switch result {
-            case .unknown,
-                 .resetting,
-                 .unsupported,
-                 .unauthorized,
-                 .poweredOff:
-                if self.advertiserAvailable {
-                    notifyListeners("onPermissionChanged", data: [
-                        "permissionGranted": false,
-                    ])
-                } else {
-                    call.reject(Constants.PERMISSION_DENIED)
-                }
             case .poweredOn:
                 if self.advertiserAvailable {
-                    notifyListeners("onPermissionChanged", data: [
-                        "permissionGranted": true,
-                    ])
                 } else {
                     self.advertiserAvailable = true
                     
                     call.success()
                 }
+            default:
+                self.advertiserAvailable = false
             }
+
+            notifyListeners("onBluetoothStateChanged", data: [
+                "state": result,
+            ])
         }
         self.advertiseTimeout = nil
         
@@ -296,9 +294,12 @@ public class Nearby: CAPPlugin {
         let isPublishing = (self.advertiser != nil) ? self.advertiser.isAdvertising() : false
         let isSubscribing = (self.scanner != nil) ? self.scanner.isScanning() : false
         
+        let uuids = scanner.getBeacons()
+
         call.success([
             "isPublishing": isPublishing,
             "isSubscribing": isSubscribing,
+            "uuids": uuids,
         ])
     }
     
@@ -381,5 +382,23 @@ public class Nearby: CAPPlugin {
         }
         
         scanner.stop()
+    }
+    
+    private func fromBluetoothState(_ state: CBManagerState) -> String {
+        switch (state)
+        {
+        case .poweredOn:
+            return "poweredOn";
+        case .poweredOff:
+            return "poweredOff";
+        case .resetting:
+            return "resetting";
+        case .unsupported:
+            return "unsupported";
+        case .unauthorized:
+            return "unauthorized";
+        default:
+            return "unknown";
+        }
     }
 }

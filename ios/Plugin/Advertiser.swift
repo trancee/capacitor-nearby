@@ -23,11 +23,16 @@ public final class Advertiser: NSObject {
     
     private var timer: Timer?
     
+    private static var serviceUUID: CBUUID?;
+    
     private static var stateCallback: StateCallback?
 
-    init(stateCallback: @escaping StateCallback) {
+    init(_ serviceUUID: CBUUID,
+         stateCallback: @escaping StateCallback) {
         super.init()
         
+        Advertiser.serviceUUID = serviceUUID
+
         Advertiser.stateCallback = stateCallback
 
         // Keys used to specify options when creating a peripheral manager.
@@ -69,7 +74,7 @@ extension Advertiser {
         let advertisementData: [String : Any] = [
             // An array of service UUIDs.
             CBAdvertisementDataServiceUUIDsKey: [
-                Constants.SERVICE_UUID,
+                Advertiser.serviceUUID,
                 beacon.uuid,
             ],
         ]

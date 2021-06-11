@@ -30,14 +30,19 @@ public final class Scanner: NSObject {
     
     private var timer: Timer?
     
+    private static var serviceUUID: CBUUID?;
+    
     private static var stateCallback: StateCallback?
     
     private static var beaconCallback: BeaconCallback?
     private static var beacons: [CBUUID: Beacon] = [:]
     
-    init(stateCallback: @escaping StateCallback,
+    init(_ serviceUUID: CBUUID,
+         stateCallback: @escaping StateCallback,
          beaconCallback: @escaping BeaconCallback) {
         super.init()
+        
+        Scanner.serviceUUID = serviceUUID
         
         Scanner.stateCallback = stateCallback
         Scanner.beaconCallback = beaconCallback
@@ -87,7 +92,7 @@ extension Scanner {
         // Scans for peripherals that are advertising services.
         centralManager.scanForPeripherals(
             withServices: [
-                Constants.SERVICE_UUID,
+                Scanner.serviceUUID!,
             ],
             
             options: options
@@ -105,7 +110,7 @@ extension Scanner {
     public func stop(_ error: Error? = nil)
     {
         stopTimer()
-
+        
         if let centralManager = self.centralManager {
             // Asks the central manager to stop scanning for peripherals.
             centralManager.stopScan()
@@ -185,7 +190,7 @@ extension Scanner: CBCentralManagerDelegate {
         
         if let advertisementDataServiceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] {
             for uuid in advertisementDataServiceUUIDs {
-                if uuid == Constants.SERVICE_UUID {
+                if uuid == Scanner.serviceUUID {
                     continue
                 }
                 
@@ -203,7 +208,7 @@ extension Scanner: CBCentralManagerDelegate {
         
         if let advertisementDataServiceData = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data] {
             for (uuid, data) in advertisementDataServiceData {
-                if uuid == Constants.SERVICE_UUID {
+                if uuid == Scanner.serviceUUID {
                     continue
                 }
                 
@@ -223,6 +228,10 @@ extension Scanner: CBCentralManagerDelegate {
 
 extension Scanner {
     private static let ttlSeconds: TimeInterval = 10
+    
+    public func getBeacons() -> [CBUUID] {
+        return Array(Scanner.beacons.keys)
+    }
     
     public final class Beacon {
         let uuid: CBUUID
