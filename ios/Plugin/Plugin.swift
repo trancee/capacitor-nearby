@@ -28,11 +28,9 @@ public enum StateResult {
 
 @objc(Nearby)
 public class Nearby: CAPPlugin {
-    private var scannerAvailable = false
     private var scanner: Scanner!
     private var scanTimeout: TimeInterval?
     
-    private var advertiserAvailable = false
     private var advertiser: Advertiser!
     private var advertiseTimeout: TimeInterval?
 
@@ -61,25 +59,17 @@ public class Nearby: CAPPlugin {
             return
         }
         
-        self.scannerAvailable = false
-        self.advertiserAvailable = false
-        
         self.scanner = Scanner(self.serviceUUID!) { [self] result in
+            notifyListeners("onBluetoothStateChanged", data: [
+                "state": fromBluetoothState(result),
+            ])
+
             switch result {
             case .poweredOn:
-                if self.scannerAvailable {
-                } else {
-                    self.scannerAvailable = true
-                    
-                    call.success()
-                }
+                call.success()
             default:
-                self.scannerAvailable = false
+                call.error("Bluetooth is not powered on.")
             }
-
-            notifyListeners("onBluetoothStateChanged", data: [
-                "state": result,
-            ])
         } beaconCallback: { [self] result in
             guard let scanner = self.scanner else {
                 return
@@ -125,21 +115,16 @@ public class Nearby: CAPPlugin {
         self.scanTimeout = nil
         
         self.advertiser = Advertiser(self.serviceUUID!) { [self] result in
+            notifyListeners("onBluetoothStateChanged", data: [
+                "state": fromBluetoothState(result),
+            ])
+
             switch result {
             case .poweredOn:
-                if self.advertiserAvailable {
-                } else {
-                    self.advertiserAvailable = true
-                    
-                    call.success()
-                }
+                call.success()
             default:
-                self.advertiserAvailable = false
+                call.error("Bluetooth is not powered on.")
             }
-
-            notifyListeners("onBluetoothStateChanged", data: [
-                "state": result,
-            ])
         }
         self.advertiseTimeout = nil
         
@@ -384,7 +369,7 @@ public class Nearby: CAPPlugin {
         scanner.stop()
     }
     
-    private func fromBluetoothState(_ state: CBManagerState) -> String {
+    private func fromBluetoothState(_ state: StateResult) -> String {
         switch (state)
         {
         case .poweredOn:
