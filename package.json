@@ -1,6 +1,6 @@
 {
   "name": "capacitor-nearby",
-  "version": "0.4.6",
+  "version": "1.0.0",
   "description": "Uses Bluetooth LE to scan and advertise for nearby devices",
   "main": "dist/plugin.js",
   "module": "dist/esm/index.js",
@@ -17,21 +17,21 @@
   "author": "Philipp Grosswiler",
   "license": "MIT",
   "devDependencies": {
-    "@capacitor/android": "^2.4.7",
-    "@capacitor/core": "^2.4.7",
-    "@capacitor/ios": "^2.4.7",
-    "@ionic/prettier-config": "^1.0.0",
-    "@ionic/swiftlint-config": "^1.0.0",
-    "@rollup/plugin-node-resolve": "^8.1.0",
-    "prettier": "^2.0.5",
-    "prettier-plugin-java": "^1.0.2",
-    "rimraf": "^3.0.0",
-    "rollup": "^2.36.1",
-    "swiftlint": "^1.0.1",
-    "typescript": "~3.8.3"
+    "@capacitor/android": "2",
+    "@capacitor/core": "2",
+    "@capacitor/ios": "2",
+    "@ionic/prettier-config": "latest",
+    "@ionic/swiftlint-config": "latest",
+    "@rollup/plugin-node-resolve": "latest",
+    "prettier": "latest",
+    "prettier-plugin-java": "latest",
+    "rimraf": "latest",
+    "rollup": "latest",
+    "swiftlint": "latest",
+    "typescript": "latest"
   },
   "peerDependencies": {
-    "@capacitor/core": "^2.4.7"
+    "@capacitor/core": "2"
   },
   "files": [
     "dist/",

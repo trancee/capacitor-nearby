@@ -171,7 +171,11 @@ public class Nearby extends Plugin {
         super.handleOnDestroy();
 
         if (isBluetoothSupported()) {
-            getContext().unregisterReceiver(BluetoothStateBroadcastReceiver);
+            try {
+                getContext().unregisterReceiver(BluetoothStateBroadcastReceiver);
+            } catch (final IllegalArgumentException e) {
+                // The receiver was not registered.
+            }
         }
 
         stop();
