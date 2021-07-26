@@ -64,7 +64,7 @@ export interface Message {
    *
    * @since 1.0.0
    */
-  data?: string;
+  content?: string;
 }
 
 export interface InitializeOptions {
@@ -143,10 +143,10 @@ export enum BluetoothState {
 
 export type PermissionChangedListener = (permissionGranted: boolean) => void;
 export type BluetoothStateChangedListener = (state: BluetoothState) => void;
-export type FoundListener = (uuid: UUID, content: string) => void;
-export type LostListener = (uuid: UUID) => void;
-export type PublishExpiredListener = (uuid: UUID) => void;
-export type SubscribeExpiredListener = (uuid: UUID) => void;
+export type FoundListener = (uuid: UUID, content?: string) => void;
+export type LostListener = (uuid: UUID, content?: string) => void;
+export type PublishExpiredListener = () => void;
+export type SubscribeExpiredListener = () => void;
 
 export interface NearbyPlugin {
   /**
@@ -181,7 +181,7 @@ export interface NearbyPlugin {
    *
    * @since 1.0.0
    */
-  unpublish(options: { uuid?: UUID }): Promise<void>;
+  unpublish(options: unknown): Promise<void>;
 
   /**
    * Start listening to nearby tokens.

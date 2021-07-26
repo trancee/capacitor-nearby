@@ -3,7 +3,6 @@ import { WebPlugin } from '@capacitor/core';
 import type {
   Message,
   Status,
-  UUID,
   InitializeOptions,
   PublishOptions,
   SubscribeOptions,
@@ -33,7 +32,7 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
     throw this.unimplemented('Method not implemented.');
   }
   // Cancels an existing published message.
-  async unpublish(options: { uuid?: UUID }): Promise<void> {
+  async unpublish(options: unknown): Promise<void> {
     console.error('unpublish', options);
     throw this.unimplemented('Method not implemented.');
   }

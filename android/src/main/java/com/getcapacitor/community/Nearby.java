@@ -95,8 +95,6 @@ interface Constants {
 )
 public class Nearby extends Plugin {
 
-    //    private Nearby implementation = new Nearby();
-
     private BroadcastReceiver bluetoothStateBroadcastReceiver;
 
     private BluetoothAdapter mAdapter;
@@ -105,11 +103,6 @@ public class Nearby extends Plugin {
     private Advertiser mAdvertiser;
 
     private UUID serviceUUID;
-
-    private Integer scanMode = ScanSettings.SCAN_MODE_BALANCED;
-
-    private Integer advertiseMode = AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY;
-    private Integer txPowerLevel = AdvertiseSettings.ADVERTISE_TX_POWER_HIGH;
 
     private UUID uuid;
     private byte[] data;
@@ -181,10 +174,10 @@ public class Nearby extends Plugin {
             return;
         }
 
-        scanMode = ScanSettings.SCAN_MODE_BALANCED;
+        Integer scanMode = ScanSettings.SCAN_MODE_BALANCED;
 
-        advertiseMode = AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY;
-        txPowerLevel = AdvertiseSettings.ADVERTISE_TX_POWER_HIGH;
+        Integer advertiseMode = AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY;
+        Integer txPowerLevel = AdvertiseSettings.ADVERTISE_TX_POWER_HIGH;
 
         JSObject optionsObject = call.getObject("options", null);
         if (optionsObject != null) {
@@ -390,10 +383,7 @@ public class Nearby extends Plugin {
                     new Advertiser.Callback() {
                         @Override
                         public void onSuccess(AdvertiseSettings settings) {
-                            call.resolve(
-                                //                                        new JSObject()
-                                //                                                .put("uuid", uuid)
-                            );
+                            call.resolve();
                         }
 
                         @Override
@@ -403,15 +393,12 @@ public class Nearby extends Plugin {
 
                         @Override
                         public void onExpired() {
-                            onPublishExpired(/*uuid*/);
+                            onPublishExpired();
                         }
                     }
                 );
             } else {
-                call.resolve(
-                    //                        new JSObject()
-                    //                                .put("uuid", uuid)
-                );
+                call.resolve();
             }
         } catch (Exception e) {
             Log.e(getLogTag(), "publish", e);
@@ -420,17 +407,12 @@ public class Nearby extends Plugin {
         }
     }
 
-    private void onPublishExpired(/*UUID uuid*/) {
+    private void onPublishExpired() {
         if (mAdvertiser.isAdvertising()) {
-            notifyListeners(
-                "onPublishExpired",
-                null
-                //                    new JSObject()
-                //                            .put("uuid", uuid)
-            );
+            notifyListeners("onPublishExpired", null);
         }
 
-        mAdvertiser.stop();
+        doUnpublish();
     }
 
     @PluginMethod
@@ -441,7 +423,7 @@ public class Nearby extends Plugin {
         }
 
         try {
-            mAdvertiser.stop();
+            doUnpublish();
 
             uuid = null;
             data = null;
@@ -454,6 +436,12 @@ public class Nearby extends Plugin {
             Log.e(getLogTag(), "stopAdvertising", e);
 
             call.reject(e.getLocalizedMessage(), e);
+        }
+    }
+
+    private void doUnpublish() {
+        if (mAdvertiser != null) {
+            mAdvertiser.stop();
         }
     }
 
@@ -482,7 +470,7 @@ public class Nearby extends Plugin {
                     new Scanner.Callback() {
                         @Override
                         public void onFailure(int errorCode, String errorMessage) {
-                            call.error(errorMessage, String.valueOf(errorCode), null);
+                            call.reject(errorMessage, String.valueOf(errorCode), null);
                         }
 
                         @Override
@@ -494,14 +482,14 @@ public class Nearby extends Plugin {
             } catch (Exception e) {
                 Log.e(getLogTag(), "scan", e);
 
-                call.error(e.getLocalizedMessage(), e);
+                call.reject(e.getLocalizedMessage(), e);
                 return;
             }
         } else {
             doUnsubscribe();
         }
 
-        call.success();
+        call.resolve();
     }
 
     private void onSubscribeExpired() {
@@ -568,48 +556,8 @@ public class Nearby extends Plugin {
         return bluetoothAdapter.isEnabled();
     }
 
-    private void start(PluginCall call) {
-        if (mAdvertiser != null && uuid != null) {
-            Advertiser.Beacon beacon = new Advertiser.Beacon(uuid, data);
-
-            mAdvertiser.start(
-                beacon,
-                advertiseTimeout,
-                new Advertiser.Callback() {
-                    @Override
-                    public void onSuccess(AdvertiseSettings settings) {
-                        call.success(
-                            //                                    new JSObject()
-                            //                                            .put("uuid", uuid)
-                        );
-                    }
-
-                    @Override
-                    public void onFailure(int errorCode, String errorMessage) {
-                        call.error(errorMessage, String.valueOf(errorCode), null);
-                    }
-                }
-            );
-        }
-
-        if (mScanner != null) {
-            mScanner.start(
-                scanTimeout,
-                new Scanner.Callback() {
-                    @Override
-                    public void onFailure(int errorCode, String errorMessage) {
-                        call.error(errorMessage, String.valueOf(errorCode), null);
-                    }
-                }
-            );
-        }
-    }
-
     private void stop() {
         doUnsubscribe();
-
-        if (mAdvertiser != null) {
-            mAdvertiser.stop();
-        }
+        doUnpublish();
     }
 }

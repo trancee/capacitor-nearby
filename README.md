@@ -86,14 +86,14 @@ Start publishing nearby token.
 ### unpublish(...)
 
 ```typescript
-unpublish(options: { uuid?: UUID; }) => Promise<void>
+unpublish(options: unknown) => Promise<void>
 ```
 
 Stop publishing nearby token.
 
-| Param         | Type                            |
-| ------------- | ------------------------------- |
-| **`options`** | <code>{ uuid?: string; }</code> |
+| Param         | Type                 |
+| ------------- | -------------------- |
+| **`options`** | <code>unknown</code> |
 
 **Since:** 1.0.0
 
@@ -297,10 +297,10 @@ Remove all native listeners for this plugin.
 
 #### Message
 
-| Prop       | Type                                  | Description                                  | Since |
-| ---------- | ------------------------------------- | -------------------------------------------- | ----- |
-| **`uuid`** | <code><a href="#uuid">UUID</a></code> | The <a href="#uuid">UUID</a> of the message. | 1.0.0 |
-| **`data`** | <code>string</code>                   | The raw bytes content of the message.        | 1.0.0 |
+| Prop          | Type                                  | Description                                  | Since |
+| ------------- | ------------------------------------- | -------------------------------------------- | ----- |
+| **`uuid`**    | <code><a href="#uuid">UUID</a></code> | The <a href="#uuid">UUID</a> of the message. | 1.0.0 |
+| **`content`** | <code>string</code>                   | The raw bytes content of the message.        | 1.0.0 |
 
 
 #### PublishOptions
@@ -349,22 +349,22 @@ Remove all native listeners for this plugin.
 
 #### FoundListener
 
-<code>(uuid: string, content: string): void</code>
+<code>(uuid: string, content?: string): void</code>
 
 
 #### LostListener
 
-<code>(uuid: string): void</code>
+<code>(uuid: string, content?: string): void</code>
 
 
 #### PublishExpiredListener
 
-<code>(uuid: string): void</code>
+<code>(): void</code>
 
 
 #### SubscribeExpiredListener
 
-<code>(uuid: string): void</code>
+<code>(): void</code>
 
 
 ### Enums
