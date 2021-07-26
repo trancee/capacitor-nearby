@@ -16,9 +16,9 @@ npx cap sync
 * [`initialize(...)`](#initialize)
 * [`reset()`](#reset)
 * [`publish(...)`](#publish)
-* [`unpublish(...)`](#unpublish)
+* [`unpublish()`](#unpublish)
 * [`subscribe(...)`](#subscribe)
-* [`unsubscribe(...)`](#unsubscribe)
+* [`unsubscribe()`](#unsubscribe)
 * [`status()`](#status)
 * [`addListener('onPermissionChanged', ...)`](#addlisteneronpermissionchanged-)
 * [`addListener('onBluetoothStateChanged', ...)`](#addlisteneronbluetoothstatechanged-)
@@ -26,7 +26,6 @@ npx cap sync
 * [`addListener('onLost', ...)`](#addlisteneronlost-)
 * [`addListener('onPublishExpired', ...)`](#addlisteneronpublishexpired-)
 * [`addListener('onSubscribeExpired', ...)`](#addlisteneronsubscribeexpired-)
-* [`removeAllListeners()`](#removealllisteners)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 * [Enums](#enums)
@@ -59,7 +58,7 @@ Initializes Bluetooth LE for advertising and scanning of nearby tokens.
 reset() => Promise<void>
 ```
 
-Resets Bluetooth LE and stops advertising and scanning of nearby tokens.
+Stops and resets advertising and scanning of nearby tokens.
 
 **Since:** 1.0.0
 
@@ -83,17 +82,13 @@ Start publishing nearby token.
 --------------------
 
 
-### unpublish(...)
+### unpublish()
 
 ```typescript
-unpublish(options: unknown) => Promise<void>
+unpublish() => Promise<void>
 ```
 
 Stop publishing nearby token.
-
-| Param         | Type                 |
-| ------------- | -------------------- |
-| **`options`** | <code>unknown</code> |
 
 **Since:** 1.0.0
 
@@ -117,17 +112,13 @@ Start listening to nearby tokens.
 --------------------
 
 
-### unsubscribe(...)
+### unsubscribe()
 
 ```typescript
-unsubscribe(options: unknown) => Promise<void>
+unsubscribe() => Promise<void>
 ```
 
 Stop listening to nearby tokens.
-
-| Param         | Type                 |
-| ------------- | -------------------- |
-| **`options`** | <code>unknown</code> |
 
 **Since:** 1.0.0
 
@@ -152,15 +143,15 @@ Returns status of operations and found tokens.
 ### addListener('onPermissionChanged', ...)
 
 ```typescript
-addListener(eventName: 'onPermissionChanged', listenerFunc: PermissionChangedListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onPermissionChanged', listenerFunc: (permissionGranted: boolean) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 Called when permission is granted or revoked for this app to use Nearby.
 
-| Param              | Type                                                                            |
-| ------------------ | ------------------------------------------------------------------------------- |
-| **`eventName`**    | <code>'onPermissionChanged'</code>                                              |
-| **`listenerFunc`** | <code><a href="#permissionchangedlistener">PermissionChangedListener</a></code> |
+| Param              | Type                                                 |
+| ------------------ | ---------------------------------------------------- |
+| **`eventName`**    | <code>'onPermissionChanged'</code>                   |
+| **`listenerFunc`** | <code>(permissionGranted: boolean) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
@@ -172,15 +163,15 @@ Called when permission is granted or revoked for this app to use Nearby.
 ### addListener('onBluetoothStateChanged', ...)
 
 ```typescript
-addListener(eventName: 'onBluetoothStateChanged', listenerFunc: BluetoothStateChangedListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onBluetoothStateChanged', listenerFunc: (state: BluetoothState) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 Called when state of Bluetooth has changed.
 
-| Param              | Type                                                                                    |
-| ------------------ | --------------------------------------------------------------------------------------- |
-| **`eventName`**    | <code>'onBluetoothStateChanged'</code>                                                  |
-| **`listenerFunc`** | <code><a href="#bluetoothstatechangedlistener">BluetoothStateChangedListener</a></code> |
+| Param              | Type                                                                          |
+| ------------------ | ----------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'onBluetoothStateChanged'</code>                                        |
+| **`listenerFunc`** | <code>(state: <a href="#bluetoothstate">BluetoothState</a>) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
@@ -192,15 +183,15 @@ Called when state of Bluetooth has changed.
 ### addListener('onFound', ...)
 
 ```typescript
-addListener(eventName: 'onFound', listenerFunc: FoundListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onFound', listenerFunc: (uuid: UUID, content?: string | undefined) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 Called when messages are found.
 
-| Param              | Type                                                    |
-| ------------------ | ------------------------------------------------------- |
-| **`eventName`**    | <code>'onFound'</code>                                  |
-| **`listenerFunc`** | <code><a href="#foundlistener">FoundListener</a></code> |
+| Param              | Type                                                     |
+| ------------------ | -------------------------------------------------------- |
+| **`eventName`**    | <code>'onFound'</code>                                   |
+| **`listenerFunc`** | <code>(uuid: string, content?: string) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
@@ -212,15 +203,15 @@ Called when messages are found.
 ### addListener('onLost', ...)
 
 ```typescript
-addListener(eventName: 'onLost', listenerFunc: LostListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onLost', listenerFunc: (uuid: UUID, content?: string | undefined) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 Called when a message is no longer detectable nearby.
 
-| Param              | Type                                                  |
-| ------------------ | ----------------------------------------------------- |
-| **`eventName`**    | <code>'onLost'</code>                                 |
-| **`listenerFunc`** | <code><a href="#lostlistener">LostListener</a></code> |
+| Param              | Type                                                     |
+| ------------------ | -------------------------------------------------------- |
+| **`eventName`**    | <code>'onLost'</code>                                    |
+| **`listenerFunc`** | <code>(uuid: string, content?: string) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
@@ -232,15 +223,15 @@ Called when a message is no longer detectable nearby.
 ### addListener('onPublishExpired', ...)
 
 ```typescript
-addListener(eventName: 'onPublishExpired', listenerFunc: PublishExpiredListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onPublishExpired', listenerFunc: () => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 The published token has expired.
 
-| Param              | Type                                                                      |
-| ------------------ | ------------------------------------------------------------------------- |
-| **`eventName`**    | <code>'onPublishExpired'</code>                                           |
-| **`listenerFunc`** | <code><a href="#publishexpiredlistener">PublishExpiredListener</a></code> |
+| Param              | Type                            |
+| ------------------ | ------------------------------- |
+| **`eventName`**    | <code>'onPublishExpired'</code> |
+| **`listenerFunc`** | <code>() =&gt; void</code>      |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
@@ -252,30 +243,17 @@ The published token has expired.
 ### addListener('onSubscribeExpired', ...)
 
 ```typescript
-addListener(eventName: 'onSubscribeExpired', listenerFunc: SubscribeExpiredListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onSubscribeExpired', listenerFunc: () => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 The subscription has expired.
 
-| Param              | Type                                                                          |
-| ------------------ | ----------------------------------------------------------------------------- |
-| **`eventName`**    | <code>'onSubscribeExpired'</code>                                             |
-| **`listenerFunc`** | <code><a href="#subscribeexpiredlistener">SubscribeExpiredListener</a></code> |
+| Param              | Type                              |
+| ------------------ | --------------------------------- |
+| **`eventName`**    | <code>'onSubscribeExpired'</code> |
+| **`listenerFunc`** | <code>() =&gt; void</code>        |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
-
-**Since:** 1.0.0
-
---------------------
-
-
-### removeAllListeners()
-
-```typescript
-removeAllListeners() => Promise<void>
-```
-
-Remove all native listeners for this plugin.
 
 **Since:** 1.0.0
 
@@ -335,36 +313,6 @@ Remove all native listeners for this plugin.
 #### Status
 
 <code>{ isPublishing: boolean; isSubscribing: boolean; uuids: UUID[]; }</code>
-
-
-#### PermissionChangedListener
-
-<code>(permissionGranted: boolean): void</code>
-
-
-#### BluetoothStateChangedListener
-
-<code>(state: <a href="#bluetoothstate">BluetoothState</a>): void</code>
-
-
-#### FoundListener
-
-<code>(uuid: string, content?: string): void</code>
-
-
-#### LostListener
-
-<code>(uuid: string, content?: string): void</code>
-
-
-#### PublishExpiredListener
-
-<code>(): void</code>
-
-
-#### SubscribeExpiredListener
-
-<code>(): void</code>
 
 
 ### Enums
