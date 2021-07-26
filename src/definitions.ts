@@ -141,13 +141,6 @@ export enum BluetoothState {
   POWERED_ON = 'poweredOn',
 }
 
-export type PermissionChangedListener = (permissionGranted: boolean) => void;
-export type BluetoothStateChangedListener = (state: BluetoothState) => void;
-export type FoundListener = (uuid: UUID, content?: string) => void;
-export type LostListener = (uuid: UUID, content?: string) => void;
-export type PublishExpiredListener = () => void;
-export type SubscribeExpiredListener = () => void;
-
 export interface NearbyPlugin {
   /**
    * Initializes Bluetooth LE for advertising and scanning of nearby tokens.
@@ -159,7 +152,7 @@ export interface NearbyPlugin {
     options?: InitializeOptions;
   }): Promise<void>;
   /**
-   * Resets Bluetooth LE and stops advertising and scanning of nearby tokens.
+   * Stops and resets advertising and scanning of nearby tokens.
    *
    * @since 1.0.0
    */
@@ -181,7 +174,7 @@ export interface NearbyPlugin {
    *
    * @since 1.0.0
    */
-  unpublish(options: unknown): Promise<void>;
+  unpublish(): Promise<void>;
 
   /**
    * Start listening to nearby tokens.
@@ -197,7 +190,7 @@ export interface NearbyPlugin {
    *
    * @since 1.0.0
    */
-  unsubscribe(options: unknown): Promise<void>;
+  unsubscribe(): Promise<void>;
 
   /**
    * Returns status of operations and found tokens.
@@ -213,7 +206,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onPermissionChanged',
-    listenerFunc: PermissionChangedListener,
+    listenerFunc: (permissionGranted: boolean) => void,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Called when state of Bluetooth has changed.
@@ -222,7 +215,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onBluetoothStateChanged',
-    listenerFunc: BluetoothStateChangedListener,
+    listenerFunc: (state: BluetoothState) => void,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 
   /**
@@ -232,7 +225,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onFound',
-    listenerFunc: FoundListener,
+    listenerFunc: (uuid: UUID, content?: string) => void,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Called when a message is no longer detectable nearby.
@@ -241,7 +234,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onLost',
-    listenerFunc: LostListener,
+    listenerFunc: (uuid: UUID, content?: string) => void,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 
   /**
@@ -251,7 +244,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onPublishExpired',
-    listenerFunc: PublishExpiredListener,
+    listenerFunc: () => void,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * The subscription has expired.
@@ -260,13 +253,6 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onSubscribeExpired',
-    listenerFunc: SubscribeExpiredListener,
+    listenerFunc: () => void,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
-
-  /**
-   * Remove all native listeners for this plugin.
-   *
-   * @since 1.0.0
-   */
-  removeAllListeners(): Promise<void>;
 }

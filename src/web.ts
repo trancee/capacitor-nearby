@@ -32,8 +32,8 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
     throw this.unimplemented('Method not implemented.');
   }
   // Cancels an existing published message.
-  async unpublish(options: unknown): Promise<void> {
-    console.error('unpublish', options);
+  async unpublish(): Promise<void> {
+    console.error('unpublish');
     throw this.unimplemented('Method not implemented.');
   }
 
@@ -45,8 +45,8 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
     throw this.unimplemented('Method not implemented.');
   }
   // Cancels an existing subscription.
-  async unsubscribe(options: unknown): Promise<void> {
-    console.error('unsubscribe', options);
+  async unsubscribe(): Promise<void> {
+    console.error('unsubscribe');
     throw this.unimplemented('Method not implemented.');
   }
 
