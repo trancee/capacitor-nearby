@@ -95,7 +95,7 @@ interface Constants {
 )
 public class Nearby extends Plugin {
 
-    private BroadcastReceiver bluetoothStateBroadcastReceiver;
+    private BroadcastReceiver mReceiver;
 
     private BluetoothAdapter mAdapter;
 
@@ -119,14 +119,14 @@ public class Nearby extends Plugin {
 
         stop();
 
-        if (bluetoothStateBroadcastReceiver != null) {
+        if (mReceiver != null) {
             try {
-                getContext().unregisterReceiver(bluetoothStateBroadcastReceiver);
+                getContext().unregisterReceiver(mReceiver);
             } catch (final IllegalArgumentException e) {
                 // The receiver was not registered.
             }
 
-            bluetoothStateBroadcastReceiver = null;
+            mReceiver = null;
         }
     }
 
@@ -265,7 +265,7 @@ public class Nearby extends Plugin {
             mAdvertiser.setTxPowerLevel(txPowerLevel);
         }
 
-        registerBluetoothStateBroadcastReceiver();
+        registerReceiver();
 
         call.resolve();
     }
@@ -283,9 +283,9 @@ public class Nearby extends Plugin {
         }
     }
 
-    private void registerBluetoothStateBroadcastReceiver() {
-        if (bluetoothStateBroadcastReceiver == null) {
-            bluetoothStateBroadcastReceiver =
+    private void registerReceiver() {
+        if (mReceiver == null) {
+            mReceiver =
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
@@ -314,7 +314,7 @@ public class Nearby extends Plugin {
                 };
 
             IntentFilter filter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
-            getContext().registerReceiver(bluetoothStateBroadcastReceiver, filter);
+            getContext().registerReceiver(mReceiver, filter);
         }
     }
 
