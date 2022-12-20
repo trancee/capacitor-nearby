@@ -206,7 +206,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onPermissionChanged',
-    listenerFunc: (permissionGranted: boolean) => void,
+    listenerFunc: (permissionGranted: boolean) => void
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Called when state of Bluetooth has changed.
@@ -215,7 +215,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onBluetoothStateChanged',
-    listenerFunc: (state: BluetoothState) => void,
+    listenerFunc: (state: BluetoothState) => void
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 
   /**
@@ -225,7 +225,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onFound',
-    listenerFunc: (uuid: UUID, content?: string) => void,
+    listenerFunc: (uuid: UUID, content?: string) => void
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Called when a message is no longer detectable nearby.
@@ -234,7 +234,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onLost',
-    listenerFunc: (uuid: UUID, content?: string) => void,
+    listenerFunc: (uuid: UUID, content?: string) => void
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 
   /**
@@ -244,7 +244,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onPublishExpired',
-    listenerFunc: () => void,
+    listenerFunc: () => void
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * The subscription has expired.
@@ -253,6 +253,6 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onSubscribeExpired',
-    listenerFunc: () => void,
+    listenerFunc: () => void
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 }

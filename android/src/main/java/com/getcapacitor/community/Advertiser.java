@@ -9,7 +9,6 @@ import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.os.Handler;
 import android.os.ParcelUuid;
 import android.util.Log;
-
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
@@ -92,63 +91,63 @@ public class Advertiser {
 
         // The AdvertiseSettings provide a way to adjust advertising preferences for each Bluetooth LE advertisement instance.
         AdvertiseSettings advertiseSettings = new AdvertiseSettings.Builder()
-                // Set advertise mode to control the advertising power and latency.
-                .setAdvertiseMode(advertiseMode)
-                // Set advertise TX power level to control the transmission power level for the advertising.
-                .setTxPowerLevel(txPowerLevel)
-                // Limit advertising to a given amount of time.
-                // .setTimeout(30 * 1000)  // May not exceed 180000 milliseconds. A value of 0 will disable the time limit.
-                // Set whether the advertisement type should be connectable or non-connectable.
-                .setConnectable(false)
-                .build();
+            // Set advertise mode to control the advertising power and latency.
+            .setAdvertiseMode(advertiseMode)
+            // Set advertise TX power level to control the transmission power level for the advertising.
+            .setTxPowerLevel(txPowerLevel)
+            // Limit advertising to a given amount of time.
+            // .setTimeout(30 * 1000)  // May not exceed 180000 milliseconds. A value of 0 will disable the time limit.
+            // Set whether the advertisement type should be connectable or non-connectable.
+            .setConnectable(false)
+            .build();
 
         // Advertise data packet container for Bluetooth LE advertising.
         // This represents the data to be advertised as well as the scan response data for active scans.
         AdvertiseData advertiseData = new AdvertiseData.Builder()
-                // Add a service UUID to advertise data.
-                .addServiceUuid(new ParcelUuid(serviceUUID))
-                .addServiceUuid(new ParcelUuid(beacon.uuid()))
-                // Whether the transmission power level should be included in the advertise packet.
-                .setIncludeTxPowerLevel(false)
-                // Set whether the device name should be included in advertise packet.
-                .setIncludeDeviceName(false)
-                .build();
+            // Add a service UUID to advertise data.
+            .addServiceUuid(new ParcelUuid(serviceUUID))
+            .addServiceUuid(new ParcelUuid(beacon.uuid()))
+            // Whether the transmission power level should be included in the advertise packet.
+            .setIncludeTxPowerLevel(false)
+            // Set whether the device name should be included in advertise packet.
+            .setIncludeDeviceName(false)
+            .build();
 
         if (advertiseCallback == null) {
             // Bluetooth LE advertising callbacks, used to deliver advertising operation status.
             // https://developer.android.com/reference/android/bluetooth/le/AdvertiseCallback
             advertiseCallback =
-                    new AdvertiseCallback() {
-                        @Override
-                        // Callback triggered in response to BluetoothLeAdvertiser#startAdvertising indicating that the advertising has been started successfully.
-                        public void onStartSuccess(AdvertiseSettings settingsInEffect) {
-                            super.onStartSuccess(settingsInEffect);
+                new AdvertiseCallback() {
+                    @Override
+                    // Callback triggered in response to BluetoothLeAdvertiser#startAdvertising indicating that the advertising has been started successfully.
+                    public void onStartSuccess(AdvertiseSettings settingsInEffect) {
+                        super.onStartSuccess(settingsInEffect);
 
-                            mAdvertising = true;
+                        mAdvertising = true;
 
-                            if (ttlSeconds != null) {
-                                startTimer(ttlSeconds, callback);
-                            }
-
-                            if (callback != null) {
-                                callback.onSuccess(settingsInEffect);
-                            }
+                        if (ttlSeconds != null) {
+                            startTimer(ttlSeconds, callback);
                         }
 
-                        @Override
-                        // Callback when advertising could not be started.
-                        public void onStartFailure(int errorCode) {
-                            Log.e("AdvertiseCallback", String.format("onStartFailure(errorCode=%d)", errorCode));
-
-                            super.onStartFailure(errorCode);
-
-                            stop();
-
-                            if (callback != null) {
-                                callback.onFailure(errorCode, advertiseFailed(errorCode));
-                            }
+                        if (callback != null) {
+                            callback.onSuccess(settingsInEffect);
                         }
-                    };
+                    }
+
+                    @Override
+                    // Callback when advertising could not be started.
+                    public void onStartFailure(int errorCode) {
+                        Log.e("AdvertiseCallback", String.format("onStartFailure(errorCode=%d)", errorCode));
+
+                        super.onStartFailure(errorCode);
+
+                        stop();
+
+                        if (callback != null) {
+                            callback.onFailure(errorCode, advertiseFailed(errorCode));
+                        }
+                    }
+                };
         }
 
         // java.lang.IllegalArgumentException: Legacy advertising data too big
@@ -181,8 +180,8 @@ public class Advertiser {
 
     private String advertiseFailed(int errorCode) {
         switch (errorCode) {
-//            case AdvertiseCallback.ADVERTISE_SUCCESS:
-//                return "The requested operation was successful.";
+            //            case AdvertiseCallback.ADVERTISE_SUCCESS:
+            //                return "The requested operation was successful.";
             case AdvertiseCallback.ADVERTISE_FAILED_DATA_TOO_LARGE:
                 return "Failed to start advertising as the advertise data to be broadcasted is larger than 31 bytes.";
             case AdvertiseCallback.ADVERTISE_FAILED_TOO_MANY_ADVERTISERS:
@@ -226,14 +225,11 @@ public class Advertiser {
 
     public abstract static class Callback {
 
-        public void onSuccess(AdvertiseSettings settings) {
-        }
+        public void onSuccess(AdvertiseSettings settings) {}
 
-        public void onFailure(int errorCode, String errorMessage) {
-        }
+        public void onFailure(int errorCode, String errorMessage) {}
 
-        public void onExpired() {
-        }
+        public void onExpired() {}
     }
 
     /**

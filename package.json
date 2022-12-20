@@ -52,6 +52,7 @@
     "@ionic/eslint-config": "latest",
     "@ionic/prettier-config": "latest",
     "@ionic/swiftlint-config": "latest",
+    "@types/web-bluetooth": "latest",
     "eslint": "latest",
     "prettier": "latest",
     "prettier-plugin-java": "latest",

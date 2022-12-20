@@ -11,7 +11,6 @@ import android.bluetooth.le.ScanSettings;
 import android.os.Handler;
 import android.os.ParcelUuid;
 import android.util.Log;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -226,10 +225,10 @@ public class Scanner {
                 return "Failed to start scan due an internal error.";
             case ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED:
                 return "Failed to start power optimized scan as this feature is not supported.";
-//            case ScanCallback.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES:
-//                return "Failed to start scan as it is out of hardware resources.";
-//            case ScanCallback.SCAN_FAILED_SCANNING_TOO_FREQUENTLY:
-//                return "Failed to start scan as application tries to scan too frequently.";
+            //            case ScanCallback.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES:
+            //                return "Failed to start scan as it is out of hardware resources.";
+            //            case ScanCallback.SCAN_FAILED_SCANNING_TOO_FREQUENTLY:
+            //                return "Failed to start scan as application tries to scan too frequently.";
             default:
                 return "Unknown error.";
         }
