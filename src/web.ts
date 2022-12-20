@@ -82,17 +82,24 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
       throw this.unavailable('Bluetooth not available.');
     }
 
-    this.scan = await navigator.bluetooth.requestLEScan({
-      filters: [
-        {
-          services: [this.serviceUUID!],
-        },
-      ],
-    });
+    await navigator.bluetooth
+      .requestLEScan({
+        filters: [
+          {
+            services: [this.serviceUUID!],
+          },
+        ],
+      })
+      .then((scan) => {
+        this.scan = scan;
 
-    navigator.bluetooth.addEventListener('advertisementreceived', (event) => {
-      console.info('bluetooth::advertisementreceived', event);
-    });
+        navigator.bluetooth.onadvertisementreceived = (event) => {
+          console.info('bluetooth::advertisementreceived', event);
+
+          const uuid = event.uuids.slice(-1);
+          uuid && !this.uuids.includes(uuid.toString()) && this.uuids.push(uuid.toString());
+        };
+      });
   }
   // Cancels an existing subscription.
   async unsubscribe(): Promise<void> {
