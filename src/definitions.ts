@@ -147,10 +147,7 @@ export interface NearbyPlugin {
    *
    * @since 1.0.0
    */
-  initialize(options: {
-    // A InitializeOptions object for this operation
-    options?: InitializeOptions;
-  }): Promise<void>;
+  initialize(options: InitializeOptions): Promise<void>;
   /**
    * Stops and resets advertising and scanning of nearby tokens.
    *
@@ -163,12 +160,14 @@ export interface NearbyPlugin {
    *
    * @since 1.0.0
    */
-  publish(options: {
-    // A Message to publish for nearby devices to see
-    message: Message;
-    // A PublishOptions object for this operation
-    options?: PublishOptions;
-  }): Promise<void>;
+  publish(
+    options:
+      | PublishOptions
+      | {
+          // A Message to publish for nearby devices to see
+          message: Message;
+        }
+  ): Promise<void>;
   /**
    * Stop publishing nearby token.
    *
@@ -181,10 +180,7 @@ export interface NearbyPlugin {
    *
    * @since 1.0.0
    */
-  subscribe(options: {
-    // A SubscribeOptions object for this operation
-    options?: SubscribeOptions;
-  }): Promise<void>;
+  subscribe(options: SubscribeOptions): Promise<void>;
   /**
    * Stop listening to nearby tokens.
    *
@@ -206,7 +202,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onPermissionChanged',
-    listenerFunc: (permissionGranted: boolean) => void
+    listenerFunc: (granted: boolean) => void
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Called when state of Bluetooth has changed.

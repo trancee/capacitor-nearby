@@ -16,10 +16,13 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
 
   scan: BluetoothLEScan | undefined = undefined;
 
-  async initialize(options: {
-    // A InitializeOptions object for this operation
-    options?: InitializeOptions;
-  }): Promise<void> {
+  isPublishing = false;
+  publishTimeout: NodeJS.Timeout | undefined = undefined;
+
+  isSubscribing = false;
+  subscribeTimeout: NodeJS.Timeout | undefined = undefined;
+
+  async initialize(options: InitializeOptions): Promise<void> {
     console.info('initialize', options);
 
     if (typeof navigator === 'undefined' || !navigator.bluetooth) {
@@ -31,91 +34,117 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
       throw this.unavailable('Bluetooth not available.');
     }
 
-    if (!options.options?.serviceUUID) {
+    if (!options.serviceUUID) {
       throw this.unavailable('UUID not found');
     }
 
-    this.serviceUUID = options.options?.serviceUUID;
+    this.serviceUUID = options.serviceUUID;
     if (!this.serviceUUID.startsWith('0x')) {
       if (this.serviceUUID.length === 4) this.serviceUUID = '0000' + this.serviceUUID;
       if (this.serviceUUID.length === 8) this.serviceUUID += '-' + '0000-1000-8000-00805f9b34fb';
     }
 
-    navigator.bluetooth.addEventListener('availabilitychanged', (event) => {
+    navigator.bluetooth.onavailabilitychanged = (event) => {
       console.info('bluetooth::availabilitychanged', event);
-    });
 
-    this.scan = undefined;
-    this.uuids = [];
+      this.reset();
+    };
   }
   async reset(): Promise<void> {
     console.info('reset');
 
+    this.unpublish();
     this.unsubscribe();
 
-    this.scan = undefined;
     this.uuids = [];
+
+    delete this.scan;
   }
 
-  async publish(options: {
-    // A Message to publish for nearby devices to see
-    message: Message;
-    // A PublishOptions object for this operation
-    options?: PublishOptions;
-  }): Promise<void> {
-    console.error('publish', options);
+  async publish(
+    options: PublishOptions & {
+      // A Message to publish for nearby devices to see
+      message: Message;
+    }
+  ): Promise<void> {
+    console.info('publish', options);
     // throw this.unimplemented('Method not implemented.');
+
+    if (this.isPublishing) throw this.unavailable('is already publishing.');
+    this.isPublishing = true;
+
+    if (options.ttlSeconds && options.ttlSeconds > 0) {
+      this.publishTimeout = setTimeout(() => {
+        this.unpublish();
+        this.notifyListeners('onPublishExpired', {});
+      }, options.ttlSeconds * 1000);
+    }
   }
   // Cancels an existing published message.
   async unpublish(): Promise<void> {
-    console.error('unpublish');
+    console.info('unpublish');
     // throw this.unimplemented('Method not implemented.');
+
+    clearTimeout(this.publishTimeout);
+    delete this.publishTimeout;
+
+    this.isPublishing = false;
   }
 
-  async subscribe(options: {
-    // A SubscribeOptions object for this operation
-    options?: SubscribeOptions;
-  }): Promise<void> {
+  async subscribe(options: SubscribeOptions): Promise<void> {
     console.info('subscribe', options);
 
     if (typeof navigator === 'undefined' || !navigator.bluetooth) {
       throw this.unavailable('Bluetooth not available.');
     }
 
-    await navigator.bluetooth
-      .requestLEScan({
-        filters: [
-          {
-            services: [this.serviceUUID!],
-          },
-        ],
-      })
-      .then((scan) => {
-        this.scan = scan;
+    if (this.isSubscribing) throw this.unavailable('is already subscribing.');
 
-        navigator.bluetooth.onadvertisementreceived = (event) => {
-          console.info('bluetooth::advertisementreceived', event);
+    if (this.serviceUUID) {
+      this.isSubscribing = true;
 
-          const uuid = event.uuids.slice(-1);
-          uuid && !this.uuids.includes(uuid.toString()) && this.uuids.push(uuid.toString());
-        };
+      if (options.ttlSeconds && options.ttlSeconds > 0) {
+        this.subscribeTimeout = setTimeout(() => {
+          this.unsubscribe();
+          this.notifyListeners('onSubscribeExpired', {});
+        }, options.ttlSeconds * 1000);
+      }
+
+      this.scan = await navigator.bluetooth.requestLEScan({
+        filters: [{ services: [this.serviceUUID] }],
       });
+
+      navigator.bluetooth.onadvertisementreceived = (event) => {
+        console.info('bluetooth::advertisementreceived', event);
+
+        const uuid = event.uuids.slice(-1);
+        uuid && !this.uuids.includes(uuid.toString()) && this.uuids.push(uuid.toString());
+
+        this.notifyListeners('onFound', { uuid });
+      };
+    }
   }
   // Cancels an existing subscription.
   async unsubscribe(): Promise<void> {
     console.info('unsubscribe');
 
+    clearTimeout(this.subscribeTimeout);
+    delete this.subscribeTimeout;
+
     if (this.scan?.active) {
       this.scan?.stop();
     }
-    this.scan = undefined;
+
+    delete this.scan;
+
+    this.isSubscribing = false;
   }
 
   async status(): Promise<Status> {
     console.info('status');
 
     return {
-      isPublishing: false,
+      isPublishing: this.isPublishing,
       isSubscribing: this.scan?.active ?? false,
       uuids: this.uuids,
     };

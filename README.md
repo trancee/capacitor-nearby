@@ -38,14 +38,14 @@ npx cap sync
 ### initialize(...)
 
 ```typescript
-initialize(options: { options?: InitializeOptions; }) => Promise<void>
+initialize(options: InitializeOptions) => Promise<void>
 ```
 
 Initializes Bluetooth LE for advertising and scanning of nearby tokens.
 
-| Param         | Type                                                                           |
-| ------------- | ------------------------------------------------------------------------------ |
-| **`options`** | <code>{ options?: <a href="#initializeoptions">InitializeOptions</a>; }</code> |
+| Param         | Type                                                            |
+| ------------- | --------------------------------------------------------------- |
+| **`options`** | <code><a href="#initializeoptions">InitializeOptions</a></code> |
 
 **Since:** 1.0.0
 
@@ -68,14 +68,14 @@ Stops and resets advertising and scanning of nearby tokens.
 ### publish(...)
 
 ```typescript
-publish(options: { message: Message; options?: PublishOptions; }) => Promise<void>
+publish(options: PublishOptions | { message: Message; }) => Promise<void>
 ```
 
 Start publishing nearby token.
 
-| Param         | Type                                                                                                              |
-| ------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **`options`** | <code>{ message: <a href="#message">Message</a>; options?: <a href="#publishoptions">PublishOptions</a>; }</code> |
+| Param         | Type                                                                                                      |
+| ------------- | --------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code><a href="#publishoptions">PublishOptions</a> \| { message: <a href="#message">Message</a>; }</code> |
 
 **Since:** 1.0.0
 
@@ -98,14 +98,14 @@ Stop publishing nearby token.
 ### subscribe(...)
 
 ```typescript
-subscribe(options: { options?: SubscribeOptions; }) => Promise<void>
+subscribe(options: SubscribeOptions) => Promise<void>
 ```
 
 Start listening to nearby tokens.
 
-| Param         | Type                                                                         |
-| ------------- | ---------------------------------------------------------------------------- |
-| **`options`** | <code>{ options?: <a href="#subscribeoptions">SubscribeOptions</a>; }</code> |
+| Param         | Type                                                          |
+| ------------- | ------------------------------------------------------------- |
+| **`options`** | <code><a href="#subscribeoptions">SubscribeOptions</a></code> |
 
 **Since:** 1.0.0
 
@@ -143,15 +143,15 @@ Returns status of operations and found tokens.
 ### addListener('onPermissionChanged', ...)
 
 ```typescript
-addListener(eventName: 'onPermissionChanged', listenerFunc: (permissionGranted: boolean) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onPermissionChanged', listenerFunc: (granted: boolean) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 Called when permission is granted or revoked for this app to use Nearby.
 
-| Param              | Type                                                 |
-| ------------------ | ---------------------------------------------------- |
-| **`eventName`**    | <code>'onPermissionChanged'</code>                   |
-| **`listenerFunc`** | <code>(permissionGranted: boolean) =&gt; void</code> |
+| Param              | Type                                       |
+| ------------------ | ------------------------------------------ |
+| **`eventName`**    | <code>'onPermissionChanged'</code>         |
+| **`listenerFunc`** | <code>(granted: boolean) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
@@ -273,19 +273,19 @@ The subscription has expired.
 | **`txPowerLevel`**  | <code><a href="#txpowerlevel">TxPowerLevel</a></code>   | Sets the TX power level for advertising. Default: Advertise using high TX power level.              | <code>TxPowerLevel.HIGH</code>         | 1.0.0 |
 
 
+#### PublishOptions
+
+| Prop             | Type                                              | Description                                                 | Since |
+| ---------------- | ------------------------------------------------- | ----------------------------------------------------------- | ----- |
+| **`ttlSeconds`** | <code><a href="#ttlseconds">TTLSeconds</a></code> | Sets the time to live in seconds for the publish operation. | 1.0.0 |
+
+
 #### Message
 
 | Prop          | Type                                  | Description                                  | Since |
 | ------------- | ------------------------------------- | -------------------------------------------- | ----- |
 | **`uuid`**    | <code><a href="#uuid">UUID</a></code> | The <a href="#uuid">UUID</a> of the message. | 1.0.0 |
 | **`content`** | <code>string</code>                   | The raw bytes content of the message.        | 1.0.0 |
-
-
-#### PublishOptions
-
-| Prop             | Type                                              | Description                                                 | Since |
-| ---------------- | ------------------------------------------------- | ----------------------------------------------------------- | ----- |
-| **`ttlSeconds`** | <code><a href="#ttlseconds">TTLSeconds</a></code> | Sets the time to live in seconds for the publish operation. | 1.0.0 |
 
 
 #### SubscribeOptions
