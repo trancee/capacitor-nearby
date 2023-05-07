@@ -11,7 +11,6 @@ import android.bluetooth.le.ScanSettings;
 import android.os.Handler;
 import android.os.ParcelUuid;
 import android.util.Log;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -41,7 +40,12 @@ public class Scanner {
 
     private static final long ttlSeconds = 10;
 
-    public static synchronized Scanner getInstance(BluetoothAdapter adapter, UUID serviceUUID, UUID serviceMask, BeaconCallback beaconCallback) {
+    public static synchronized Scanner getInstance(
+        BluetoothAdapter adapter,
+        UUID serviceUUID,
+        UUID serviceMask,
+        BeaconCallback beaconCallback
+    ) {
         if (instance == null) {
             instance = new Scanner(adapter, serviceUUID, serviceMask, beaconCallback);
         }
@@ -101,93 +105,93 @@ public class Scanner {
 
         // https://developer.android.com/reference/android/bluetooth/le/ScanSettings.Builder
         ScanSettings settings = new ScanSettings.Builder()
-                // Set scan mode for Bluetooth LE scan.
-                .setScanMode(scanMode)
-                .build();
+            // Set scan mode for Bluetooth LE scan.
+            .setScanMode(scanMode)
+            .build();
 
         if (scanCallback == null) {
             // Bluetooth LE scan callbacks. Scan results are reported using these callbacks.
             // https://developer.android.com/reference/android/bluetooth/le/ScanCallback
             scanCallback =
-                    new ScanCallback() {
-                        @Override
-                        // Callback when a BLE advertisement has been found.
-                        public void onScanResult(int callbackType, ScanResult result) {
-                            super.onScanResult(callbackType, result);
+                new ScanCallback() {
+                    @Override
+                    // Callback when a BLE advertisement has been found.
+                    public void onScanResult(int callbackType, ScanResult result) {
+                        super.onScanResult(callbackType, result);
 
-                            // Represents a scan record from Bluetooth LE scan.
-                            ScanRecord record = result.getScanRecord();
-                            if (record == null) return;
+                        // Represents a scan record from Bluetooth LE scan.
+                        ScanRecord record = result.getScanRecord();
+                        if (record == null) return;
 
-                            Map<ParcelUuid, byte[]> map = record.getServiceData();
-                            if (map != null) {
-                                for (ParcelUuid key : map.keySet()) {
-                                    UUID uuid = key.getUuid();
-                                    byte[] data = map.get(key);
+                        Map<ParcelUuid, byte[]> map = record.getServiceData();
+                        if (map != null) {
+                            for (ParcelUuid key : map.keySet()) {
+                                UUID uuid = key.getUuid();
+                                byte[] data = map.get(key);
 
-                                    if (uuid.compareTo(serviceUUID) == 0) {
-                                        continue;
-                                    }
-
-                                    synchronized (beacons) {
-                                        Beacon beacon = beacons.get(uuid);
-                                        if (beacon != null) {
-                                            beacon.alive();
-                                        } else {
-                                            beacons.put(uuid, new Beacon(uuid));
-
-                                            if (beaconCallback != null) {
-                                                beaconCallback.onFound(uuid, data);
-                                            }
-                                        }
-                                    }
+                                if (uuid.compareTo(serviceUUID) == 0) {
+                                    continue;
                                 }
-                            }
 
-                            List<ParcelUuid> serviceUuids = record.getServiceUuids();
-                            if (serviceUuids != null) {
-                                for (ParcelUuid serviceUuid : serviceUuids) {
-                                    UUID uuid = serviceUuid.getUuid();
+                                synchronized (beacons) {
+                                    Beacon beacon = beacons.get(uuid);
+                                    if (beacon != null) {
+                                        beacon.alive();
+                                    } else {
+                                        beacons.put(uuid, new Beacon(uuid));
 
-                                    if (uuid.compareTo(serviceUUID) == 0) {
-                                        continue;
-                                    }
-
-                                    synchronized (beacons) {
-                                        Beacon beacon = beacons.get(uuid);
-                                        if (beacon != null) {
-                                            beacon.alive();
-                                        } else {
-                                            beacons.put(uuid, new Beacon(uuid));
-
-                                            if (beaconCallback != null) {
-                                                beaconCallback.onFound(uuid, null);
-                                            }
+                                        if (beaconCallback != null) {
+                                            beaconCallback.onFound(uuid, data);
                                         }
                                     }
                                 }
                             }
                         }
 
-                        @Override
-                        public void onBatchScanResults(List<ScanResult> results) {
-                            super.onBatchScanResults(results);
-                        }
+                        List<ParcelUuid> serviceUuids = record.getServiceUuids();
+                        if (serviceUuids != null) {
+                            for (ParcelUuid serviceUuid : serviceUuids) {
+                                UUID uuid = serviceUuid.getUuid();
 
-                        @Override
-                        // Callback when scan could not be started.
-                        public void onScanFailed(int errorCode) {
-                            Log.e("ScanCallback", String.format("onScanFailed(errorCode=%d)", errorCode));
+                                if (uuid.compareTo(serviceUUID) == 0) {
+                                    continue;
+                                }
 
-                            super.onScanFailed(errorCode);
+                                synchronized (beacons) {
+                                    Beacon beacon = beacons.get(uuid);
+                                    if (beacon != null) {
+                                        beacon.alive();
+                                    } else {
+                                        beacons.put(uuid, new Beacon(uuid));
 
-                            stop();
-
-                            if (callback != null) {
-                                callback.onFailure(errorCode, scanFailed(errorCode));
+                                        if (beaconCallback != null) {
+                                            beaconCallback.onFound(uuid, null);
+                                        }
+                                    }
+                                }
                             }
                         }
-                    };
+                    }
+
+                    @Override
+                    public void onBatchScanResults(List<ScanResult> results) {
+                        super.onBatchScanResults(results);
+                    }
+
+                    @Override
+                    // Callback when scan could not be started.
+                    public void onScanFailed(int errorCode) {
+                        Log.e("ScanCallback", String.format("onScanFailed(errorCode=%d)", errorCode));
+
+                        super.onScanFailed(errorCode);
+
+                        stop();
+
+                        if (callback != null) {
+                            callback.onFailure(errorCode, scanFailed(errorCode));
+                        }
+                    }
+                };
         }
 
         // Start Bluetooth LE scan.
@@ -271,20 +275,16 @@ public class Scanner {
 
     public abstract static class BeaconCallback {
 
-        public void onFound(UUID uuid, byte[] data) {
-        }
+        public void onFound(UUID uuid, byte[] data) {}
 
-        public void onLost(UUID uuid, byte[] data) {
-        }
+        public void onLost(UUID uuid, byte[] data) {}
     }
 
     public abstract static class Callback {
 
-        public void onFailure(int errorCode, String errorMessage) {
-        }
+        public void onFailure(int errorCode, String errorMessage) {}
 
-        public void onExpired() {
-        }
+        public void onExpired() {}
     }
 
     /**
@@ -315,21 +315,21 @@ public class Scanner {
             this.timestamp = System.currentTimeMillis();
 
             this.runnable =
-                    () -> {
-                        // Check if we are still alive.
-                        synchronized (beacons) {
-                            Beacon beacon = beacons.get(this.uuid);
-                            if (beacon != null) {
-                                if (mScanning) {
-                                    if (beaconCallback != null) {
-                                        beaconCallback.onLost(this.uuid, this.data);
-                                    }
+                () -> {
+                    // Check if we are still alive.
+                    synchronized (beacons) {
+                        Beacon beacon = beacons.get(this.uuid);
+                        if (beacon != null) {
+                            if (mScanning) {
+                                if (beaconCallback != null) {
+                                    beaconCallback.onLost(this.uuid, this.data);
                                 }
                             }
                         }
+                    }
 
-                        this.kill();
-                    };
+                    this.kill();
+                };
 
             synchronized (beacons) {
                 this.lastSeen = System.currentTimeMillis();

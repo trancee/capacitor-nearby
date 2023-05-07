@@ -13,10 +13,8 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.util.Base64;
 import android.util.Log;
-
 import androidx.activity.result.ActivityResult;
 import androidx.annotation.StringDef;
-
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
@@ -27,7 +25,6 @@ import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
-
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
@@ -45,14 +42,14 @@ interface Constants {
     String BLUETOOTH_BASE_UUID = "0000-1000-8000-00805f9b34fb";
 
     @StringDef(
-            {
-                    BluetoothState.UNKNOWN,
-                    BluetoothState.RESETTING,
-                    BluetoothState.UNSUPPORTED,
-                    BluetoothState.UNAUTHORIZED,
-                    BluetoothState.POWERED_OFF,
-                    BluetoothState.POWERED_ON
-            }
+        {
+            BluetoothState.UNKNOWN,
+            BluetoothState.RESETTING,
+            BluetoothState.UNSUPPORTED,
+            BluetoothState.UNAUTHORIZED,
+            BluetoothState.POWERED_OFF,
+            BluetoothState.POWERED_ON
+        }
     )
     @Retention(RetentionPolicy.SOURCE)
     @interface BluetoothState {
@@ -81,38 +78,38 @@ interface Constants {
 }
 
 @CapacitorPlugin(
-        name = "Nearby",
-        permissions = {
-                @Permission(
-                        strings = {
-                                // Allows an app to access approximate location.
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                                // Allows an app to access precise location.
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                        },
-                        alias = "location"
-                ),
-                @Permission(
-                        strings = {
-                                // Allows applications to connect to paired bluetooth devices.
-                                Manifest.permission.BLUETOOTH,
-                                // Allows applications to discover and pair bluetooth devices.
-                                Manifest.permission.BLUETOOTH_ADMIN
-                        },
-                        alias = "bluetoothLegacy"
-                ),
-                @Permission(
-                        strings = {
-                                // Required to be able to connect to paired Bluetooth devices.
-                                Manifest.permission.BLUETOOTH_CONNECT,
-                                // Required to be able to advertise to nearby Bluetooth devices.
-                                Manifest.permission.BLUETOOTH_ADVERTISE,
-                                // Required to be able to discover and pair nearby Bluetooth devices.
-                                Manifest.permission.BLUETOOTH_SCAN
-                        },
-                        alias = "bluetooth"
-                )
-        }
+    name = "Nearby",
+    permissions = {
+        @Permission(
+            strings = {
+                // Allows an app to access approximate location.
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+                // Allows an app to access precise location.
+                Manifest.permission.ACCESS_FINE_LOCATION
+            },
+            alias = "location"
+        ),
+        @Permission(
+            strings = {
+                // Allows applications to connect to paired bluetooth devices.
+                Manifest.permission.BLUETOOTH,
+                // Allows applications to discover and pair bluetooth devices.
+                Manifest.permission.BLUETOOTH_ADMIN
+            },
+            alias = "bluetoothLegacy"
+        ),
+        @Permission(
+            strings = {
+                // Required to be able to connect to paired Bluetooth devices.
+                Manifest.permission.BLUETOOTH_CONNECT,
+                // Required to be able to advertise to nearby Bluetooth devices.
+                Manifest.permission.BLUETOOTH_ADVERTISE,
+                // Required to be able to discover and pair nearby Bluetooth devices.
+                Manifest.permission.BLUETOOTH_SCAN
+            },
+            alias = "bluetooth"
+        )
+    }
 )
 public class Nearby extends Plugin {
 
@@ -177,12 +174,12 @@ public class Nearby extends Plugin {
     }
 
     private void initializeBluetooth(PluginCall call) {
-//        if (!getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH)) {
-//            Log.i(getLogTag(), Constants.BLUETOOTH_NOT_SUPPORTED);
-//
-//            call.reject(Constants.BLUETOOTH_NOT_SUPPORTED);
-//            return;
-//        }
+        //        if (!getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH)) {
+        //            Log.i(getLogTag(), Constants.BLUETOOTH_NOT_SUPPORTED);
+        //
+        //            call.reject(Constants.BLUETOOTH_NOT_SUPPORTED);
+        //            return;
+        //        }
 
         if (!getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             Log.i(getLogTag(), Constants.BLUETOOTH_LE_NOT_SUPPORTED);
@@ -235,55 +232,55 @@ public class Nearby extends Plugin {
             return;
         }
 
-//        if (mAdapter.getScanMode() != BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
-//            final Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
-////            intent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
-//            startActivityForResult(call, intent, "initializeBluetoothCallback");
-//
-//            return;
-//        }
+        //        if (mAdapter.getScanMode() != BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
+        //            final Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+        ////            intent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
+        //            startActivityForResult(call, intent, "initializeBluetoothCallback");
+        //
+        //            return;
+        //        }
 
         mScanner =
-                Scanner.getInstance(
-                        this.mAdapter,
-                        this.serviceUUID,
-                        this.serviceMask,
-                        new Scanner.BeaconCallback() {
-                            @Override
-                            public void onFound(UUID uuid, byte[] data) {
-                                try {
-                                    if (mScanner.isScanning()) {
-                                        JSObject jsData = new JSObject().put("uuid", uuid.toString());
+            Scanner.getInstance(
+                this.mAdapter,
+                this.serviceUUID,
+                this.serviceMask,
+                new Scanner.BeaconCallback() {
+                    @Override
+                    public void onFound(UUID uuid, byte[] data) {
+                        try {
+                            if (mScanner.isScanning()) {
+                                JSObject jsData = new JSObject().put("uuid", uuid.toString());
 
-                                        if (data != null && data.length > 0) {
-                                            jsData.put("content", Base64.encodeToString(data, Base64.DEFAULT | Base64.NO_WRAP));
-                                        }
-
-                                        notifyListeners("onFound", jsData);
-                                    }
-                                } catch (Exception e) {
-                                    Log.e(getLogTag(), "onFound", e);
+                                if (data != null && data.length > 0) {
+                                    jsData.put("content", Base64.encodeToString(data, Base64.DEFAULT | Base64.NO_WRAP));
                                 }
+
+                                notifyListeners("onFound", jsData);
                             }
-
-                            @Override
-                            public void onLost(UUID uuid, byte[] data) {
-                                try {
-                                    if (mScanner.isScanning()) {
-                                        JSObject jsData = new JSObject().put("uuid", uuid.toString());
-
-                                        if (data != null && data.length > 0) {
-                                            jsData.put("content", Base64.encodeToString(data, Base64.DEFAULT | Base64.NO_WRAP));
-                                        }
-
-                                        notifyListeners("onLost", jsData);
-                                    }
-                                } catch (Exception e) {
-                                    Log.e(getLogTag(), "onLost", e);
-                                }
-                            }
+                        } catch (Exception e) {
+                            Log.e(getLogTag(), "onFound", e);
                         }
-                );
+                    }
+
+                    @Override
+                    public void onLost(UUID uuid, byte[] data) {
+                        try {
+                            if (mScanner.isScanning()) {
+                                JSObject jsData = new JSObject().put("uuid", uuid.toString());
+
+                                if (data != null && data.length > 0) {
+                                    jsData.put("content", Base64.encodeToString(data, Base64.DEFAULT | Base64.NO_WRAP));
+                                }
+
+                                notifyListeners("onLost", jsData);
+                            }
+                        } catch (Exception e) {
+                            Log.e(getLogTag(), "onLost", e);
+                        }
+                    }
+                }
+            );
 
         if (scanMode != null) {
             mScanner.setScanMode(scanMode);
@@ -319,36 +316,36 @@ public class Nearby extends Plugin {
     private void registerReceiver() {
         if (mReceiver == null) {
             mReceiver =
-                    new BroadcastReceiver() {
-                        @Override
-                        public void onReceive(Context context, Intent intent) {
-                            final String action = intent.getAction();
+                new BroadcastReceiver() {
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        final String action = intent.getAction();
 
-                            if (action != null && action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
-                                final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
+                        if (action != null && action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+                            final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
 
-                                notifyListeners("onBluetoothStateChanged", new JSObject().put("state", fromBluetoothState(state)));
-                            }
+                            notifyListeners("onBluetoothStateChanged", new JSObject().put("state", fromBluetoothState(state)));
                         }
+                    }
 
-                        private String fromBluetoothState(int bluetoothState) {
-                            switch (bluetoothState) {
-                                case BluetoothAdapter.STATE_ON:
-                                    //                                case BluetoothAdapter.STATE_BLE_ON:
-                                    return Constants.BluetoothState.POWERED_ON;
-                                case BluetoothAdapter.STATE_OFF:
-                                    //                                case BluetoothAdapter.STATE_BLE_OFF:
-                                    return Constants.BluetoothState.POWERED_OFF;
-                                case BluetoothAdapter.STATE_TURNING_ON:
-                                    //                                case BluetoothAdapter.STATE_BLE_TURNING_ON:
-                                case BluetoothAdapter.STATE_TURNING_OFF:
-                                    //                                case BluetoothAdapter.STATE_BLE_TURNING_OFF:
-                                    return Constants.BluetoothState.RESETTING;
-                                default:
-                                    return Constants.BluetoothState.UNKNOWN;
-                            }
+                    private String fromBluetoothState(int bluetoothState) {
+                        switch (bluetoothState) {
+                            case BluetoothAdapter.STATE_ON:
+                                //                                case BluetoothAdapter.STATE_BLE_ON:
+                                return Constants.BluetoothState.POWERED_ON;
+                            case BluetoothAdapter.STATE_OFF:
+                                //                                case BluetoothAdapter.STATE_BLE_OFF:
+                                return Constants.BluetoothState.POWERED_OFF;
+                            case BluetoothAdapter.STATE_TURNING_ON:
+                            //                                case BluetoothAdapter.STATE_BLE_TURNING_ON:
+                            case BluetoothAdapter.STATE_TURNING_OFF:
+                                //                                case BluetoothAdapter.STATE_BLE_TURNING_OFF:
+                                return Constants.BluetoothState.RESETTING;
+                            default:
+                                return Constants.BluetoothState.UNKNOWN;
                         }
-                    };
+                    }
+                };
 
             IntentFilter filter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
             getContext().registerReceiver(mReceiver, filter);
@@ -405,24 +402,24 @@ public class Nearby extends Plugin {
                 Advertiser.Beacon beacon = new Advertiser.Beacon(uuid, data);
 
                 mAdvertiser.start(
-                        beacon,
-                        call.getInt("ttlSeconds", null),
-                        new Advertiser.Callback() {
-                            @Override
-                            public void onSuccess(AdvertiseSettings settings) {
-                                call.resolve();
-                            }
-
-                            @Override
-                            public void onFailure(int errorCode, String errorMessage) {
-                                call.reject(errorMessage, String.valueOf(errorCode));
-                            }
-
-                            @Override
-                            public void onExpired() {
-                                onPublishExpired();
-                            }
+                    beacon,
+                    call.getInt("ttlSeconds", null),
+                    new Advertiser.Callback() {
+                        @Override
+                        public void onSuccess(AdvertiseSettings settings) {
+                            call.resolve();
                         }
+
+                        @Override
+                        public void onFailure(int errorCode, String errorMessage) {
+                            call.reject(errorMessage, String.valueOf(errorCode));
+                        }
+
+                        @Override
+                        public void onExpired() {
+                            onPublishExpired();
+                        }
+                    }
                 );
             } else {
                 call.resolve();
@@ -483,18 +480,18 @@ public class Nearby extends Plugin {
         if (!mScanner.isScanning()) {
             try {
                 mScanner.start(
-                        call.getInt("ttlSeconds", null),
-                        new Scanner.Callback() {
-                            @Override
-                            public void onFailure(int errorCode, String errorMessage) {
-                                call.reject(errorMessage, String.valueOf(errorCode));
-                            }
-
-                            @Override
-                            public void onExpired() {
-                                onSubscribeExpired();
-                            }
+                    call.getInt("ttlSeconds", null),
+                    new Scanner.Callback() {
+                        @Override
+                        public void onFailure(int errorCode, String errorMessage) {
+                            call.reject(errorMessage, String.valueOf(errorCode));
                         }
+
+                        @Override
+                        public void onExpired() {
+                            onSubscribeExpired();
+                        }
+                    }
                 );
             } catch (Exception e) {
                 Log.e(getLogTag(), "scan", e);
@@ -552,7 +549,7 @@ public class Nearby extends Plugin {
             Set<UUID> uuids = mScanner.getBeacons();
 
             call.resolve(
-                    new JSObject().put("isPublishing", isPublishing).put("isSubscribing", isSubscribing).put("uuids", new JSArray(uuids))
+                new JSObject().put("isPublishing", isPublishing).put("isSubscribing", isSubscribing).put("uuids", new JSArray(uuids))
             );
         } catch (Exception e) {
             call.reject(e.getLocalizedMessage(), e);

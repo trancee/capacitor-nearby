@@ -1,7 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.getcapacitor.community.nearby">
-
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Bluetooth -->
     <!-- https://developer.android.com/guide/topics/connectivity/bluetooth/permissions -->
     <!-- Request legacy Bluetooth permissions on older devices. -->
