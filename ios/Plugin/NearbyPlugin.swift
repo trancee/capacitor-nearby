@@ -39,7 +39,7 @@ public class NearbyPlugin: CAPPlugin {
     private var uuid: CBUUID?
     private var data: Data?
 
-    private let implementation = Nearby()
+    //private let implementation = Nearby()
 
     /**
      * Public functions
@@ -68,9 +68,9 @@ public class NearbyPlugin: CAPPlugin {
 
             switch result {
             case .poweredOn:
-                call.success()
+                call.resolve()
             default:
-                call.error("Bluetooth is not powered on.")
+                call.reject("Bluetooth is not powered on.")
             }
         } beaconCallback: { [self] result in
             guard let scanner = self.scanner else {
@@ -123,9 +123,9 @@ public class NearbyPlugin: CAPPlugin {
 
             switch result {
             case .poweredOn:
-                call.success()
+                call.resolve()
             default:
-                call.error("Bluetooth is not powered on.")
+                call.reject("Bluetooth is not powered on.")
             }
         }
         self.advertiseTimeout = nil
@@ -144,7 +144,7 @@ public class NearbyPlugin: CAPPlugin {
         self.uuid = nil
         self.data = nil
 
-        call.success()
+        call.resolve()
     }
 
     @objc func publish(_ call: CAPPluginCall) {
@@ -184,12 +184,12 @@ public class NearbyPlugin: CAPPlugin {
             advertiser.start(beacon, withTimeout: self.advertiseTimeout) { result in
                 switch result {
                 case .started:
-                    call.success()
+                    call.resolve()
 
                     break
                 case .stopped(let e):
                     if let e = e {
-                        call.error(e.localizedDescription, e)
+                        call.reject(e.localizedDescription, String((e as NSError).code))
                     }
 
                     break
@@ -200,7 +200,7 @@ public class NearbyPlugin: CAPPlugin {
                 }
             }
         } else {
-            call.success()
+            call.resolve()
         }
     }
     @objc func unpublish(_ call: CAPPluginCall) {
@@ -216,7 +216,7 @@ public class NearbyPlugin: CAPPlugin {
         self.uuid = nil
         self.data = nil
 
-        call.success()
+        call.resolve()
     }
 
     @objc func subscribe(_ call: CAPPluginCall) {
@@ -234,12 +234,12 @@ public class NearbyPlugin: CAPPlugin {
             scanner.start(withTimeout: self.scanTimeout) { result in
                 switch result {
                 case .started:
-                    call.success()
+                    call.resolve()
 
                     break
                 case .stopped(let e):
                     if let e = e {
-                        call.error(e.localizedDescription, e)
+                        call.reject(e.localizedDescription, String((e as NSError).code))
                     }
 
                     break
@@ -250,7 +250,7 @@ public class NearbyPlugin: CAPPlugin {
                 }
             }
         } else {
-            call.success()
+            call.resolve()
         }
     }
     @objc func unsubscribe(_ call: CAPPluginCall) {
@@ -263,18 +263,18 @@ public class NearbyPlugin: CAPPlugin {
 
         self.scanTimeout = nil
 
-        call.success()
+        call.resolve()
     }
 
     @objc func pause(_ call: CAPPluginCall) {
         stop()
 
-        call.success()
+        call.resolve()
     }
     @objc func resume(_ call: CAPPluginCall) {
         start(call);
 
-        call.success()
+        call.resolve()
     }
 
     @objc func status(_ call: CAPPluginCall) {
@@ -283,7 +283,7 @@ public class NearbyPlugin: CAPPlugin {
 
         let uuids = (self.scanner != nil) ? scanner.getBeacons() : []
 
-        call.success([
+        call.resolve([
             "isPublishing": isPublishing,
             "isSubscribing": isSubscribing,
             "uuids": uuids,
@@ -301,12 +301,12 @@ public class NearbyPlugin: CAPPlugin {
                 advertiser.start(beacon, withTimeout: self.advertiseTimeout) { result in
                     switch result {
                     case .started:
-                        call.success()
+                        call.resolve()
 
                         break
                     case .stopped(let e):
                         if let e = e {
-                            call.error(e.localizedDescription, e)
+                            call.reject(e.localizedDescription, String((e as NSError).code))
                         }
 
                         break
@@ -323,12 +323,12 @@ public class NearbyPlugin: CAPPlugin {
             scanner.start(withTimeout: self.scanTimeout) { result in
                 switch result {
                 case .started:
-                    call.success()
+                    call.resolve()
 
                     break
                 case .stopped(let e):
                     if let e = e {
-                        call.error(e.localizedDescription, e)
+                        call.reject(e.localizedDescription, String((e as NSError).code))
                     }
 
                     break

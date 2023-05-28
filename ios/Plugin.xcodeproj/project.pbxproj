@@ -9,7 +9,8 @@
 /* Begin PBXBuildFile section */
 		03FC29A292ACC40490383A1F /* Pods_Plugin.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3B2A61DA5A1F2DD4F959604D /* Pods_Plugin.framework */; };
 		20C0B05DCFC8E3958A738AF2 /* Pods_PluginTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F6753A823D3815DB436415E3 /* Pods_PluginTests.framework */; };
-		2F98D68224C9AAE500613A4C /* Nearby.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F98D68124C9AAE400613A4C /* Nearby.swift */; };
+		4A9190222A23DE1800E0604D /* Advertiser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9190202A23DE1800E0604D /* Advertiser.swift */; };
+		4A9190232A23DE1800E0604D /* Scanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9190212A23DE1800E0604D /* Scanner.swift */; };
 		50ADFF92201F53D600D50D53 /* Plugin.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 50ADFF88201F53D600D50D53 /* Plugin.framework */; };
 		50ADFF97201F53D600D50D53 /* NearbyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50ADFF96201F53D600D50D53 /* NearbyTests.swift */; };
 		50ADFF99201F53D600D50D53 /* NearbyPlugin.h in Headers */ = {isa = PBXBuildFile; fileRef = 50ADFF8B201F53D600D50D53 /* NearbyPlugin.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -29,8 +30,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		2F98D68124C9AAE400613A4C /* Nearby.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Nearby.swift; sourceTree = "<group>"; };
 		3B2A61DA5A1F2DD4F959604D /* Pods_Plugin.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Plugin.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		4A9190202A23DE1800E0604D /* Advertiser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Advertiser.swift; sourceTree = "<group>"; };
+		4A9190212A23DE1800E0604D /* Scanner.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Scanner.swift; sourceTree = "<group>"; };
 		50ADFF88201F53D600D50D53 /* Plugin.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Plugin.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		50ADFF8B201F53D600D50D53 /* NearbyPlugin.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NearbyPlugin.h; sourceTree = "<group>"; };
 		50ADFF8C201F53D600D50D53 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -92,8 +94,9 @@
 		50ADFF8A201F53D600D50D53 /* Plugin */ = {
 			isa = PBXGroup;
 			children = (
+				4A9190202A23DE1800E0604D /* Advertiser.swift */,
+				4A9190212A23DE1800E0604D /* Scanner.swift */,
 				50E1A94720377CB70090CE1A /* NearbyPlugin.swift */,
-				2F98D68124C9AAE400613A4C /* Nearby.swift */,
 				50ADFF8B201F53D600D50D53 /* NearbyPlugin.h */,
 				50ADFFA72020EE4F00D50D53 /* NearbyPlugin.m */,
 				50ADFF8C201F53D600D50D53 /* Info.plist */,
@@ -307,8 +310,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				50E1A94820377CB70090CE1A /* NearbyPlugin.swift in Sources */,
-				2F98D68224C9AAE500613A4C /* Nearby.swift in Sources */,
 				50ADFFA82020EE4F00D50D53 /* NearbyPlugin.m in Sources */,
+				4A9190232A23DE1800E0604D /* Scanner.swift in Sources */,
+				4A9190222A23DE1800E0604D /* Advertiser.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
