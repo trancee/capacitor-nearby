@@ -179,22 +179,14 @@ public class Advertiser {
     }
 
     private String advertiseFailed(int errorCode) {
-        switch (errorCode) {
-            //            case AdvertiseCallback.ADVERTISE_SUCCESS:
-            //                return "The requested operation was successful.";
-            case AdvertiseCallback.ADVERTISE_FAILED_DATA_TOO_LARGE:
-                return "Failed to start advertising as the advertise data to be broadcasted is larger than 31 bytes.";
-            case AdvertiseCallback.ADVERTISE_FAILED_TOO_MANY_ADVERTISERS:
-                return "Failed to start advertising because no advertising instance is available.";
-            case AdvertiseCallback.ADVERTISE_FAILED_ALREADY_STARTED:
-                return "Failed to start advertising as the advertising is already started.";
-            case AdvertiseCallback.ADVERTISE_FAILED_INTERNAL_ERROR:
-                return "Operation failed due to an internal error.";
-            case AdvertiseCallback.ADVERTISE_FAILED_FEATURE_UNSUPPORTED:
-                return "This feature is not supported on this platform.";
-            default:
-                return "Unknown error.";
-        }
+        return switch (errorCode) {
+            case AdvertiseCallback.ADVERTISE_FAILED_DATA_TOO_LARGE -> "Failed to start advertising as the advertise data to be broadcasted is larger than 31 bytes.";
+            case AdvertiseCallback.ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> "Failed to start advertising because no advertising instance is available.";
+            case AdvertiseCallback.ADVERTISE_FAILED_ALREADY_STARTED -> "Failed to start advertising as the advertising is already started.";
+            case AdvertiseCallback.ADVERTISE_FAILED_INTERNAL_ERROR -> "Operation failed due to an internal error.";
+            case AdvertiseCallback.ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> "This feature is not supported on this platform.";
+            default -> "Unknown error.";
+        };
     }
 
     /**

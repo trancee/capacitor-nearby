@@ -1,11 +1,11 @@
-# capacitor-nearby
+# @capacitor-community/capacitor-nearby
 
 Uses Bluetooth LE to scan and advertise for nearby devices
 
 ## Install
 
 ```bash
-npm install capacitor-nearby
+npm install @capacitor-community/capacitor-nearby
 npx cap sync
 ```
 

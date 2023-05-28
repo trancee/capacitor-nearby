@@ -229,22 +229,15 @@ public class Scanner {
     }
 
     private String scanFailed(int errorCode) {
-        switch (errorCode) {
-            case ScanCallback.SCAN_FAILED_ALREADY_STARTED:
-                return "Failed to start scan as BLE scan with the same settings is already started by the app.";
-            case ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED:
-                return "Failed to start scan as app cannot be registered.";
-            case ScanCallback.SCAN_FAILED_INTERNAL_ERROR:
-                return "Failed to start scan due an internal error.";
-            case ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED:
-                return "Failed to start power optimized scan as this feature is not supported.";
-            //            case ScanCallback.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES:
-            //                return "Failed to start scan as it is out of hardware resources.";
-            //            case ScanCallback.SCAN_FAILED_SCANNING_TOO_FREQUENTLY:
-            //                return "Failed to start scan as application tries to scan too frequently.";
-            default:
-                return "Unknown error.";
-        }
+        return switch (errorCode) {
+            case ScanCallback.SCAN_FAILED_ALREADY_STARTED -> "Failed to start scan as BLE scan with the same settings is already started by the app.";
+            case ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> "Failed to start scan as app cannot be registered.";
+            case ScanCallback.SCAN_FAILED_INTERNAL_ERROR -> "Failed to start scan due an internal error.";
+            case ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED -> "Failed to start power optimized scan as this feature is not supported.";
+            case ScanCallback.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES -> "Failed to start scan as it is out of hardware resources.";
+            case ScanCallback.SCAN_FAILED_SCANNING_TOO_FREQUENTLY -> "Failed to start scan as application tries to scan too frequently.";
+            default -> "Unknown error.";
+        };
     }
 
     /**

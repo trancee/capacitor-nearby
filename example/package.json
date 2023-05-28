@@ -16,13 +16,13 @@
     "@capacitor/core": "latest",
     "@capacitor/camera": "latest",
     "@capacitor/splash-screen": "latest",
-    "capacitor-nearby": "file:..",
-    "@capacitor/ios": "^4.0.0",
-    "@capacitor/android": "^4.0.0"
+    "@capacitor-community/capacitor-nearby": "file:..",
+    "@capacitor/ios": "latest",
+    "@capacitor/android": "latest"
   },
   "devDependencies": {
     "@capacitor/cli": "latest",
-    "vite": "^2.9.13"
+    "vite": "latest"
   },
   "author": "",
   "license": "ISC"

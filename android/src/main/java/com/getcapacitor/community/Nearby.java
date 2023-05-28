@@ -113,7 +113,7 @@ interface Constants {
 )
 public class Nearby extends Plugin {
 
-    private ArrayList<String> aliases = new ArrayList<>();
+    private final ArrayList<String> aliases = new ArrayList<>();
 
     private BroadcastReceiver mReceiver;
     private BluetoothAdapter mAdapter;
@@ -201,14 +201,14 @@ public class Nearby extends Plugin {
             String serviceMask = "00000000-0000-0000-0000-000000000000";
 
             switch (serviceUUID.length()) {
-                case 4:
+                case 4 -> {
                     serviceUUID = "0000" + serviceUUID + "-" + Constants.BLUETOOTH_BASE_UUID;
                     serviceMask = "0000ffff-0000-0000-0000-000000000000";
-                    break;
-                case 8:
+                }
+                case 8 -> {
                     serviceUUID = serviceUUID + "-" + Constants.BLUETOOTH_BASE_UUID;
                     serviceMask = "ffffffff-0000-0000-0000-000000000000";
-                    break;
+                }
             }
 
             this.serviceUUID = UUID.fromString(serviceUUID);
@@ -329,21 +329,13 @@ public class Nearby extends Plugin {
                     }
 
                     private String fromBluetoothState(int bluetoothState) {
-                        switch (bluetoothState) {
-                            case BluetoothAdapter.STATE_ON:
-                                //                                case BluetoothAdapter.STATE_BLE_ON:
-                                return Constants.BluetoothState.POWERED_ON;
-                            case BluetoothAdapter.STATE_OFF:
-                                //                                case BluetoothAdapter.STATE_BLE_OFF:
-                                return Constants.BluetoothState.POWERED_OFF;
-                            case BluetoothAdapter.STATE_TURNING_ON:
-                            //                                case BluetoothAdapter.STATE_BLE_TURNING_ON:
-                            case BluetoothAdapter.STATE_TURNING_OFF:
-                                //                                case BluetoothAdapter.STATE_BLE_TURNING_OFF:
-                                return Constants.BluetoothState.RESETTING;
-                            default:
-                                return Constants.BluetoothState.UNKNOWN;
-                        }
+                        return switch (bluetoothState) {
+                            case BluetoothAdapter.STATE_ON -> Constants.BluetoothState.POWERED_ON;
+                            case BluetoothAdapter.STATE_OFF -> Constants.BluetoothState.POWERED_OFF;
+                            case BluetoothAdapter.STATE_TURNING_ON,
+                                BluetoothAdapter.STATE_TURNING_OFF -> Constants.BluetoothState.RESETTING;
+                            default -> Constants.BluetoothState.UNKNOWN;
+                        };
                     }
                 };
 
