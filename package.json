@@ -42,27 +42,28 @@
     "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.js",
     "clean": "rimraf ./dist",
     "watch": "tsc --watch",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "upgrade": "npm install --upgrade @capacitor/core @capacitor/docgen @capacitor/android @capacitor/ios @ionic/eslint-config @ionic/prettier-config @ionic/swiftlint-config @types/web-bluetooth eslint prettier prettier-plugin-java rimraf rollup swiftlint typescript"
   },
   "devDependencies": {
-    "@capacitor/android": "latest",
-    "@capacitor/core": "latest",
-    "@capacitor/docgen": "latest",
-    "@capacitor/ios": "latest",
-    "@ionic/eslint-config": "latest",
-    "@ionic/prettier-config": "latest",
-    "@ionic/swiftlint-config": "latest",
-    "@types/web-bluetooth": "latest",
-    "eslint": "latest",
-    "prettier": "latest",
-    "prettier-plugin-java": "latest",
-    "rimraf": "latest",
-    "rollup": "latest",
-    "swiftlint": "latest",
-    "typescript": "latest"
+    "@capacitor/android": "^5.0.4",
+    "@capacitor/core": "^5.0.4",
+    "@capacitor/docgen": "^0.2.1",
+    "@capacitor/ios": "^5.0.4",
+    "@ionic/eslint-config": "^0.3.0",
+    "@ionic/prettier-config": "^3.0.0",
+    "@ionic/swiftlint-config": "^1.1.2",
+    "@types/web-bluetooth": "^0.0.17",
+    "eslint": "^7.32.0",
+    "prettier": "^2.8.8",
+    "prettier-plugin-java": "^2.1.0",
+    "rimraf": "^5.0.1",
+    "rollup": "^3.23.0",
+    "swiftlint": "^1.0.2",
+    "typescript": "^5.0.4"
   },
   "peerDependencies": {
-    "@capacitor/core": "latest"
+    "@capacitor/core": "^5.0.0"
   },
   "prettier": "@ionic/prettier-config",
   "swiftlint": "@ionic/swiftlint-config",
