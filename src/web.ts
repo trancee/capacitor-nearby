@@ -40,11 +40,13 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
 
     this.serviceUUID = options.serviceUUID;
     if (!this.serviceUUID.startsWith('0x')) {
-      if (this.serviceUUID.length === 4) this.serviceUUID = '0000' + this.serviceUUID;
-      if (this.serviceUUID.length === 8) this.serviceUUID += '-' + '0000-1000-8000-00805f9b34fb';
+      if (this.serviceUUID.length === 4)
+        this.serviceUUID = '0000' + this.serviceUUID;
+      if (this.serviceUUID.length === 8)
+        this.serviceUUID += '-' + '0000-1000-8000-00805f9b34fb';
     }
 
-    navigator.bluetooth.onavailabilitychanged = (event) => {
+    navigator.bluetooth.onavailabilitychanged = event => {
       console.info('bluetooth::availabilitychanged', event);
 
       this.reset();
@@ -65,7 +67,7 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
     options: PublishOptions & {
       // A Message to publish for nearby devices to see
       message: Message;
-    }
+    },
   ): Promise<void> {
     console.info('publish', options);
     // throw this.unimplemented('Method not implemented.');
@@ -114,11 +116,13 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
         filters: [{ services: [this.serviceUUID] }],
       });
 
-      navigator.bluetooth.onadvertisementreceived = (event) => {
+      navigator.bluetooth.onadvertisementreceived = event => {
         console.info('bluetooth::advertisementreceived', event);
 
         const uuid = event.uuids.slice(-1);
-        uuid && !this.uuids.includes(uuid.toString()) && this.uuids.push(uuid.toString());
+        uuid &&
+          !this.uuids.includes(uuid.toString()) &&
+          this.uuids.push(uuid.toString());
 
         this.notifyListeners('onFound', { uuid });
       };

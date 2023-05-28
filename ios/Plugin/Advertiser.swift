@@ -23,7 +23,7 @@ public final class Advertiser: NSObject {
 
     private var timer: Timer?
 
-    private static var serviceUUID: CBUUID?;
+    private static var serviceUUID: CBUUID?
 
     private static var stateCallback: StateCallback?
 
@@ -36,9 +36,9 @@ public final class Advertiser: NSObject {
         Advertiser.stateCallback = stateCallback
 
         // Keys used to specify options when creating a peripheral manager.
-        let options: [String : Any] = [
+        let options: [String: Any] = [
             // A Boolean value specifying whether the system should warn if Bluetooth is in the powered-off state when instantiating the peripheral manager.
-            CBPeripheralManagerOptionShowPowerAlertKey: true,
+            CBPeripheralManagerOptionShowPowerAlertKey: true
         ]
 
         self.peripheralManager = CBPeripheralManager(delegate: self, queue: nil, options: options)
@@ -56,8 +56,7 @@ extension Advertiser {
     public func start(
         _ beacon: Beacon,
         withTimeout timeout: TimeInterval?,
-        callback: @escaping AdvertiseCallback)
-    {
+        callback: @escaping AdvertiseCallback) {
         self.callback = callback
 
         stop()
@@ -71,12 +70,12 @@ extension Advertiser {
         }
 
         // An optional dictionary containing the data you want to advertise.
-        let advertisementData: [String : Any] = [
+        let advertisementData: [String: Any] = [
             // An array of service UUIDs.
             CBAdvertisementDataServiceUUIDsKey: [
                 Advertiser.serviceUUID,
-                beacon.uuid,
-            ],
+                beacon.uuid
+            ]
         ]
 
         // Advertises peripheral manager data.
@@ -87,8 +86,7 @@ extension Advertiser {
         }
     }
 
-    public func stop(_ error: Error? = nil)
-    {
+    public func stop(_ error: Error? = nil) {
         stopTimer()
 
         if let peripheralManager = self.peripheralManager {
@@ -101,8 +99,7 @@ extension Advertiser {
         }
     }
 
-    public func isAdvertising() -> Bool
-    {
+    public func isAdvertising() -> Bool {
         guard let peripheralManager = self.peripheralManager else { return false }
 
         // A Boolean value that indicates whether the peripheral is advertising data.

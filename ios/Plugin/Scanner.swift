@@ -30,7 +30,7 @@ public final class Scanner: NSObject {
 
     private var timer: Timer?
 
-    private static var serviceUUID: CBUUID?;
+    private static var serviceUUID: CBUUID?
 
     private static var stateCallback: StateCallback?
 
@@ -48,9 +48,9 @@ public final class Scanner: NSObject {
         Scanner.beaconCallback = beaconCallback
 
         // Keys used to pass options when initializing a central manager.
-        let options: [String : Any] = [
+        let options: [String: Any] = [
             // A Boolean value that specifies whether the system warns the user if the app instantiates the central manager when Bluetooth service isn’t available.
-            CBCentralManagerOptionShowPowerAlertKey: true,
+            CBCentralManagerOptionShowPowerAlertKey: true
         ]
 
         self.centralManager = CBCentralManager(delegate: self, queue: nil, options: options)
@@ -69,8 +69,7 @@ extension Scanner {
     // Start scanning for peripherals
     public func start(
         withTimeout timeout: TimeInterval?,
-        callback: @escaping ScanCallback)
-    {
+        callback: @escaping ScanCallback) {
         self.callback = callback
 
         stop()
@@ -84,15 +83,15 @@ extension Scanner {
         }
 
         // Keys used to pass options when scanning for peripherals.
-        let options: [String : Any] = [
+        let options: [String: Any] = [
             // A Boolean value that specifies whether the scan should run without duplicate filtering.
-            CBCentralManagerScanOptionAllowDuplicatesKey: true,
+            CBCentralManagerScanOptionAllowDuplicatesKey: true
         ]
 
         // Scans for peripherals that are advertising services.
         centralManager.scanForPeripherals(
             withServices: [
-                Scanner.serviceUUID!,
+                Scanner.serviceUUID!
             ],
 
             options: options
@@ -107,8 +106,7 @@ extension Scanner {
         }
     }
 
-    public func stop(_ error: Error? = nil)
-    {
+    public func stop(_ error: Error? = nil) {
         stopTimer()
 
         if let centralManager = self.centralManager {
@@ -121,8 +119,7 @@ extension Scanner {
         }
     }
 
-    public func isScanning() -> Bool
-    {
+    public func isScanning() -> Bool {
         guard let centralManager = self.centralManager else { return false }
 
         // A Boolean value that indicates whether the central is currently scanning.
