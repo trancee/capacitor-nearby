@@ -1,6 +1,7 @@
 package com.getcapacitor.community;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.AdvertiseSettings;
@@ -77,6 +78,7 @@ interface Constants {
     }
 }
 
+@SuppressLint("InlinedApi")
 @CapacitorPlugin(
     name = "Nearby",
     permissions = {
@@ -121,8 +123,8 @@ public class Nearby extends Plugin {
     private Scanner mScanner;
     private Advertiser mAdvertiser;
 
-    private UUID serviceUUID;
-    private UUID serviceMask;
+    protected UUID serviceUUID;
+    protected UUID serviceMask;
 
     private UUID uuid;
     private byte[] data;
@@ -159,7 +161,8 @@ public class Nearby extends Plugin {
             aliases.add("bluetoothLegacy");
         }
         aliases.add("location");
-        requestPermissionForAliases(aliases.toArray(new String[aliases.size()]), call, "initializeCallback");
+
+        requestPermissionForAliases(aliases.toArray(new String[0]), call, "initializeCallback");
     }
 
     @PermissionCallback
@@ -170,17 +173,11 @@ public class Nearby extends Plugin {
                 return;
             }
         }
+
         initializeBluetooth(call);
     }
 
     private void initializeBluetooth(PluginCall call) {
-        //        if (!getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH)) {
-        //            Log.i(getLogTag(), Constants.BLUETOOTH_NOT_SUPPORTED);
-        //
-        //            call.reject(Constants.BLUETOOTH_NOT_SUPPORTED);
-        //            return;
-        //        }
-
         if (!getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             Log.i(getLogTag(), Constants.BLUETOOTH_LE_NOT_SUPPORTED);
 
@@ -225,20 +222,12 @@ public class Nearby extends Plugin {
 
         mAdapter = BluetoothAdapter.getDefaultAdapter();
 
-        if (mAdapter == null && !mAdapter.isEnabled()) {
+        if (mAdapter == null || !mAdapter.isEnabled()) {
             Log.i(getLogTag(), Constants.BLUETOOTH_NOT_AVAILABLE);
 
             call.reject(Constants.BLUETOOTH_NOT_AVAILABLE);
             return;
         }
-
-        //        if (mAdapter.getScanMode() != BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
-        //            final Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
-        ////            intent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
-        //            startActivityForResult(call, intent, "initializeBluetoothCallback");
-        //
-        //            return;
-        //        }
 
         mScanner =
             Scanner.getInstance(
