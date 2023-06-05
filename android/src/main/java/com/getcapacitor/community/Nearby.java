@@ -29,6 +29,7 @@ import com.getcapacitor.annotation.PermissionCallback;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 
@@ -236,14 +237,10 @@ public class Nearby extends Plugin {
                 this.serviceMask,
                 new Scanner.BeaconCallback() {
                     @Override
-                    public void onFound(UUID uuid, byte[] data) {
+                    public void onFound(UUID uuid, Number rssi) {
                         try {
                             if (mScanner.isScanning()) {
-                                JSObject jsData = new JSObject().put("uuid", uuid.toString());
-
-                                if (data != null && data.length > 0) {
-                                    jsData.put("content", Base64.encodeToString(data, Base64.DEFAULT | Base64.NO_WRAP));
-                                }
+                                JSObject jsData = new JSObject().put("uuid", uuid.toString()).put("rssi", rssi.toString());
 
                                 notifyListeners("onFound", jsData);
                             }
@@ -253,14 +250,10 @@ public class Nearby extends Plugin {
                     }
 
                     @Override
-                    public void onLost(UUID uuid, byte[] data) {
+                    public void onLost(UUID uuid, Number rssi) {
                         try {
                             if (mScanner.isScanning()) {
-                                JSObject jsData = new JSObject().put("uuid", uuid.toString());
-
-                                if (data != null && data.length > 0) {
-                                    jsData.put("content", Base64.encodeToString(data, Base64.DEFAULT | Base64.NO_WRAP));
-                                }
+                                JSObject jsData = new JSObject().put("uuid", uuid.toString()).put("rssi", rssi.toString());
 
                                 notifyListeners("onLost", jsData);
                             }
@@ -275,7 +268,7 @@ public class Nearby extends Plugin {
             mScanner.setScanMode(scanMode);
         }
 
-        mAdvertiser = Advertiser.getInstance(this.mAdapter, this.serviceUUID);
+        mAdvertiser = Advertiser.getInstance(this.serviceUUID, this.mAdapter);
 
         if (advertiseMode != null) {
             mAdvertiser.setAdvertiseMode(advertiseMode);
@@ -363,27 +356,17 @@ public class Nearby extends Plugin {
         }
 
         try {
-            JSObject messageObject = call.getObject("message", null);
-            if (messageObject != null) {
-                String messageUUID = messageObject.getString("uuid", null);
-                if (messageUUID != null && messageUUID.length() > 0) {
-                    uuid = UUID.fromString(messageUUID);
-                } else {
-                    call.reject(Constants.UUID_NOT_FOUND);
-                    return;
-                }
-
-                String content = messageObject.getString("content", null);
-                if (content != null && content.length() > 0) {
-                    data = Base64.decode(content, Base64.DEFAULT);
-                }
+            String beaconUUID = call.getString("uuid", null);
+            if (beaconUUID != null && beaconUUID.length() > 0) {
+                uuid = UUID.fromString(beaconUUID);
+            } else {
+                call.reject(Constants.UUID_NOT_FOUND);
+                return;
             }
 
             if (!mAdvertiser.isAdvertising()) {
-                Advertiser.Beacon beacon = new Advertiser.Beacon(uuid, data);
-
                 mAdvertiser.start(
-                    beacon,
+                    uuid,
                     call.getInt("ttlSeconds", null),
                     new Advertiser.Callback() {
                         @Override
@@ -398,7 +381,7 @@ public class Nearby extends Plugin {
 
                         @Override
                         public void onExpired() {
-                            onPublishExpired();
+                            publishExpired();
                         }
                     }
                 );
@@ -412,14 +395,6 @@ public class Nearby extends Plugin {
         }
     }
 
-    private void onPublishExpired() {
-        if (mAdvertiser.isAdvertising()) {
-            notifyListeners("onPublishExpired", null);
-        }
-
-        doUnpublish();
-    }
-
     @PluginMethod
     public void unpublish(PluginCall call) {
         if (mAdapter == null) {
@@ -428,7 +403,9 @@ public class Nearby extends Plugin {
         }
 
         try {
-            doUnpublish();
+            if (mAdvertiser != null) {
+                mAdvertiser.stop();
+            }
 
             uuid = null;
             data = null;
@@ -441,10 +418,16 @@ public class Nearby extends Plugin {
         }
     }
 
-    private void doUnpublish() {
-        if (mAdvertiser != null) {
-            mAdvertiser.stop();
+    private void publishExpired() {
+        if (mAdvertiser == null) {
+            return;
         }
+
+        if (mAdvertiser.isAdvertising()) {
+            notifyListeners("onPublishExpired", null);
+        }
+
+        mAdvertiser.stop();
     }
 
     /**
@@ -453,7 +436,7 @@ public class Nearby extends Plugin {
 
     @PluginMethod
     public void subscribe(final PluginCall call) {
-        if (mAdapter == null) {
+        if (mAdapter == null || mScanner == null) {
             call.reject(Constants.NOT_INITIALIZED);
             return;
         }
@@ -470,7 +453,7 @@ public class Nearby extends Plugin {
 
                         @Override
                         public void onExpired() {
-                            onSubscribeExpired();
+                            subscribeExpired();
                         }
                     }
                 );
@@ -481,18 +464,10 @@ public class Nearby extends Plugin {
                 return;
             }
         } else {
-            doUnsubscribe();
+            mScanner.stop();
         }
 
         call.resolve();
-    }
-
-    private void onSubscribeExpired() {
-        if (mScanner.isScanning()) {
-            notifyListeners("onSubscribeExpired", null);
-        }
-
-        doUnsubscribe();
     }
 
     @PluginMethod
@@ -503,7 +478,9 @@ public class Nearby extends Plugin {
         }
 
         try {
-            doUnsubscribe();
+            if (mScanner != null) {
+                mScanner.stop();
+            }
 
             call.resolve();
         } catch (Exception e) {
@@ -511,10 +488,16 @@ public class Nearby extends Plugin {
         }
     }
 
-    private void doUnsubscribe() {
-        if (mScanner != null) {
-            mScanner.stop();
+    private void subscribeExpired() {
+        if (mScanner == null) {
+            return;
         }
+
+        if (mScanner.isScanning()) {
+            notifyListeners("onSubscribeExpired", null);
+        }
+
+        mScanner.stop();
     }
 
     /**
@@ -524,10 +507,10 @@ public class Nearby extends Plugin {
     @PluginMethod
     public void status(PluginCall call) {
         try {
-            boolean isPublishing = mAdvertiser.isAdvertising();
-            boolean isSubscribing = mScanner.isScanning();
+            boolean isPublishing = mAdvertiser != null ? mAdvertiser.isAdvertising() : false;
+            boolean isSubscribing = mScanner != null ? mScanner.isScanning() : false;
 
-            Set<UUID> uuids = mScanner.getBeacons();
+            Set<UUID> uuids = mScanner != null ? mScanner.getBeacons() : Collections.emptySet();
 
             call.resolve(
                 new JSObject().put("isPublishing", isPublishing).put("isSubscribing", isSubscribing).put("uuids", new JSArray(uuids))
@@ -541,6 +524,16 @@ public class Nearby extends Plugin {
      * Helper
      */
 
+    private void stop() {
+        if (mScanner != null) {
+            mScanner.stop();
+        }
+
+        if (mAdvertiser != null) {
+            mAdvertiser.stop();
+        }
+    }
+
     private boolean isBluetoothEnabled() {
         BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
@@ -549,10 +542,5 @@ public class Nearby extends Plugin {
         }
 
         return bluetoothAdapter.isEnabled();
-    }
-
-    private void stop() {
-        doUnsubscribe();
-        doUnpublish();
     }
 }

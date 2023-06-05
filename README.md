@@ -68,14 +68,14 @@ Stops and resets advertising and scanning of nearby tokens.
 ### publish(...)
 
 ```typescript
-publish(options: PublishOptions | { message: Message; }) => Promise<void>
+publish(options: PublishOptions) => Promise<void>
 ```
 
 Start publishing nearby token.
 
-| Param         | Type                                                                                                      |
-| ------------- | --------------------------------------------------------------------------------------------------------- |
-| **`options`** | <code><a href="#publishoptions">PublishOptions</a> \| { message: <a href="#message">Message</a>; }</code> |
+| Param         | Type                                                      |
+| ------------- | --------------------------------------------------------- |
+| **`options`** | <code><a href="#publishoptions">PublishOptions</a></code> |
 
 **Since:** 1.0.0
 
@@ -183,19 +183,19 @@ Called when state of Bluetooth has changed.
 ### addListener('onFound', ...)
 
 ```typescript
-addListener(eventName: 'onFound', listenerFunc: (uuid: UUID, content?: string | undefined) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onFound', listenerFunc: (uuid: UUID, rssi: number) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
-Called when messages are found.
+Called when beacons are found.
 
-| Param              | Type                                                     |
-| ------------------ | -------------------------------------------------------- |
-| **`eventName`**    | <code>'onFound'</code>                                   |
-| **`listenerFunc`** | <code>(uuid: string, content?: string) =&gt; void</code> |
+| Param              | Type                                                 |
+| ------------------ | ---------------------------------------------------- |
+| **`eventName`**    | <code>'onFound'</code>                               |
+| **`listenerFunc`** | <code>(uuid: string, rssi: number) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
-**Since:** 1.0.0
+**Since:** 1.1.0
 
 --------------------
 
@@ -203,19 +203,19 @@ Called when messages are found.
 ### addListener('onLost', ...)
 
 ```typescript
-addListener(eventName: 'onLost', listenerFunc: (uuid: UUID, content?: string | undefined) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onLost', listenerFunc: (uuid: UUID, rssi: number) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
-Called when a message is no longer detectable nearby.
+Called when a beacon is no longer detectable nearby.
 
-| Param              | Type                                                     |
-| ------------------ | -------------------------------------------------------- |
-| **`eventName`**    | <code>'onLost'</code>                                    |
-| **`listenerFunc`** | <code>(uuid: string, content?: string) =&gt; void</code> |
+| Param              | Type                                                 |
+| ------------------ | ---------------------------------------------------- |
+| **`eventName`**    | <code>'onLost'</code>                                |
+| **`listenerFunc`** | <code>(uuid: string, rssi: number) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
-**Since:** 1.0.0
+**Since:** 1.1.0
 
 --------------------
 
@@ -275,17 +275,10 @@ The subscription has expired.
 
 #### PublishOptions
 
-| Prop             | Type                                              | Description                                                 | Since |
-| ---------------- | ------------------------------------------------- | ----------------------------------------------------------- | ----- |
-| **`ttlSeconds`** | <code><a href="#ttlseconds">TTLSeconds</a></code> | Sets the time to live in seconds for the publish operation. | 1.0.0 |
-
-
-#### Message
-
-| Prop          | Type                                  | Description                                  | Since |
-| ------------- | ------------------------------------- | -------------------------------------------- | ----- |
-| **`uuid`**    | <code><a href="#uuid">UUID</a></code> | The <a href="#uuid">UUID</a> of the message. | 1.0.0 |
-| **`content`** | <code>string</code>                   | The raw bytes content of the message.        | 1.0.0 |
+| Prop             | Type                                              | Description                                                         | Since |
+| ---------------- | ------------------------------------------------- | ------------------------------------------------------------------- | ----- |
+| **`uuid`**       | <code><a href="#uuid">UUID</a></code>             | Sets the beacon <a href="#uuid">UUID</a> for the publish operation. | 1.1.0 |
+| **`ttlSeconds`** | <code><a href="#ttlseconds">TTLSeconds</a></code> | Sets the time to live in seconds for the publish operation.         | 1.0.0 |
 
 
 #### SubscribeOptions

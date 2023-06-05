@@ -266,17 +266,6 @@ public class NearbyPlugin: CAPPlugin {
         call.resolve()
     }
 
-    @objc func pause(_ call: CAPPluginCall) {
-        stop()
-
-        call.resolve()
-    }
-    @objc func resume(_ call: CAPPluginCall) {
-        start(call)
-
-        call.resolve()
-    }
-
     @objc func status(_ call: CAPPluginCall) {
         let isPublishing = (self.advertiser != nil) ? self.advertiser.isAdvertising() : false
         let isSubscribing = (self.scanner != nil) ? self.scanner.isScanning() : false

@@ -13,8 +13,5 @@ CAP_PLUGIN(NearbyPlugin, "Nearby",
     CAP_PLUGIN_METHOD(subscribe, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(unsubscribe, CAPPluginReturnPromise);
 
-    CAP_PLUGIN_METHOD(pause, CAPPluginReturnPromise);
-    CAP_PLUGIN_METHOD(resume, CAPPluginReturnPromise);
-
     CAP_PLUGIN_METHOD(status, CAPPluginReturnPromise);
 )

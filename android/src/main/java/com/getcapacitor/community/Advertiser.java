@@ -9,7 +9,6 @@ import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.os.Handler;
 import android.os.ParcelUuid;
 import android.util.Log;
-import java.nio.ByteBuffer;
 import java.util.UUID;
 
 public class Advertiser {
@@ -31,15 +30,15 @@ public class Advertiser {
     private final Handler handler = new Handler();
     private Runnable runnable;
 
-    public static synchronized Advertiser getInstance(BluetoothAdapter adapter, UUID serviceUUID) {
+    public static synchronized Advertiser getInstance(UUID serviceUUID, BluetoothAdapter adapter) {
         if (instance == null) {
-            instance = new Advertiser(adapter, serviceUUID);
+            instance = new Advertiser(serviceUUID, adapter);
         }
 
         return instance;
     }
 
-    Advertiser(BluetoothAdapter adapter, UUID serviceUUID) {
+    Advertiser(UUID serviceUUID, BluetoothAdapter adapter) {
         this.adapter = adapter;
 
         this.serviceUUID = serviceUUID;
@@ -61,16 +60,16 @@ public class Advertiser {
         this.txPowerLevel = txPowerLevel;
     }
 
-    public void start(Beacon beacon) {
-        start(beacon, null, null);
+    public void start(UUID beaconUUID) {
+        start(beaconUUID, null, null);
     }
 
-    public void start(Beacon beacon, Callback callback) {
-        start(beacon, null, callback);
+    public void start(UUID beaconUUID, Callback callback) {
+        start(beaconUUID, null, callback);
     }
 
     @SuppressLint("MissingPermission")
-    public void start(Beacon beacon, Integer ttlSeconds, Callback callback) {
+    public void start(UUID beaconUUID, Integer ttlSeconds, Callback callback) {
         stopTimer();
 
         if (mAdvertising) {
@@ -106,7 +105,7 @@ public class Advertiser {
         AdvertiseData advertiseData = new AdvertiseData.Builder()
             // Add a service UUID to advertise data.
             .addServiceUuid(new ParcelUuid(serviceUUID))
-            .addServiceUuid(new ParcelUuid(beacon.uuid()))
+            .addServiceUuid(new ParcelUuid(beaconUUID))
             // Whether the transmission power level should be included in the advertise packet.
             .setIncludeTxPowerLevel(false)
             // Set whether the device name should be included in advertise packet.
@@ -222,48 +221,5 @@ public class Advertiser {
         public void onFailure(int errorCode, String errorMessage) {}
 
         public void onExpired() {}
-    }
-
-    /**
-     * Beacon
-     */
-
-    public static class Beacon {
-
-        UUID uuid;
-        byte[] data;
-
-        long timestamp;
-
-        public Beacon(UUID uuid, byte[] data) {
-            this.uuid = uuid;
-            this.data = data;
-
-            this.timestamp = System.currentTimeMillis();
-        }
-
-        public Beacon(UUID uuid) {
-            this(uuid, null);
-        }
-
-        public UUID uuid() {
-            return this.uuid;
-        }
-
-        public byte[] data() { // 22 - 4
-            int length = 0; // 7
-
-            if (this.data != null) {
-                length += this.data.length;
-            }
-
-            ByteBuffer data = ByteBuffer.wrap(new byte[length]);
-
-            if (this.data != null) {
-                data.put(this.data);
-            }
-
-            return data.array();
-        }
     }
 }

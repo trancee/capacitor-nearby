@@ -50,23 +50,6 @@ export enum TxPowerLevel {
   HIGH = 3,
 }
 
-// A message that will be shared with nearby devices.
-export interface Message {
-  /**
-   * The UUID of the message.
-   *
-   * @since 1.0.0
-   */
-  uuid: UUID;
-
-  /**
-   * The raw bytes content of the message.
-   *
-   * @since 1.0.0
-   */
-  content?: string;
-}
-
 export interface InitializeOptions {
   /**
    * Sets the service UUID for the nearby token.
@@ -109,6 +92,13 @@ export interface InitializeOptions {
 }
 
 export interface PublishOptions {
+  /**
+   * Sets the beacon UUID for the publish operation.
+   *
+   * @since 1.1.0
+   */
+  uuid: UUID;
+
   /**
    * Sets the time to live in seconds for the publish operation.
    *
@@ -160,14 +150,7 @@ export interface NearbyPlugin {
    *
    * @since 1.0.0
    */
-  publish(
-    options:
-      | PublishOptions
-      | {
-          // A Message to publish for nearby devices to see
-          message: Message;
-        },
-  ): Promise<void>;
+  publish(options: PublishOptions): Promise<void>;
   /**
    * Stop publishing nearby token.
    *
@@ -215,22 +198,22 @@ export interface NearbyPlugin {
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 
   /**
-   * Called when messages are found.
+   * Called when beacons are found.
    *
-   * @since 1.0.0
+   * @since 1.1.0
    */
   addListener(
     eventName: 'onFound',
-    listenerFunc: (uuid: UUID, content?: string) => void,
+    listenerFunc: (uuid: UUID, rssi: number) => void,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
-   * Called when a message is no longer detectable nearby.
+   * Called when a beacon is no longer detectable nearby.
    *
-   * @since 1.0.0
+   * @since 1.1.0
    */
   addListener(
     eventName: 'onLost',
-    listenerFunc: (uuid: UUID, content?: string) => void,
+    listenerFunc: (uuid: UUID, rssi: number) => void,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 
   /**

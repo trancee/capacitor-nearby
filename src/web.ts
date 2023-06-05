@@ -1,7 +1,6 @@
 import { WebPlugin } from '@capacitor/core';
 
 import type {
-  Message,
   Status,
   InitializeOptions,
   PublishOptions,
@@ -63,12 +62,7 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
     delete this.scan;
   }
 
-  async publish(
-    options: PublishOptions & {
-      // A Message to publish for nearby devices to see
-      message: Message;
-    },
-  ): Promise<void> {
+  async publish(options: PublishOptions): Promise<void> {
     console.info('publish', options);
     // throw this.unimplemented('Method not implemented.');
 
@@ -82,7 +76,7 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
       }, options.ttlSeconds * 1000);
     }
   }
-  // Cancels an existing published message.
+  // Cancels an existing published beacon.
   async unpublish(): Promise<void> {
     console.info('unpublish');
     // throw this.unimplemented('Method not implemented.');
@@ -119,12 +113,14 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
       navigator.bluetooth.onadvertisementreceived = event => {
         console.info('bluetooth::advertisementreceived', event);
 
+        const rssi = event.rssi;
+
         const uuid = event.uuids.slice(-1);
         uuid &&
           !this.uuids.includes(uuid.toString()) &&
           this.uuids.push(uuid.toString());
 
-        this.notifyListeners('onFound', { uuid });
+        this.notifyListeners('onFound', { uuid, rssi });
       };
     }
   }

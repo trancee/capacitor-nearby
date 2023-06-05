@@ -123,6 +123,8 @@ public class Scanner {
                         ScanRecord record = result.getScanRecord();
                         if (record == null) return;
 
+                        int rssi = result.getRssi();
+
                         Map<ParcelUuid, byte[]> map = record.getServiceData();
                         if (map != null) {
                             for (ParcelUuid key : map.keySet()) {
@@ -138,10 +140,10 @@ public class Scanner {
                                     if (beacon != null) {
                                         beacon.alive();
                                     } else {
-                                        beacons.put(uuid, new Beacon(uuid));
+                                        beacons.put(uuid, new Beacon(uuid, rssi));
 
                                         if (beaconCallback != null) {
-                                            beaconCallback.onFound(uuid, data);
+                                            beaconCallback.onFound(uuid, rssi);
                                         }
                                     }
                                 }
@@ -162,10 +164,10 @@ public class Scanner {
                                     if (beacon != null) {
                                         beacon.alive();
                                     } else {
-                                        beacons.put(uuid, new Beacon(uuid));
+                                        beacons.put(uuid, new Beacon(uuid, rssi));
 
                                         if (beaconCallback != null) {
-                                            beaconCallback.onFound(uuid, null);
+                                            beaconCallback.onFound(uuid, rssi);
                                         }
                                     }
                                 }
@@ -268,9 +270,9 @@ public class Scanner {
 
     public abstract static class BeaconCallback {
 
-        public void onFound(UUID uuid, byte[] data) {}
+        public void onFound(UUID uuid, Number rssi) {}
 
-        public void onLost(UUID uuid, byte[] data) {}
+        public void onLost(UUID uuid, Number rssi) {}
     }
 
     public abstract static class Callback {
@@ -293,7 +295,7 @@ public class Scanner {
     private class Beacon {
 
         UUID uuid;
-        byte[] data;
+        Number rssi;
 
         long timestamp;
 
@@ -301,9 +303,9 @@ public class Scanner {
 
         long lastSeen;
 
-        public Beacon(UUID uuid, byte[] data) {
+        public Beacon(UUID uuid, Number rssi) {
             this.uuid = uuid;
-            this.data = data;
+            this.rssi = rssi;
 
             this.timestamp = System.currentTimeMillis();
 
@@ -315,7 +317,7 @@ public class Scanner {
                         if (beacon != null) {
                             if (mScanning) {
                                 if (beaconCallback != null) {
-                                    beaconCallback.onLost(this.uuid, this.data);
+                                    beaconCallback.onLost(this.uuid, this.rssi);
                                 }
                             }
                         }
@@ -331,18 +333,6 @@ public class Scanner {
 
                 beacons.put(this.uuid, this);
             }
-        }
-
-        public Beacon(UUID uuid) {
-            this(uuid, null);
-        }
-
-        public UUID uuid() {
-            return this.uuid;
-        }
-
-        public byte[] data() {
-            return this.data;
         }
 
         public void kill() {
