@@ -54,8 +54,8 @@ public final class Advertiser: NSObject {
 extension Advertiser {
     // Start advertising this device as a peripheral
     public func start(
-        _ beacon: Beacon,
-        withTimeout timeout: TimeInterval?,
+        _ beaconUUID: CBUUID,
+        _ ttlSeconds: Int?,
         callback: @escaping AdvertiseCallback) {
         self.callback = callback
 
@@ -74,15 +74,15 @@ extension Advertiser {
             // An array of service UUIDs.
             CBAdvertisementDataServiceUUIDsKey: [
                 Advertiser.serviceUUID,
-                beacon.uuid
+                beaconUUID
             ]
         ]
 
         // Advertises peripheral manager data.
         peripheralManager.startAdvertising(advertisementData)
 
-        if let timeout = timeout {
-            startTimer(timeout)
+        if let ttlSeconds = ttlSeconds {
+            startTimer(TimeInterval(ttlSeconds))
         }
     }
 
@@ -167,22 +167,6 @@ extension Advertiser: CBPeripheralManagerDelegate {
             } else {
                 callback(.started)
             }
-        }
-    }
-}
-
-extension Advertiser {
-    public final class Beacon {
-        let uuid: CBUUID
-        let data: Data?
-
-        let timestamp: Date
-
-        init(_ uuid: CBUUID, data: Data?) {
-            self.uuid = uuid
-            self.data = data
-
-            self.timestamp = Date()
         }
     }
 }

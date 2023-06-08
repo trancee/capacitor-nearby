@@ -29,20 +29,15 @@ public enum StateResult {
 @objc(NearbyPlugin)
 public class NearbyPlugin: CAPPlugin {
     private var scanner: Scanner!
-    private var scanTimeout: TimeInterval?
-
     private var advertiser: Advertiser!
-    private var advertiseTimeout: TimeInterval?
 
     private var serviceUUID: CBUUID?
 
     private var uuid: CBUUID?
     private var data: Data?
 
-    // private let implementation = Nearby()
-
     /**
-     * Public functions
+     * Initialize
      */
     @objc func initialize(_ call: CAPPluginCall) {
         if let optionsObject = call.getObject("options") {
@@ -114,7 +109,6 @@ public class NearbyPlugin: CAPPlugin {
                 break
             }
         }
-        self.scanTimeout = nil
 
         self.advertiser = Advertiser(self.serviceUUID!) { [self] result in
             notifyListeners("onBluetoothStateChanged", data: [
@@ -128,18 +122,18 @@ public class NearbyPlugin: CAPPlugin {
                 call.reject("Bluetooth is not powered on.")
             }
         }
-        self.advertiseTimeout = nil
 
         self.uuid = nil
         self.data = nil
 
         // call.success()
     }
+
+    /**
+     * Reset
+     */
     @objc func reset(_ call: CAPPluginCall) {
         stop()
-
-        self.scanTimeout = nil
-        self.advertiseTimeout = nil
 
         self.uuid = nil
         self.data = nil
@@ -147,41 +141,26 @@ public class NearbyPlugin: CAPPlugin {
         call.resolve()
     }
 
+    /**
+     * Publish
+     */
     @objc func publish(_ call: CAPPluginCall) {
         guard let advertiser = self.advertiser else {
             call.reject(Constants.NOT_INITIALIZED)
             return
         }
 
-        if let messageObject = call.getObject("message") {
-            guard let messageUUID = messageObject["uuid"] as? String else {
-                call.reject(Constants.UUID_NOT_FOUND)
-                return
-            }
-
-            if messageUUID.count > 0 {
-                self.uuid = CBUUID(string: messageUUID)
-            }
-
-            guard let content = messageObject["content"] as? String else {
-                call.reject(Constants.UUID_NOT_FOUND)
-                return
-            }
-
-            if content.count > 0 {
-                self.data = Data(base64Encoded: content)
-            }
+        guard let beaconUUID = call.getString("uuid") else {
+            call.reject(Constants.UUID_NOT_FOUND)
+            return
         }
 
-        self.advertiseTimeout = nil
-        if let optionsObject = call.getObject("options") {
-            self.advertiseTimeout = optionsObject["ttlSeconds"] as? TimeInterval
+        if beaconUUID.count > 0 {
+            self.uuid = CBUUID(string: beaconUUID)
         }
 
         if !advertiser.isAdvertising() {
-            let beacon = Advertiser.Beacon(self.uuid!, data: self.data)
-
-            advertiser.start(beacon, withTimeout: self.advertiseTimeout) { result in
+            advertiser.start(uuid!, call.getInt("ttlSeconds")) { result in
                 switch result {
                 case .started:
                     call.resolve()
@@ -203,6 +182,7 @@ public class NearbyPlugin: CAPPlugin {
             call.resolve()
         }
     }
+
     @objc func unpublish(_ call: CAPPluginCall) {
         guard let advertiser = self.advertiser else {
             call.reject(Constants.NOT_INITIALIZED)
@@ -211,27 +191,33 @@ public class NearbyPlugin: CAPPlugin {
 
         advertiser.stop()
 
-        self.advertiseTimeout = nil
-
         self.uuid = nil
         self.data = nil
 
         call.resolve()
     }
 
+    private func publishExpired() {
+        guard let advertiser = self.advertiser else { return }
+
+        if advertiser.isAdvertising() {
+            notifyListeners("onPublishExpired", data: nil)
+        }
+
+        advertiser.stop()
+    }
+
+    /**
+     * Subscribe
+     */
     @objc func subscribe(_ call: CAPPluginCall) {
         guard let scanner = self.scanner else {
             call.reject(Constants.NOT_INITIALIZED)
             return
         }
 
-        self.scanTimeout = nil
-        if let optionsObject = call.getObject("options") {
-            self.scanTimeout = optionsObject["ttlSeconds"] as? TimeInterval
-        }
-
         if !scanner.isScanning() {
-            scanner.start(withTimeout: self.scanTimeout) { result in
+            scanner.start(call.getInt("ttlSeconds")) { result in
                 switch result {
                 case .started:
                     call.resolve()
@@ -253,6 +239,7 @@ public class NearbyPlugin: CAPPlugin {
             call.resolve()
         }
     }
+
     @objc func unsubscribe(_ call: CAPPluginCall) {
         guard let scanner = self.scanner else {
             call.reject(Constants.NOT_INITIALIZED)
@@ -261,11 +248,22 @@ public class NearbyPlugin: CAPPlugin {
 
         scanner.stop()
 
-        self.scanTimeout = nil
-
         call.resolve()
     }
 
+    private func subscribeExpired() {
+        guard let scanner = self.scanner else { return }
+
+        if scanner.isScanning() {
+            notifyListeners("onSubscribeExpired", data: nil)
+        }
+
+        scanner.stop()
+    }
+
+    /**
+     * Status
+     */
     @objc func status(_ call: CAPPluginCall) {
         let isPublishing = (self.advertiser != nil) ? self.advertiser.isAdvertising() : false
         let isSubscribing = (self.scanner != nil) ? self.scanner.isScanning() : false
@@ -280,56 +278,8 @@ public class NearbyPlugin: CAPPlugin {
     }
 
     /**
-     * Private functions
+     * Helper
      */
-    private func start(_ call: CAPPluginCall) {
-        if self.uuid != nil {
-            let beacon = Advertiser.Beacon(self.uuid!, data: self.data)
-
-            if let advertiser = self.advertiser {
-                advertiser.start(beacon, withTimeout: self.advertiseTimeout) { result in
-                    switch result {
-                    case .started:
-                        call.resolve()
-
-                        break
-                    case .stopped(let e):
-                        if let e = e {
-                            call.reject(e.localizedDescription, String((e as NSError).code))
-                        }
-
-                        break
-                    case .expired:
-                        self.publishExpired()
-
-                        break
-                    }
-                }
-            }
-        }
-
-        if let scanner = self.scanner {
-            scanner.start(withTimeout: self.scanTimeout) { result in
-                switch result {
-                case .started:
-                    call.resolve()
-
-                    break
-                case .stopped(let e):
-                    if let e = e {
-                        call.reject(e.localizedDescription, String((e as NSError).code))
-                    }
-
-                    break
-                case .expired:
-                    self.subscribeExpired()
-
-                    break
-                }
-            }
-        }
-    }
-
     private func stop() {
         if let scanner = self.scanner {
             scanner.stop()
@@ -338,26 +288,6 @@ public class NearbyPlugin: CAPPlugin {
         if let advertiser = self.advertiser {
             advertiser.stop()
         }
-    }
-
-    private func publishExpired() {
-        guard let advertiser = self.advertiser else { return }
-
-        if advertiser.isAdvertising() {
-            notifyListeners("onPublishExpired", data: nil)
-        }
-
-        advertiser.stop()
-    }
-
-    private func subscribeExpired() {
-        guard let scanner = self.scanner else { return }
-
-        if scanner.isScanning() {
-            notifyListeners("onSubscribeExpired", data: nil)
-        }
-
-        scanner.stop()
     }
 
     private func fromBluetoothState(_ state: StateResult) -> String {

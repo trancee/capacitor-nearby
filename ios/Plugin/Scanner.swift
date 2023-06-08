@@ -68,7 +68,7 @@ public final class Scanner: NSObject {
 extension Scanner {
     // Start scanning for peripherals
     public func start(
-        withTimeout timeout: TimeInterval?,
+        _ ttlSeconds: Int?,
         callback: @escaping ScanCallback) {
         self.callback = callback
 
@@ -101,8 +101,8 @@ extension Scanner {
             callback(.started)
         }
 
-        if let timeout = timeout {
-            startTimer(timeout)
+        if let ttlSeconds = ttlSeconds {
+            startTimer(TimeInterval(ttlSeconds))
         }
     }
 
@@ -204,7 +204,7 @@ extension Scanner: CBCentralManagerDelegate {
         }
 
         if let advertisementDataServiceData = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data] {
-            for (uuid, data) in advertisementDataServiceData {
+            for (uuid, _) in advertisementDataServiceData {
                 if uuid == Scanner.serviceUUID {
                     continue
                 }
@@ -212,10 +212,10 @@ extension Scanner: CBCentralManagerDelegate {
                 if let beacon = Scanner.beacons[uuid] {
                     beacon.alive()
                 } else {
-                    Scanner.beacons[uuid] = Beacon(uuid, data: data, rssi: rssi)
+                    Scanner.beacons[uuid] = Beacon(uuid, rssi: rssi)
 
                     if let beaconCallback = Scanner.beaconCallback {
-                        beaconCallback(.found(uuid, data: data, rssi: rssi))
+                        beaconCallback(.found(uuid, rssi: rssi))
                     }
                 }
             }
@@ -238,7 +238,6 @@ extension Scanner {
 
     public final class Beacon {
         let uuid: CBUUID
-        let data: Data?
         let rssi: NSNumber?
 
         let timestamp: Date
@@ -247,9 +246,8 @@ extension Scanner {
 
         private var lastSeen: Date
 
-        init(_ uuid: CBUUID, data: Data? = nil, rssi: NSNumber? = nil) {
+        init(_ uuid: CBUUID, rssi: NSNumber? = nil) {
             self.uuid = uuid
-            self.data = data
             self.rssi = rssi
 
             self.timestamp = Date()
@@ -303,7 +301,7 @@ extension Scanner {
             kill()
 
             if let beaconCallback = Scanner.beaconCallback {
-                beaconCallback(.lost(self.uuid, data: self.data, rssi: self.rssi))
+                beaconCallback(.lost(self.uuid, rssi: self.rssi))
             }
         }
     }
