@@ -183,15 +183,15 @@ Called when state of Bluetooth has changed.
 ### addListener('onFound', ...)
 
 ```typescript
-addListener(eventName: 'onFound', listenerFunc: (uuid: UUID, rssi: number) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onFound', listenerFunc: (uuid: UUID, rssi?: number | undefined) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 Called when beacons are found.
 
-| Param              | Type                                                 |
-| ------------------ | ---------------------------------------------------- |
-| **`eventName`**    | <code>'onFound'</code>                               |
-| **`listenerFunc`** | <code>(uuid: string, rssi: number) =&gt; void</code> |
+| Param              | Type                                                  |
+| ------------------ | ----------------------------------------------------- |
+| **`eventName`**    | <code>'onFound'</code>                                |
+| **`listenerFunc`** | <code>(uuid: string, rssi?: number) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
@@ -203,15 +203,15 @@ Called when beacons are found.
 ### addListener('onLost', ...)
 
 ```typescript
-addListener(eventName: 'onLost', listenerFunc: (uuid: UUID, rssi: number) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onLost', listenerFunc: (uuid: UUID, rssi?: number | undefined) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 Called when a beacon is no longer detectable nearby.
 
-| Param              | Type                                                 |
-| ------------------ | ---------------------------------------------------- |
-| **`eventName`**    | <code>'onLost'</code>                                |
-| **`listenerFunc`** | <code>(uuid: string, rssi: number) =&gt; void</code> |
+| Param              | Type                                                  |
+| ------------------ | ----------------------------------------------------- |
+| **`eventName`**    | <code>'onLost'</code>                                 |
+| **`listenerFunc`** | <code>(uuid: string, rssi?: number) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 

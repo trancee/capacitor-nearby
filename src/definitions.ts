@@ -204,7 +204,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onFound',
-    listenerFunc: (uuid: UUID, rssi: number) => void,
+    listenerFunc: (uuid: UUID, rssi?: number) => void,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Called when a beacon is no longer detectable nearby.
@@ -213,7 +213,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onLost',
-    listenerFunc: (uuid: UUID, rssi: number) => void,
+    listenerFunc: (uuid: UUID, rssi?: number) => void,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 
   /**
