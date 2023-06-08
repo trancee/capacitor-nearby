@@ -16,9 +16,9 @@
     "@capacitor/core": "latest",
     "@capacitor/camera": "latest",
     "@capacitor/splash-screen": "latest",
-    "@capacitor-community/capacitor-nearby": "file:..",
     "@capacitor/ios": "latest",
-    "@capacitor/android": "latest"
+    "@capacitor/android": "latest",
+    "capacitor-nearby": "file:.."
   },
   "devDependencies": {
     "@capacitor/cli": "latest",
