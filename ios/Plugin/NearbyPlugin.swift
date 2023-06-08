@@ -40,18 +40,14 @@ public class NearbyPlugin: CAPPlugin {
      * Initialize
      */
     @objc func initialize(_ call: CAPPluginCall) {
-        if let optionsObject = call.getObject("options") {
-            guard let serviceUUID = optionsObject["serviceUUID"] as? String else {
-                call.reject(Constants.UUID_NOT_FOUND)
-                return
-            }
-
-            if serviceUUID.count > 0 {
-                self.serviceUUID = CBUUID(string: serviceUUID)
-            }
+        guard let serviceUUID = call.getString("serviceUUID") else {
+            call.reject(Constants.UUID_NOT_FOUND)
+            return
         }
 
-        guard self.serviceUUID != nil else {
+        if serviceUUID.count > 0 {
+            self.serviceUUID = CBUUID(string: serviceUUID)
+        } else {
             call.reject(Constants.UUID_NOT_FOUND)
             return
         }
@@ -157,6 +153,9 @@ public class NearbyPlugin: CAPPlugin {
 
         if beaconUUID.count > 0 {
             self.uuid = CBUUID(string: beaconUUID)
+        } else {
+            call.reject(Constants.UUID_NOT_FOUND)
+            return
         }
 
         if !advertiser.isAdvertising() {
