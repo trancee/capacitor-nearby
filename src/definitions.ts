@@ -2,6 +2,13 @@ import type { PluginListenerHandle } from '@capacitor/core';
 
 export type UUID = string;
 
+export interface Beacon {
+  uuid: UUID;
+  rssi?: number | string;
+}
+
+export type BeaconCallback = (uuid: UUID, rssi?: number | string) => void;
+
 export enum TTLSeconds {
   // The default time to live in seconds.
   TTL_SECONDS_DEFAULT = 300,
@@ -204,7 +211,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onFound',
-    listenerFunc: (uuid: UUID, rssi?: number) => void,
+    listenerFunc: BeaconCallback,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Called when a beacon is no longer detectable nearby.
@@ -213,7 +220,7 @@ export interface NearbyPlugin {
    */
   addListener(
     eventName: 'onLost',
-    listenerFunc: (uuid: UUID, rssi?: number) => void,
+    listenerFunc: BeaconCallback,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 
   /**
