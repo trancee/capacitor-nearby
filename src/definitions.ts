@@ -7,7 +7,7 @@ export interface Beacon {
   rssi?: number | string;
 }
 
-export type BeaconCallback = (uuid: UUID, rssi?: number | string) => void;
+export type BeaconCallback = (_: Beacon) => void;
 
 export enum TTLSeconds {
   // The default time to live in seconds.

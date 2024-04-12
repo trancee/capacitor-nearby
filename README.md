@@ -295,6 +295,14 @@ The subscription has expired.
 | **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
 
 
+#### Beacon
+
+| Prop       | Type                                  |
+| ---------- | ------------------------------------- |
+| **`uuid`** | <code><a href="#uuid">UUID</a></code> |
+| **`rssi`** | <code>string \| number</code>         |
+
+
 ### Type Aliases
 
 
@@ -310,7 +318,7 @@ The subscription has expired.
 
 #### BeaconCallback
 
-<code>(uuid: string, rssi?: string | number): void</code>
+<code>(_: <a href="#beacon">Beacon</a>): void</code>
 
 
 ### Enums
