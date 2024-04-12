@@ -1,5 +1,5 @@
 {
-  "name": "capacitor-nearby",
+  "name": "@capacitor-trancee/nearby",
   "version": "3.2.1",
   "description": "Uses Bluetooth LE to scan and advertise for nearby devices",
   "main": "dist/plugin.cjs.js",
