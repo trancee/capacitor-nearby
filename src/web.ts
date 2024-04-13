@@ -7,6 +7,7 @@ import type {
   SubscribeOptions,
   NearbyPlugin,
   UUID,
+  Beacon,
 } from './definitions';
 
 export class NearbyWeb extends WebPlugin implements NearbyPlugin {
@@ -72,6 +73,7 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
     if (options.ttlSeconds && options.ttlSeconds > 0) {
       this.publishTimeout = setTimeout(() => {
         this.unpublish();
+
         this.notifyListeners('onPublishExpired', {});
       }, options.ttlSeconds * 1000);
     }
@@ -106,22 +108,19 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
         }, options.ttlSeconds * 1000);
       }
 
+      navigator.bluetooth.removeEventListener(
+        'advertisementreceived',
+
+        this.onAdvertisementReceivedCallback as EventListener,
+      );
+
+      navigator.bluetooth.onadvertisementreceived =
+        this.onAdvertisementReceivedCallback;
+
       this.scan = await navigator.bluetooth.requestLEScan({
         filters: [{ services: [this.serviceUUID] }],
       });
-
-      navigator.bluetooth.onadvertisementreceived = event => {
-        console.info('bluetooth::advertisementreceived', event);
-
-        const rssi = event.rssi;
-
-        const uuid = event.uuids.slice(-1);
-        uuid &&
-          !this.uuids.includes(uuid.toString()) &&
-          this.uuids.push(uuid.toString());
-
-        this.notifyListeners('onFound', { uuid, rssi });
-      };
+      console.info('bluetooth::requestLEScan', this.scan);
     }
   }
   // Cancels an existing subscription.
@@ -132,7 +131,7 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
     delete this.subscribeTimeout;
 
     if (this.scan?.active) {
-      this.scan?.stop();
+      this.scan.stop();
     }
 
     delete this.scan;
@@ -146,7 +145,27 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
     return {
       isPublishing: this.isPublishing,
       isSubscribing: this.scan?.active ?? false,
+
       uuids: this.uuids,
     };
+  }
+
+  private onAdvertisementReceivedCallback =
+    this.onAdvertisementReceived.bind(this);
+
+  private onAdvertisementReceived(event: BluetoothAdvertisingEvent): void {
+    console.info('bluetooth::advertisementreceived', event);
+
+    const rssi = event.rssi;
+
+    const uuid = event.uuids.slice(-1).toString();
+    uuid && !this.uuids.includes(uuid) && this.uuids.push(uuid);
+
+    const beacon: Beacon = {
+      uuid,
+      rssi,
+    };
+
+    this.notifyListeners('onFound', beacon);
   }
 }
