@@ -143,7 +143,7 @@ Returns status of operations and found tokens.
 ### addListener('onPermissionChanged', ...)
 
 ```typescript
-addListener(eventName: 'onPermissionChanged', listenerFunc: (granted: boolean) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onPermissionChanged', listenerFunc: (granted: boolean) => void) => Promise<PluginListenerHandle>
 ```
 
 Called when permission is granted or revoked for this app to use Nearby.
@@ -153,7 +153,7 @@ Called when permission is granted or revoked for this app to use Nearby.
 | **`eventName`**    | <code>'onPermissionChanged'</code>         |
 | **`listenerFunc`** | <code>(granted: boolean) =&gt; void</code> |
 
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 **Since:** 1.0.0
 
@@ -163,7 +163,7 @@ Called when permission is granted or revoked for this app to use Nearby.
 ### addListener('onBluetoothStateChanged', ...)
 
 ```typescript
-addListener(eventName: 'onBluetoothStateChanged', listenerFunc: (state: BluetoothState) => void) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onBluetoothStateChanged', listenerFunc: (state: BluetoothState) => void) => Promise<PluginListenerHandle>
 ```
 
 Called when state of Bluetooth has changed.
@@ -173,7 +173,7 @@ Called when state of Bluetooth has changed.
 | **`eventName`**    | <code>'onBluetoothStateChanged'</code>                                        |
 | **`listenerFunc`** | <code>(state: <a href="#bluetoothstate">BluetoothState</a>) =&gt; void</code> |
 
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 **Since:** 1.0.0
 
@@ -183,7 +183,7 @@ Called when state of Bluetooth has changed.
 ### addListener('onFound', ...)
 
 ```typescript
-addListener(eventName: 'onFound', listenerFunc: BeaconCallback) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onFound', listenerFunc: BeaconCallback) => Promise<PluginListenerHandle>
 ```
 
 Called when beacons are found.
@@ -193,7 +193,7 @@ Called when beacons are found.
 | **`eventName`**    | <code>'onFound'</code>                                    |
 | **`listenerFunc`** | <code><a href="#beaconcallback">BeaconCallback</a></code> |
 
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 **Since:** 1.1.0
 
@@ -203,7 +203,7 @@ Called when beacons are found.
 ### addListener('onLost', ...)
 
 ```typescript
-addListener(eventName: 'onLost', listenerFunc: BeaconCallback) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onLost', listenerFunc: BeaconCallback) => Promise<PluginListenerHandle>
 ```
 
 Called when a beacon is no longer detectable nearby.
@@ -213,7 +213,7 @@ Called when a beacon is no longer detectable nearby.
 | **`eventName`**    | <code>'onLost'</code>                                     |
 | **`listenerFunc`** | <code><a href="#beaconcallback">BeaconCallback</a></code> |
 
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 **Since:** 1.1.0
 
@@ -223,7 +223,7 @@ Called when a beacon is no longer detectable nearby.
 ### addListener('onPublishExpired', ...)
 
 ```typescript
-addListener(eventName: 'onPublishExpired', listenerFunc: () => void) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onPublishExpired', listenerFunc: () => void) => Promise<PluginListenerHandle>
 ```
 
 The published token has expired.
@@ -233,7 +233,7 @@ The published token has expired.
 | **`eventName`**    | <code>'onPublishExpired'</code> |
 | **`listenerFunc`** | <code>() =&gt; void</code>      |
 
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 **Since:** 1.0.0
 
@@ -243,7 +243,7 @@ The published token has expired.
 ### addListener('onSubscribeExpired', ...)
 
 ```typescript
-addListener(eventName: 'onSubscribeExpired', listenerFunc: () => void) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: 'onSubscribeExpired', listenerFunc: () => void) => Promise<PluginListenerHandle>
 ```
 
 The subscription has expired.
@@ -253,7 +253,7 @@ The subscription has expired.
 | **`eventName`**    | <code>'onSubscribeExpired'</code> |
 | **`listenerFunc`** | <code>() =&gt; void</code>        |
 
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 **Since:** 1.0.0
 

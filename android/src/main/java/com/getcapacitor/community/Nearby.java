@@ -12,7 +12,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.util.Base64;
 import android.util.Log;
 import androidx.activity.result.ActivityResult;
 import androidx.annotation.StringDef;
@@ -128,7 +127,6 @@ public class Nearby extends Plugin {
     protected UUID serviceMask;
 
     private UUID uuid;
-    private byte[] data;
 
     /**
      * Clean up callback to prevent leaks.
@@ -194,7 +192,7 @@ public class Nearby extends Plugin {
         }
 
         String serviceUUID = call.getString("serviceUUID", null);
-        if (serviceUUID != null && serviceUUID.length() > 0) {
+        if (serviceUUID != null && !serviceUUID.isEmpty()) {
             serviceUUID = serviceUUID.replace("0x", "");
             String serviceMask = "00000000-0000-0000-0000-000000000000";
 
@@ -336,7 +334,6 @@ public class Nearby extends Plugin {
             stop();
 
             uuid = null;
-            data = null;
 
             call.resolve();
         } catch (Exception e) {
@@ -357,7 +354,7 @@ public class Nearby extends Plugin {
 
         try {
             String beaconUUID = call.getString("uuid", null);
-            if (beaconUUID != null && beaconUUID.length() > 0) {
+            if (beaconUUID != null && !beaconUUID.isEmpty()) {
                 uuid = UUID.fromString(beaconUUID);
             } else {
                 call.reject(Constants.UUID_NOT_FOUND);
@@ -408,7 +405,6 @@ public class Nearby extends Plugin {
             }
 
             uuid = null;
-            data = null;
 
             call.resolve();
         } catch (Exception e) {
@@ -507,8 +503,8 @@ public class Nearby extends Plugin {
     @PluginMethod
     public void status(PluginCall call) {
         try {
-            boolean isPublishing = mAdvertiser != null ? mAdvertiser.isAdvertising() : false;
-            boolean isSubscribing = mScanner != null ? mScanner.isScanning() : false;
+            boolean isPublishing = mAdvertiser != null && mAdvertiser.isAdvertising();
+            boolean isSubscribing = mScanner != null && mScanner.isScanning();
 
             Set<UUID> uuids = mScanner != null ? mScanner.getBeacons() : Collections.emptySet();
 

@@ -129,7 +129,6 @@ public class Scanner {
                         if (map != null) {
                             for (ParcelUuid key : map.keySet()) {
                                 UUID uuid = key.getUuid();
-                                byte[] data = map.get(key);
 
                                 if (uuid.compareTo(serviceUUID) == 0) {
                                     continue;
