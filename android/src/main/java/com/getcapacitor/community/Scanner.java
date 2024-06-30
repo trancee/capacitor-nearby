@@ -218,6 +218,9 @@ public class Scanner {
             scanCallback = null;
         }
 
+        // Make sure to clear all found beacons.
+        clearBeacons();
+
         mScanning = false;
     }
 
@@ -286,6 +289,10 @@ public class Scanner {
      */
 
     private final Map<UUID, Beacon> beacons = new HashMap<>();
+
+    public void clearBeacons() {
+        beacons.clear();
+    }
 
     public Set<UUID> getBeacons() {
         return beacons.keySet();

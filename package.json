@@ -1,6 +1,6 @@
 {
   "name": "@capacitor-trancee/nearby",
-  "version": "3.3.1",
+  "version": "3.3.2",
   "description": "Uses Bluetooth LE to scan and advertise for nearby devices",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -45,10 +45,10 @@
     "upgrade": "npm install --upgrade @capacitor/core @capacitor/docgen @capacitor/android @capacitor/ios @ionic/eslint-config @ionic/prettier-config @ionic/swiftlint-config @types/web-bluetooth eslint prettier prettier-plugin-java rimraf rollup swiftlint typescript"
   },
   "devDependencies": {
-    "@capacitor/android": "^6.0.0",
-    "@capacitor/core": "^6.0.0",
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/core": "^6.1.0",
     "@capacitor/docgen": "^0.0.18",
-    "@capacitor/ios": "^6.0.0",
+    "@capacitor/ios": "^6.1.0",
     "@ionic/eslint-config": "^0.3.0",
     "@ionic/prettier-config": "^1.0.1",
     "@ionic/swiftlint-config": "^1.1.2",

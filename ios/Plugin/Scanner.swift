@@ -58,7 +58,7 @@ public final class Scanner: NSObject {
 
         self.timer = nil
 
-        Scanner.beacons = [:]
+        Scanner.clearBeacons()
     }
     deinit {
         stop()
@@ -113,6 +113,8 @@ extension Scanner {
             // Asks the central manager to stop scanning for peripherals.
             centralManager.stopScan()
         }
+
+        Scanner.clearBeacons()
 
         if let callback = self.callback {
             callback(.stopped(error))
@@ -225,6 +227,10 @@ extension Scanner: CBCentralManagerDelegate {
 
 extension Scanner {
     private static let ttlSeconds: TimeInterval = 10
+
+    public func clearBeacons() {
+        Scanner.beacons = [:]
+    }
 
     public func getBeacons() -> [String] {
         var result: [String] = []
