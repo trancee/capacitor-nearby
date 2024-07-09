@@ -1,6 +1,6 @@
 {
   "name": "@capacitor-trancee/nearby",
-  "version": "3.3.3",
+  "version": "3.3.4",
   "description": "Uses Bluetooth LE to scan and advertise for nearby devices",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -11,7 +11,7 @@
     "android/build.gradle",
     "dist/",
     "ios/Plugin/",
-    "CapacitorNearby.podspec"
+    "CapacitorTranceeNearby.podspec"
   ],
   "author": "Philipp Grosswiler",
   "license": "MIT",
