@@ -58,7 +58,7 @@ public final class Scanner: NSObject {
 
         self.timer = nil
 
-        Scanner.clearBeacons()
+        clearBeacons()
     }
     deinit {
         stop()
@@ -114,7 +114,7 @@ extension Scanner {
             centralManager.stopScan()
         }
 
-        Scanner.clearBeacons()
+        clearBeacons()
 
         if let callback = self.callback {
             callback(.stopped(error))

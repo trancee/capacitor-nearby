@@ -84,9 +84,7 @@ public class NearbyPlugin: CAPPlugin {
 
                     notifyListeners("onFound", data: jsData)
                 }
-
-                break
-            case .lost(let uuid, let data, let rssi):
+                case .lost(let uuid, let data, let rssi):
                 if scanner.isScanning() {
                     var jsData: [String: Any] = [
                         "uuid": uuid.uuidString.lowercased()
@@ -101,8 +99,6 @@ public class NearbyPlugin: CAPPlugin {
 
                     notifyListeners("onLost", data: jsData)
                 }
-
-                break
             }
         }
 
@@ -163,18 +159,12 @@ public class NearbyPlugin: CAPPlugin {
                 switch result {
                 case .started:
                     call.resolve()
-
-                    break
-                case .stopped(let e):
+                    case .stopped(let e):
                     if let e = e {
                         call.reject(e.localizedDescription, String((e as NSError).code))
                     }
-
-                    break
-                case .expired:
+                    case .expired:
                     self.publishExpired()
-
-                    break
                 }
             }
         } else {
@@ -220,18 +210,12 @@ public class NearbyPlugin: CAPPlugin {
                 switch result {
                 case .started:
                     call.resolve()
-
-                    break
-                case .stopped(let e):
+                    case .stopped(let e):
                     if let e = e {
                         call.reject(e.localizedDescription, String((e as NSError).code))
                     }
-
-                    break
-                case .expired:
+                    case .expired:
                     self.subscribeExpired()
-
-                    break
                 }
             }
         } else {
