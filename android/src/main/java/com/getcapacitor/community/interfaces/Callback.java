@@ -1,4 +1,5 @@
 package com.getcapacitor.community.interfaces;
 
-public class Callback {
+public interface Callback {
+    void error(Exception exception);
 }

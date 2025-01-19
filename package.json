@@ -1,7 +1,7 @@
 {
   "name": "@capacitor-trancee/nearby",
   "version": "4.0.0",
-  "description": "Uses Bluetooth LE to scan and advertise for nearby devices",
+  "description": "Uses Nearby Connections peer-to-peer networking API that allows apps to easily discover, connect to, and exchange data with nearby devices in real-time, regardless of network connectivity",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
@@ -15,7 +15,7 @@
     "Package.swift",
     "CapacitorTranceeNearby.podspec"
   ],
-  "author": "Philipp Grosswiler",
+  "author": "Philipp Grosswiler <philipp.grosswiler@gmail.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -78,5 +78,8 @@
     "android": {
       "src": "android"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

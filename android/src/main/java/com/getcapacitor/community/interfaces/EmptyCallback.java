@@ -1,4 +1,5 @@
 package com.getcapacitor.community.interfaces;
 
-public class EmptyCallback {
+public interface EmptyCallback extends Callback {
+    void success();
 }
