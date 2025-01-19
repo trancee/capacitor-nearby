@@ -1,23 +1,47 @@
+/// <reference types="@capacitor/cli" />
+
 import type { PluginListenerHandle } from '@capacitor/core';
+
+declare module '@capacitor/cli' {
+  export interface PluginsConfig {
+    /**
+     * These configuration values are available:
+     */
+    Nearby?: {
+      /**
+       * An identifier to advertise your app to other endpoints.
+       *
+       * Only available for Android and iOS.
+       */
+      serviceId?: string;
+
+      /**
+       * Sets the `Strategy` to be used when discovering or advertising to Nearby devices.
+       *
+       * Only available for Android and iOS.
+       */
+      strategy?: Strategy;
+
+      /**
+       * Sets whether low power should be used.
+       *
+       * Only available for Android and iOS.
+       *
+       * @default false
+       * @example false
+       */
+      lowPower?: boolean;
+    };
+  }
+}
 
 export type UUID = string;
 
 export interface Beacon {
   uuid: UUID;
-  rssi?: number | string;
 }
 
 export type BeaconCallback = (_: Beacon) => void;
-
-export enum TTLSeconds {
-  // The default time to live in seconds.
-  TTL_SECONDS_DEFAULT = 300,
-  // The maximum time to live in seconds, if not TTL_SECONDS_INFINITE.
-  TTL_SECONDS_MAX = 86400,
-  // An infinite time to live in seconds.
-  // Note: This is currently only supported for subscriptions.
-  TTL_SECONDS_INFINITE = 2147483647,
-}
 
 export type Status = {
   isPublishing: boolean;
@@ -25,77 +49,53 @@ export type Status = {
   uuids: UUID[];
 };
 
-export enum ScanMode {
-  // Perform Bluetooth LE scan in low power mode.
-  LOW_POWER = 0,
-  // Perform Bluetooth LE scan in balanced power mode.
-  BALANCED = 1,
-  // Scan using highest duty cycle.
-  LOW_LATENCY = 2,
-
-  // A special Bluetooth LE scan mode.
-  OPPORTUNISTIC = -1,
-}
-
-export enum AdvertiseMode {
-  // Perform Bluetooth LE advertising in low power mode.
-  LOW_POWER = 0,
-  // Perform Bluetooth LE advertising in balanced power mode.
-  BALANCED = 1,
-  // Perform Bluetooth LE advertising in low latency, high power mode.
-  LOW_LATENCY = 2,
-}
-
-export enum TxPowerLevel {
-  // Advertise using the lowest transmission (TX) power level.
-  ULTRA_LOW = 0,
-  // Advertise using low TX power level.
-  LOW = 1,
-  // Advertise using medium TX power level.
-  MEDIUM = 2,
-  // Advertise using high TX power level.
-  HIGH = 3,
+/**
+ * The `Strategy` to be used when discovering or advertising to Nearby devices.
+ *
+ * The `Strategy` defines
+ *  1. the connectivity requirements for the device, and
+ *  2. the topology constraints of the connection.
+ *
+ * @since 4.0.0
+ */
+export enum Strategy {
+  // Peer-to-peer strategy that supports an M-to-N, or cluster-shaped, connection topology.
+  CLUSTER = 'cluster',
+  // Peer-to-peer strategy that supports a 1-to-N, or star-shaped, connection topology.
+  STAR = 'star',
+  // Peer-to-peer strategy that supports a 1-to-1 connection topology.
+  POINT_TO_POINT = 'p2p',
 }
 
 export interface InitializeOptions {
   /**
-   * Sets the service UUID for the nearby token.
+   * A human readable name for this endpoint, to appear on the remote device.
    *
-   * @since 1.0.0
+   * @since 4.0.0
    */
-  serviceUUID: UUID;
+  name?: string;
 
   /**
-   * Sets the scan mode.
+   * An identifier to advertise your app to other endpoints.
    *
-   * Default:
-   * Perform Bluetooth LE scan in balanced power mode.
-   *
-   * @since 1.0.0
-   * @default ScanMode.BALANCED
+   * @since 4.0.0
    */
-  scanMode?: ScanMode;
+  serviceId: string;
 
   /**
-   * Sets the advertise mode.
+   * Sets the `Strategy` to be used when discovering or advertising to Nearby devices.
    *
-   * Default:
-   * Perform Bluetooth LE advertising in low latency, high power mode.
-   *
-   * @since 1.0.0
-   * @default AdvertiseMode.LOW_LATENCY
+   * @since 4.0.0
    */
-  advertiseMode?: AdvertiseMode;
+  strategy: Strategy;
+
   /**
-   * Sets the TX power level for advertising.
+   * Sets whether low power should be used.
    *
-   * Default:
-   * Advertise using high TX power level.
-   *
-   * @since 1.0.0
-   * @default TxPowerLevel.HIGH
+   * @since 4.0.0
+   * @default false
    */
-  txPowerLevel?: TxPowerLevel;
+  lowPower?: boolean;
 }
 
 export interface PublishOptions {
@@ -105,22 +105,6 @@ export interface PublishOptions {
    * @since 1.1.0
    */
   uuid: UUID;
-
-  /**
-   * Sets the time to live in seconds for the publish operation.
-   *
-   * @since 1.0.0
-   */
-  ttlSeconds?: TTLSeconds;
-}
-
-export interface SubscribeOptions {
-  /**
-   * Sets the time to live in seconds for the subscribe operation.
-   *
-   * @since 1.0.0
-   */
-  ttlSeconds?: TTLSeconds;
 }
 
 export enum BluetoothState {
@@ -140,13 +124,13 @@ export enum BluetoothState {
 
 export interface NearbyPlugin {
   /**
-   * Initializes Bluetooth LE for advertising and scanning of nearby tokens.
+   * Initializes Nearby Connections for advertising and discovering of endpoints.
    *
    * @since 1.0.0
    */
   initialize(options: InitializeOptions): Promise<void>;
   /**
-   * Stops and resets advertising and scanning of nearby tokens.
+   * Stops and resets advertising and discovering of endpoints.
    *
    * @since 1.0.0
    */
@@ -170,7 +154,7 @@ export interface NearbyPlugin {
    *
    * @since 1.0.0
    */
-  subscribe(options: SubscribeOptions): Promise<void>;
+  subscribe(): Promise<void>;
   /**
    * Stop listening to nearby tokens.
    *
@@ -209,36 +193,11 @@ export interface NearbyPlugin {
    *
    * @since 1.1.0
    */
-  addListener(
-    eventName: 'onFound',
-    listenerFunc: BeaconCallback,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'onFound', listenerFunc: BeaconCallback): Promise<PluginListenerHandle>;
   /**
    * Called when a beacon is no longer detectable nearby.
    *
    * @since 1.1.0
    */
-  addListener(
-    eventName: 'onLost',
-    listenerFunc: BeaconCallback,
-  ): Promise<PluginListenerHandle>;
-
-  /**
-   * The published token has expired.
-   *
-   * @since 1.0.0
-   */
-  addListener(
-    eventName: 'onPublishExpired',
-    listenerFunc: () => void,
-  ): Promise<PluginListenerHandle>;
-  /**
-   * The subscription has expired.
-   *
-   * @since 1.0.0
-   */
-  addListener(
-    eventName: 'onSubscribeExpired',
-    listenerFunc: () => void,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'onLost', listenerFunc: BeaconCallback): Promise<PluginListenerHandle>;
 }

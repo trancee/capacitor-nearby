@@ -17,15 +17,13 @@ npx cap sync
 * [`reset()`](#reset)
 * [`publish(...)`](#publish)
 * [`unpublish()`](#unpublish)
-* [`subscribe(...)`](#subscribe)
+* [`subscribe()`](#subscribe)
 * [`unsubscribe()`](#unsubscribe)
 * [`status()`](#status)
-* [`addListener('onPermissionChanged', ...)`](#addlisteneronpermissionchanged)
-* [`addListener('onBluetoothStateChanged', ...)`](#addlisteneronbluetoothstatechanged)
-* [`addListener('onFound', ...)`](#addlisteneronfound)
-* [`addListener('onLost', ...)`](#addlisteneronlost)
-* [`addListener('onPublishExpired', ...)`](#addlisteneronpublishexpired)
-* [`addListener('onSubscribeExpired', ...)`](#addlisteneronsubscribeexpired)
+* [`addListener('onPermissionChanged', ...)`](#addlisteneronpermissionchanged-)
+* [`addListener('onBluetoothStateChanged', ...)`](#addlisteneronbluetoothstatechanged-)
+* [`addListener('onFound', ...)`](#addlisteneronfound-)
+* [`addListener('onLost', ...)`](#addlisteneronlost-)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 * [Enums](#enums)
@@ -41,7 +39,7 @@ npx cap sync
 initialize(options: InitializeOptions) => Promise<void>
 ```
 
-Initializes Bluetooth LE for advertising and scanning of nearby tokens.
+Initializes Nearby Connections for advertising and discovering of endpoints.
 
 | Param         | Type                                                            |
 | ------------- | --------------------------------------------------------------- |
@@ -58,7 +56,7 @@ Initializes Bluetooth LE for advertising and scanning of nearby tokens.
 reset() => Promise<void>
 ```
 
-Stops and resets advertising and scanning of nearby tokens.
+Stops and resets advertising and discovering of endpoints.
 
 **Since:** 1.0.0
 
@@ -95,17 +93,13 @@ Stop publishing nearby token.
 --------------------
 
 
-### subscribe(...)
+### subscribe()
 
 ```typescript
-subscribe(options: SubscribeOptions) => Promise<void>
+subscribe() => Promise<void>
 ```
 
 Start listening to nearby tokens.
-
-| Param         | Type                                                          |
-| ------------- | ------------------------------------------------------------- |
-| **`options`** | <code><a href="#subscribeoptions">SubscribeOptions</a></code> |
 
 **Since:** 1.0.0
 
@@ -220,72 +214,24 @@ Called when a beacon is no longer detectable nearby.
 --------------------
 
 
-### addListener('onPublishExpired', ...)
-
-```typescript
-addListener(eventName: 'onPublishExpired', listenerFunc: () => void) => Promise<PluginListenerHandle>
-```
-
-The published token has expired.
-
-| Param              | Type                            |
-| ------------------ | ------------------------------- |
-| **`eventName`**    | <code>'onPublishExpired'</code> |
-| **`listenerFunc`** | <code>() =&gt; void</code>      |
-
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
-
-**Since:** 1.0.0
-
---------------------
-
-
-### addListener('onSubscribeExpired', ...)
-
-```typescript
-addListener(eventName: 'onSubscribeExpired', listenerFunc: () => void) => Promise<PluginListenerHandle>
-```
-
-The subscription has expired.
-
-| Param              | Type                              |
-| ------------------ | --------------------------------- |
-| **`eventName`**    | <code>'onSubscribeExpired'</code> |
-| **`listenerFunc`** | <code>() =&gt; void</code>        |
-
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
-
-**Since:** 1.0.0
-
---------------------
-
-
 ### Interfaces
 
 
 #### InitializeOptions
 
-| Prop                | Type                                                    | Description                                                                                         | Default                                | Since |
-| ------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------- | ----- |
-| **`serviceUUID`**   | <code><a href="#uuid">UUID</a></code>                   | Sets the service <a href="#uuid">UUID</a> for the nearby token.                                     |                                        | 1.0.0 |
-| **`scanMode`**      | <code><a href="#scanmode">ScanMode</a></code>           | Sets the scan mode. Default: Perform Bluetooth LE scan in balanced power mode.                      | <code>ScanMode.BALANCED</code>         | 1.0.0 |
-| **`advertiseMode`** | <code><a href="#advertisemode">AdvertiseMode</a></code> | Sets the advertise mode. Default: Perform Bluetooth LE advertising in low latency, high power mode. | <code>AdvertiseMode.LOW_LATENCY</code> | 1.0.0 |
-| **`txPowerLevel`**  | <code><a href="#txpowerlevel">TxPowerLevel</a></code>   | Sets the TX power level for advertising. Default: Advertise using high TX power level.              | <code>TxPowerLevel.HIGH</code>         | 1.0.0 |
+| Prop            | Type                                          | Description                                                                                               | Default            | Since |
+| --------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------ | ----- |
+| **`name`**      | <code>string</code>                           | A human readable name for this endpoint, to appear on the remote device.                                  |                    | 4.0.0 |
+| **`serviceId`** | <code>string</code>                           | An identifier to advertise your app to other endpoints.                                                   |                    | 4.0.0 |
+| **`strategy`**  | <code><a href="#strategy">Strategy</a></code> | Sets the <a href="#strategy">`Strategy`</a> to be used when discovering or advertising to Nearby devices. |                    | 4.0.0 |
+| **`lowPower`**  | <code>boolean</code>                          | Sets whether low power should be used.                                                                    | <code>false</code> | 4.0.0 |
 
 
 #### PublishOptions
 
-| Prop             | Type                                              | Description                                                         | Since |
-| ---------------- | ------------------------------------------------- | ------------------------------------------------------------------- | ----- |
-| **`uuid`**       | <code><a href="#uuid">UUID</a></code>             | Sets the beacon <a href="#uuid">UUID</a> for the publish operation. | 1.1.0 |
-| **`ttlSeconds`** | <code><a href="#ttlseconds">TTLSeconds</a></code> | Sets the time to live in seconds for the publish operation.         | 1.0.0 |
-
-
-#### SubscribeOptions
-
-| Prop             | Type                                              | Description                                                   | Since |
-| ---------------- | ------------------------------------------------- | ------------------------------------------------------------- | ----- |
-| **`ttlSeconds`** | <code><a href="#ttlseconds">TTLSeconds</a></code> | Sets the time to live in seconds for the subscribe operation. | 1.0.0 |
+| Prop       | Type                                  | Description                                                         | Since |
+| ---------- | ------------------------------------- | ------------------------------------------------------------------- | ----- |
+| **`uuid`** | <code><a href="#uuid">UUID</a></code> | Sets the beacon <a href="#uuid">UUID</a> for the publish operation. | 1.1.0 |
 
 
 #### PluginListenerHandle
@@ -300,7 +246,6 @@ The subscription has expired.
 | Prop       | Type                                  |
 | ---------- | ------------------------------------- |
 | **`uuid`** | <code><a href="#uuid">UUID</a></code> |
-| **`rssi`** | <code>string \| number</code>         |
 
 
 ### Type Aliases
@@ -324,42 +269,13 @@ The subscription has expired.
 ### Enums
 
 
-#### ScanMode
+#### Strategy
 
-| Members             | Value           |
-| ------------------- | --------------- |
-| **`LOW_POWER`**     | <code>0</code>  |
-| **`BALANCED`**      | <code>1</code>  |
-| **`LOW_LATENCY`**   | <code>2</code>  |
-| **`OPPORTUNISTIC`** | <code>-1</code> |
-
-
-#### AdvertiseMode
-
-| Members           | Value          |
-| ----------------- | -------------- |
-| **`LOW_POWER`**   | <code>0</code> |
-| **`BALANCED`**    | <code>1</code> |
-| **`LOW_LATENCY`** | <code>2</code> |
-
-
-#### TxPowerLevel
-
-| Members         | Value          |
-| --------------- | -------------- |
-| **`ULTRA_LOW`** | <code>0</code> |
-| **`LOW`**       | <code>1</code> |
-| **`MEDIUM`**    | <code>2</code> |
-| **`HIGH`**      | <code>3</code> |
-
-
-#### TTLSeconds
-
-| Members                    | Value                   |
-| -------------------------- | ----------------------- |
-| **`TTL_SECONDS_DEFAULT`**  | <code>300</code>        |
-| **`TTL_SECONDS_MAX`**      | <code>86400</code>      |
-| **`TTL_SECONDS_INFINITE`** | <code>2147483647</code> |
+| Members              | Value                  |
+| -------------------- | ---------------------- |
+| **`CLUSTER`**        | <code>'cluster'</code> |
+| **`STAR`**           | <code>'star'</code>    |
+| **`POINT_TO_POINT`** | <code>'p2p'</code>     |
 
 
 #### BluetoothState

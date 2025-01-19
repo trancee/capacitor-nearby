@@ -1,28 +1,28 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <!-- Bluetooth -->
-    <!-- https://developer.android.com/guide/topics/connectivity/bluetooth/permissions -->
-    <!-- Request legacy Bluetooth permissions on older devices. -->
-    <uses-permission
-        android:name="android.permission.BLUETOOTH"
-        android:maxSdkVersion="30" />
-    <uses-permission
-        android:name="android.permission.BLUETOOTH_ADMIN"
-        android:maxSdkVersion="30" />
-
-    <uses-permission
-        android:name="android.permission.BLUETOOTH_CONNECT"
+    <!-- https://developers.google.com/nearby/connections/android/get-started#request_permissions -->
+    <!-- Required for Nearby Connections -->
+    <uses-permission android:maxSdkVersion="31" android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:maxSdkVersion="31" android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:maxSdkVersion="30" android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:maxSdkVersion="30" android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:maxSdkVersion="28"
+        android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:minSdkVersion="29" android:maxSdkVersion="32"
+        android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:minSdkVersion="31"
+        android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:minSdkVersion="31" android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:minSdkVersion="31" android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
         tools:targetApi="s" />
-    <uses-permission
-        android:name="android.permission.BLUETOOTH_ADVERTISE"
+    <uses-permission android:minSdkVersion="32"
+        android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation"
         tools:targetApi="s" />
-    <uses-permission
-        android:name="android.permission.BLUETOOTH_SCAN"
-        tools:targetApi="s" />
-
-    <!-- Location -->
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Optional: only required for FILE payloads -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
 
     <uses-feature
         android:name="android.hardware.bluetooth_le"
