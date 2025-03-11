@@ -10,19 +10,18 @@
   "scripts": {
     "start": "vite",
     "build": "vite build",
+    "build-android": "vite build && npx cap sync android && npx cap copy android && npx cap open android",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor-trancee/nearby": "file:..",
+    "@capacitor/android": "latest",
     "@capacitor/core": "latest",
-    "@capacitor/camera": "latest",
-    "@capacitor/splash-screen": "latest",
-    "capacitor-plugin-test": "file:..",
-    "@capacitor/ios": "^6.0.0",
-    "@capacitor/android": "^6.0.0"
+    "@capacitor/ios": "latest"
   },
   "devDependencies": {
     "@capacitor/cli": "latest",
-    "vite": "^5.4.2"
+    "vite": "latest"
   },
   "author": "",
   "license": "ISC"

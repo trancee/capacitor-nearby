@@ -10,7 +10,7 @@ let package = Package(
             targets: ["NearbyPlugin"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", branch: "main")
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", branch: "7.0.1")
     ],
     targets: [
         .target(

@@ -1,4 +1,4 @@
-package com.example.plugin;
+package com.example.myapp;
 
 import com.getcapacitor.BridgeActivity;
 

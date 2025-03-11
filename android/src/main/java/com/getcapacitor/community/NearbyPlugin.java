@@ -7,12 +7,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.util.Log;
-
 import androidx.activity.result.ActivityResult;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringDef;
-
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Logger;
@@ -43,7 +41,6 @@ import com.google.android.gms.nearby.connection.Payload;
 import com.google.android.gms.nearby.connection.PayloadCallback;
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate;
 import com.google.android.gms.nearby.connection.Strategy;
-
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
@@ -73,14 +70,14 @@ interface Constants {
     String UNKNOWN_ERROR = "unknown error has occurred";
 
     @StringDef(
-            {
-                    BluetoothState.UNKNOWN,
-                    BluetoothState.RESETTING,
-                    BluetoothState.UNSUPPORTED,
-                    BluetoothState.UNAUTHORIZED,
-                    BluetoothState.POWERED_OFF,
-                    BluetoothState.POWERED_ON
-            }
+        {
+            BluetoothState.UNKNOWN,
+            BluetoothState.RESETTING,
+            BluetoothState.UNSUPPORTED,
+            BluetoothState.UNAUTHORIZED,
+            BluetoothState.POWERED_OFF,
+            BluetoothState.POWERED_ON
+        }
     )
     @Retention(RetentionPolicy.SOURCE)
     @interface BluetoothState {
@@ -109,61 +106,61 @@ interface Constants {
 }
 
 @CapacitorPlugin(
-        name = "Nearby",
-        permissions = {
-                @Permission(
-                        strings = {
-                                // Allows applications to connect to paired bluetooth devices.
-                                Manifest.permission.BLUETOOTH,
-                                // Allows applications to discover and pair bluetooth devices.
-                                Manifest.permission.BLUETOOTH_ADMIN
-                        },
-                        alias = "bluetoothLegacy"
-                ),
-                @Permission(
-                        strings = {
-                                // Required to be able to connect to paired Bluetooth devices.
-                                Manifest.permission.BLUETOOTH_CONNECT,
-                                // Required to be able to advertise to nearby Bluetooth devices.
-                                Manifest.permission.BLUETOOTH_ADVERTISE,
-                                // Required to be able to discover and pair nearby Bluetooth devices.
-                                Manifest.permission.BLUETOOTH_SCAN
-                        },
-                        alias = "bluetooth"
-                ),
-                @Permission(
-                        strings = {
-                                // Required to be able to advertise and connect to nearby devices via Wi-Fi.
-                                Manifest.permission.NEARBY_WIFI_DEVICES
-                        },
-                        alias = "wifiNearby"
-                ),
-                @Permission(
-                        strings = {
-                                // Allows applications to access information about Wi-Fi networks.
-                                Manifest.permission.ACCESS_WIFI_STATE,
-                                // Allows applications to change Wi-Fi connectivity state.
-                                Manifest.permission.CHANGE_WIFI_STATE
-                        },
-                        alias = "wifiState"
-                ),
-                @Permission(
-                        strings = {
-                                // Allows an app to access approximate location.
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                                // Allows an app to access precise location.
-                                Manifest.permission.ACCESS_FINE_LOCATION
-                        },
-                        alias = "location"
-                ),
-                @Permission(
-                        strings = {
-                                // Allows an app to access approximate location.
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                        },
-                        alias = "locationCoarse"
-                )
-        }
+    name = "Nearby",
+    permissions = {
+        @Permission(
+            strings = {
+                // Allows applications to connect to paired bluetooth devices.
+                Manifest.permission.BLUETOOTH,
+                // Allows applications to discover and pair bluetooth devices.
+                Manifest.permission.BLUETOOTH_ADMIN
+            },
+            alias = "bluetoothLegacy"
+        ),
+        @Permission(
+            strings = {
+                // Required to be able to connect to paired Bluetooth devices.
+                Manifest.permission.BLUETOOTH_CONNECT,
+                // Required to be able to advertise to nearby Bluetooth devices.
+                Manifest.permission.BLUETOOTH_ADVERTISE,
+                // Required to be able to discover and pair nearby Bluetooth devices.
+                Manifest.permission.BLUETOOTH_SCAN
+            },
+            alias = "bluetooth"
+        ),
+        @Permission(
+            strings = {
+                // Required to be able to advertise and connect to nearby devices via Wi-Fi.
+                Manifest.permission.NEARBY_WIFI_DEVICES
+            },
+            alias = "wifiNearby"
+        ),
+        @Permission(
+            strings = {
+                // Allows applications to access information about Wi-Fi networks.
+                Manifest.permission.ACCESS_WIFI_STATE,
+                // Allows applications to change Wi-Fi connectivity state.
+                Manifest.permission.CHANGE_WIFI_STATE
+            },
+            alias = "wifiState"
+        ),
+        @Permission(
+            strings = {
+                // Allows an app to access approximate location.
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+                // Allows an app to access precise location.
+                Manifest.permission.ACCESS_FINE_LOCATION
+            },
+            alias = "location"
+        ),
+        @Permission(
+            strings = {
+                // Allows an app to access approximate location.
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            },
+            alias = "locationCoarse"
+        )
+    }
 )
 public class NearbyPlugin extends Plugin {
 
@@ -480,13 +477,13 @@ public class NearbyPlugin extends Plugin {
 
         // Ask to connect
         mConnectionsClient
-                .requestConnection(getName(), endpoint.getId(), mConnectionLifecycleCallback)
-                .addOnFailureListener(e -> {
-                    Log.w(getLogTag(), "requestConnection() failed.", e);
-                    mIsConnecting = false;
+            .requestConnection(getName(), endpoint.getId(), mConnectionLifecycleCallback)
+            .addOnFailureListener(e -> {
+                Log.w(getLogTag(), "requestConnection() failed.", e);
+                mIsConnecting = false;
 
-                    onConnectionFailed(endpoint);
-                });
+                onConnectionFailed(endpoint);
+            });
     }
 
     private void connectedToEndpoint(Endpoint endpoint) {
@@ -513,12 +510,12 @@ public class NearbyPlugin extends Plugin {
      */
     private static String toString(Status status) {
         return String.format(
-                Locale.US,
-                "[%d]%s",
-                status.getStatusCode(),
-                status.getStatusMessage() != null
-                        ? status.getStatusMessage()
-                        : ConnectionsStatusCodes.getStatusCodeString(status.getStatusCode())
+            Locale.US,
+            "[%d]%s",
+            status.getStatusCode(),
+            status.getStatusMessage() != null
+                ? status.getStatusMessage()
+                : ConnectionsStatusCodes.getStatusCodeString(status.getStatusCode())
         );
     }
 
@@ -528,27 +525,23 @@ public class NearbyPlugin extends Plugin {
      * we want to continue with the connection, call {@link #acceptConnection(Endpoint)}. Otherwise,
      * call {@link #rejectConnection(Endpoint)}.
      */
-    protected void onConnectionInitiated(Endpoint endpoint, ConnectionInfo connectionInfo) {
-    }
+    protected void onConnectionInitiated(Endpoint endpoint, ConnectionInfo connectionInfo) {}
 
     /**
      * Called when a connection with this endpoint has failed. Override this method to act on the
      * event.
      */
-    protected void onConnectionFailed(Endpoint endpoint) {
-    }
+    protected void onConnectionFailed(Endpoint endpoint) {}
 
     /**
      * Called when someone has connected to us. Override this method to act on the event.
      */
-    protected void onEndpointConnected(Endpoint endpoint) {
-    }
+    protected void onEndpointConnected(Endpoint endpoint) {}
 
     /**
      * Called when someone has disconnected. Override this method to act on the event.
      */
-    protected void onEndpointDisconnected(Endpoint endpoint) {
-    }
+    protected void onEndpointDisconnected(Endpoint endpoint) {}
 
     /**
      * Returns a list of currently connected endpoints.
@@ -570,16 +563,15 @@ public class NearbyPlugin extends Plugin {
      * @param endpoint The sender.
      * @param payload  The data.
      */
-    protected void onReceive(Endpoint endpoint, Payload payload) {
-    }
+    protected void onReceive(Endpoint endpoint, Payload payload) {}
 
     /**
      * Accepts a connection request.
      */
     protected void acceptConnection(final Endpoint endpoint) {
         mConnectionsClient
-                .acceptConnection(endpoint.getId(), mPayloadCallback)
-                .addOnFailureListener(e -> Log.w(getLogTag(), "acceptConnection() failed.", e));
+            .acceptConnection(endpoint.getId(), mPayloadCallback)
+            .addOnFailureListener(e -> Log.w(getLogTag(), "acceptConnection() failed.", e));
     }
 
     /**
@@ -587,8 +579,8 @@ public class NearbyPlugin extends Plugin {
      */
     protected void rejectConnection(Endpoint endpoint) {
         mConnectionsClient
-                .rejectConnection(endpoint.getId())
-                .addOnFailureListener(e -> Log.w(getLogTag(), "rejectConnection() failed.", e));
+            .rejectConnection(endpoint.getId())
+            .addOnFailureListener(e -> Log.w(getLogTag(), "rejectConnection() failed.", e));
     }
 
     private void resolveCall(@NonNull PluginCall call, @Nullable JSObject result) {
@@ -617,42 +609,34 @@ public class NearbyPlugin extends Plugin {
      */
     protected void onEndpointFound(String endpointId, DiscoveredEndpointInfo info) {
         Log.d(
-                getLogTag(),
-                String.format(
-                        "onEndpointFound(endpointId=%s, serviceId=%s, endpointName=%s)",
-                        endpointId,
-                        info.getServiceId(),
-                        info.getEndpointName()
-                )
+            getLogTag(),
+            String.format(
+                "onEndpointFound(endpointId=%s, serviceId=%s, endpointName=%s)",
+                endpointId,
+                info.getServiceId(),
+                info.getEndpointName()
+            )
         );
 
         JSObject jsData = new JSObject()
-                // The ID of the remote endpoint that was discovered.
-                .put("id", endpointId)
-                // The human readable name of the remote endpoint.
-                .put("name", info.getEndpointName());
+            // The ID of the remote endpoint that was discovered.
+            .put("id", endpointId)
+            // The human readable name of the remote endpoint.
+            .put("name", info.getEndpointName());
 
         notifyListeners(Constants.ENDPOINT_FOUND_EVENT, jsData);
     }
-
 
     /**
      * Called when a remote endpoint is no longer discoverable.
      */
     protected void onEndpointLost(String endpointId) {
-        Log.d(
-                getLogTag(),
-                String.format(
-                        "onEndpointLost(endpointId=%s)",
-                        endpointId
-                )
-        );
+        Log.d(getLogTag(), String.format("onEndpointLost(endpointId=%s)", endpointId));
 
         JSObject jsData = new JSObject()
-                // The ID of the remote endpoint that was lost.
-                .put("id", endpointId);
+            // The ID of the remote endpoint that was lost.
+            .put("id", endpointId);
 
         notifyListeners(Constants.ENDPOINT_LOST_EVENT, jsData);
     }
-
 }

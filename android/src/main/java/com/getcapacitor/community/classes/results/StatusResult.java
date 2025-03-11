@@ -2,11 +2,9 @@ package com.getcapacitor.community.classes.results;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.community.interfaces.Result;
-
 import org.json.JSONException;
 
 public class StatusResult implements Result {
@@ -17,12 +15,7 @@ public class StatusResult implements Result {
     @Nullable
     private final String[] uuids;
 
-    public StatusResult(
-            boolean isPublishing,
-            boolean isSubscribing,
-
-            @Nullable String[] uuids
-    ) {
+    public StatusResult(boolean isPublishing, boolean isSubscribing, @Nullable String[] uuids) {
         this.isPublishing = isPublishing;
         this.isSubscribing = isSubscribing;
 

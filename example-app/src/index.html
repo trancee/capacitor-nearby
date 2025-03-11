@@ -1,26 +1,99 @@
 <!doctype html>
 <html lang="en" dir="ltr" class="hydrated">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Example Capacitor App</title>
-    <meta
-      name="viewport"
-      content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
-    <meta name="format-detection" content="telephone=no" />
-  </head>
-  <body>
-    <main>
-      <h1>Capacitor Test Plugin Project</h1>
-      <p>
-        This project can be used to test out the functionality of your plugin. Nothing in the
-        <em>example-app/</em> folder will be published to npm when using this template, so you can create away!
-      </p>
-      <label for="echoInput">Echo Text:</label>
-      <input type="text" id="echoInput" name="echoInput" value="Hello World!" />
-      <button onclick="testEcho()">Click Me!</button>
-    </main>
 
-    <script src="./js/example.js" type="module"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <title>Example Capacitor App</title>
+  <meta name="viewport"
+    content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="format-detection" content="telephone=no" />
+  <style>
+    html,
+    body {
+      height: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <h1>Capacitor Test Plugin Project</h1>
+    <p>
+      This project can be used to test out the functionality of your plugin. Nothing in the
+      <em>example-app/</em> folder will be published to npm when using this template, so you can create away!
+    </p>
+
+    <div style="width: 50%; float: left;">
+      <fieldset>
+        <legend>Initializes Nearby for advertising and discovering of endpoints.</legend>
+        <label for="initialize-endpointName">A human readable name for this endpoint, to appear on the remote
+          device.</label><br>
+        <input type="text" id="initialize-endpointName" name="initialize-endpointName" value="My App" /><br>
+        <label for="initialize-serviceID">An identifier to advertise your app to other endpoints.</label><br>
+        <input type="text" id="initialize-serviceID" name="initialize-serviceID" value="com.example.myapp" /><br>
+        <button onclick="testInitialize()">Initialize</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Stops and resets advertising and discovering of endpoints.</legend>
+        <button onclick="testReset()">Reset</button>
+      </fieldset>
+
+      <hr>
+
+      <fieldset>
+        <legend>Starts advertising an endpoint for a local app.</legend>
+        <label for="startAdvertising-endpointName">A human readable name for this endpoint, to appear on the remote
+          device.</label><br>
+        <input type="text" id="startAdvertising-endpointName" name="startAdvertising-endpointName" value="" /><br>
+        <button onclick="testStartAdvertising()">Start Advertising</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Stops advertising a local endpoint.</legend>
+        <button onclick="testStopAdvertising()">Stop Advertising</button>
+      </fieldset>
+
+      <hr>
+
+      <fieldset>
+        <legend>Starts discovering remote endpoints with the specified service ID.</legend>
+        <button onclick="testStartDiscovering()">Start Discovering</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Stops discovering remote endpoints.</legend>
+        <button onclick="testStopDiscovering()">Stop Discovering</button>
+      </fieldset>
+
+      <hr>
+
+      <fieldset>
+        <legend>Returns advertising and discovering status, and discovered endpoints.</legend>
+        <button onclick="testStatus()">Status</button>
+      </fieldset>
+
+      <hr>
+
+      <fieldset>
+        <button onclick="testCheckPermissions()">Check Permissions</button>
+        <br>
+        <select id="aliases" name="aliases" multiple>
+          <option value="bluetooth">Bluetooth</option>
+          <option value="location">Location</option>
+        </select><br>
+        <button onclick="testRequestPermissions()">Request Permissions</button>
+      </fieldset>
+    </div>
+
+    <div style="width: 50%; float: right;">
+      <textarea id="status" rows="30" cols="50" style="width: 100%; height: 100%;"></textarea>
+      <textarea id="events" rows="30" cols="50" style="width: 100%; height: 100%;"></textarea>
+    </div>
+
+  </main>
+
+  <script src="./js/example.js" type="module"></script>
+</body>
+
 </html>

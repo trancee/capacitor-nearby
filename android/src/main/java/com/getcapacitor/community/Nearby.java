@@ -1,10 +1,8 @@
 package com.getcapacitor.community;
 
 import android.util.Log;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.community.classes.options.PublishOptions;
@@ -22,7 +20,6 @@ import com.google.android.gms.nearby.connection.EndpointDiscoveryCallback;
 import com.google.android.gms.nearby.connection.Payload;
 import com.google.android.gms.nearby.connection.PayloadCallback;
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -116,21 +113,21 @@ public class Nearby {
         advertisingOptions.setStrategy(getStrategy());
 
         connectionsClient
-                .startAdvertising(name, getServiceId(), connectionLifecycleCallback, advertisingOptions.build())
-                .addOnSuccessListener(unusedResult -> {
-                    Log.v(getLogTag(), "Now advertising endpoint " + getName());
-                    onAdvertisingStarted();
+            .startAdvertising(name, getServiceId(), connectionLifecycleCallback, advertisingOptions.build())
+            .addOnSuccessListener(unusedResult -> {
+                Log.v(getLogTag(), "Now advertising endpoint " + getName());
+                onAdvertisingStarted();
 
-                    callback.success();
-                })
-                .addOnFailureListener(exception -> {
-                    isAdvertising = false;
+                callback.success();
+            })
+            .addOnFailureListener(exception -> {
+                isAdvertising = false;
 
-                    Log.w(getLogTag(), "startAdvertising failed.", e);
-                    onAdvertisingFailed();
+                Log.w(getLogTag(), "startAdvertising failed.", e);
+                onAdvertisingFailed();
 
-                    callback.error(exception);
-                });
+                callback.error(exception);
+            });
     }
 
     public void unpublish(@NonNull EmptyCallback callback) {
@@ -154,21 +151,21 @@ public class Nearby {
         discoveryOptions.setStrategy(getStrategy());
 
         connectionsClient
-                .startDiscovery(getServiceId(), endpointDiscoveryCallback, discoveryOptions.build())
-                .addOnSuccessListener(unusedResult -> {
-                    Log.v(getLogTag(), "Now starting discovery");
-                    onDiscoveryStarted();
+            .startDiscovery(getServiceId(), endpointDiscoveryCallback, discoveryOptions.build())
+            .addOnSuccessListener(unusedResult -> {
+                Log.v(getLogTag(), "Now starting discovery");
+                onDiscoveryStarted();
 
-                    callback.success();
-                })
-                .addOnFailureListener(e -> {
-                    isDiscovering = false;
+                callback.success();
+            })
+            .addOnFailureListener(e -> {
+                isDiscovering = false;
 
-                    Log.w(getLogTag(), "startDiscovering failed.", e);
-                    onDiscoveryFailed();
+                Log.w(getLogTag(), "startDiscovering failed.", e);
+                onDiscoveryFailed();
 
-                    callback.error(exception);
-                });
+                callback.error(exception);
+            });
     }
 
     public void unsubscribe(@NonNull EmptyCallback callback) {
@@ -253,8 +250,8 @@ public class Nearby {
         @Override
         public void onConnectionInitiated(@NonNull String endpointId, ConnectionInfo connectionInfo) {
             Log.d(
-                    getLogTag(),
-                    String.format("onConnectionInitiated(endpointId=%s, endpointName=%s)", endpointId, connectionInfo.getEndpointName())
+                getLogTag(),
+                String.format("onConnectionInitiated(endpointId=%s, endpointName=%s)", endpointId, connectionInfo.getEndpointName())
             );
 
             NearbyPlugin.Endpoint endpoint = new NearbyPlugin.Endpoint(endpointId, connectionInfo.getEndpointName());
@@ -327,25 +324,20 @@ public class Nearby {
     /**
      * Called when advertising successfully starts. Override this method to act on the event.
      */
-    protected void onAdvertisingStarted() {
-    }
+    protected void onAdvertisingStarted() {}
 
     /**
      * Called when advertising fails to start. Override this method to act on the event.
      */
-    protected void onAdvertisingFailed() {
-    }
+    protected void onAdvertisingFailed() {}
 
     /**
      * Called when discovery successfully starts. Override this method to act on the event.
      */
-    protected void onDiscoveryStarted() {
-    }
+    protected void onDiscoveryStarted() {}
 
     /**
      * Called when discovery fails to start. Override this method to act on the event.
      */
-    protected void onDiscoveryFailed() {
-    }
-
+    protected void onDiscoveryFailed() {}
 }

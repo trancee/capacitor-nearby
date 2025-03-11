@@ -1,6 +1,6 @@
 {
   "name": "@capacitor-trancee/nearby",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Uses Nearby Connections peer-to-peer networking API that allows apps to easily discover, connect to, and exchange data with nearby devices in real-time, regardless of network connectivity",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -56,10 +56,10 @@
     "@ionic/prettier-config": "^4.0.0",
     "@ionic/swiftlint-config": "^2.0.0",
     "eslint": "^8.57.1",
-    "prettier": "^3.4.2",
-    "prettier-plugin-java": "^2.6.6",
+    "prettier": "^3.5.3",
+    "prettier-plugin-java": "^2.6.7",
     "rimraf": "^6.0.1",
-    "rollup": "^4.31.0",
+    "rollup": "^4.35.0",
     "swiftlint": "^2.0.0",
     "typescript": "~4.1.5"
   },

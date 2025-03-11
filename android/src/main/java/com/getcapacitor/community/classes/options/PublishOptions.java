@@ -15,5 +15,4 @@ public class PublishOptions {
     public String getName() {
         return name;
     }
-
 }
