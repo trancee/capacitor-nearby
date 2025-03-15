@@ -2,6 +2,8 @@ package com.getcapacitor.community;
 
 import android.Manifest;
 import android.os.Build;
+import android.util.Base64;
+import androidx.annotation.Nullable;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
@@ -359,6 +361,7 @@ public class NearbyPlugin extends Plugin {
                             }
                             break;
                         case "location":
+                            //noinspection StatementWithEmptyBody
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                 // does not require location permission
                             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -387,10 +390,23 @@ public class NearbyPlugin extends Plugin {
      */
 
     private NearbyConfig getNearbyConfig() {
-        String endpointName = getConfig().getString("endpointName", null);
-        String serviceID = getConfig().getString("serviceID", null);
+        @Nullable
+        byte[] endpointInfo = null;
 
-        return new NearbyConfig(endpointName, serviceID);
+        @Nullable
+        String value = getConfig().getString("endpointInfo");
+        if (value != null && !value.isEmpty()) {
+            try {
+                endpointInfo = Base64.decode(value, Base64.NO_WRAP);
+            } catch (IllegalArgumentException ignored) {
+                endpointInfo = value.getBytes();
+            }
+        }
+
+        @Nullable
+        String serviceID = getConfig().getString("serviceID");
+
+        return new NearbyConfig(endpointInfo, serviceID);
     }
 
     /**

@@ -82,7 +82,7 @@ public class Nearby {
         }
 
         {
-            byte[] data = NearbyHelper.hash(config.getServiceID(), 8 + 8);
+            byte[] data = NearbyHelper.hash(config.getServiceID().getBytes(), 8 + 8);
 
             //          0000-1000-8000-00805f9b34fb
             // ffffffff-0000-0000-0000-000000000000
@@ -92,9 +92,9 @@ public class Nearby {
                 (((long) data[1] & 0xff) << 48) | // 16-bits UUID
                 (((long) data[2] & 0xff) << 40) |
                 (((long) data[3] & 0xff) << 32); // 32-bits UUID
-            long lsb = 0;
+            long lsb = 0L;
 
-            this.serviceUUID = new UUID(BLUETOOTH_BASE_UUID_MSB | (msb & 0xffffffff), BLUETOOTH_BASE_UUID_LSB | (lsb & 0xffffffff));
+            this.serviceUUID = new UUID(BLUETOOTH_BASE_UUID_MSB | (msb & 0xffffffffL), BLUETOOTH_BASE_UUID_LSB | lsb);
         }
 
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -142,12 +142,13 @@ public class Nearby {
             callback.error(exception);
         }
 
-        String endpointInfo = options.getEndpointInfo();
-        if (endpointInfo == null || endpointInfo.isEmpty()) {
-            Exception exception = new Exception(MISSING_ENDPOINT_INFO);
-            callback.error(exception);
-            return;
-        }
+        @Nullable
+        byte[] endpointInfo = options.getEndpointInfo();
+        //        if (endpointInfo == null || endpointInfo.length == 0) {
+        //            Exception exception = new Exception(MISSING_ENDPOINT_INFO);
+        //            callback.error(exception);
+        //            return;
+        //        }
 
         String serviceID = config.getServiceID();
         if (serviceID == null || serviceID.isEmpty()) {
@@ -157,7 +158,7 @@ public class Nearby {
         }
 
         nearbyAdvertiser.start(
-            endpointInfo.getBytes(StandardCharsets.UTF_8),
+            endpointInfo,
             new NearbyAdvertiser.Callback() {
                 @Override
                 public void onSuccess(AdvertiseSettings settings) {
@@ -213,7 +214,7 @@ public class Nearby {
                     } else {
                         new NearbyEndpoint(endpointID, endpointInfo, rssi, device, () -> {
                             if (nearbyScanner.isScanning()) {
-                                Endpoint endpoint = new Endpoint(endpointID, new String(endpointInfo));
+                                Endpoint endpoint = new Endpoint(endpointID, endpointInfo);
 
                                 plugin.onEndpointLost(endpoint);
                             }
@@ -299,12 +300,13 @@ public class Nearby {
             return;
         }
 
-        String endpointInfo = options.getEndpointInfo();
-        if (endpointInfo == null || endpointInfo.isEmpty()) {
-            Exception exception = new Exception(MISSING_ENDPOINT_INFO);
-            callback.error(exception);
-            return;
-        }
+        @Nullable
+        byte[] endpointInfo = options.getEndpointInfo();
+        //        if (endpointInfo == null || endpointInfo.isEmpty()) {
+        //            Exception exception = new Exception(MISSING_ENDPOINT_INFO);
+        //            callback.error(exception);
+        //            return;
+        //        }
 
         callback.success();
     }
@@ -317,12 +319,12 @@ public class Nearby {
             return;
         }
 
-        String endpointInfo = options.getEndpointInfo();
-        if (endpointInfo == null || endpointInfo.isEmpty()) {
-            Exception exception = new Exception(MISSING_ENDPOINT_INFO);
-            callback.error(exception);
-            return;
-        }
+        byte[] endpointInfo = options.getEndpointInfo();
+        //        if (endpointInfo == null || endpointInfo.isEmpty()) {
+        //            Exception exception = new Exception(MISSING_ENDPOINT_INFO);
+        //            callback.error(exception);
+        //            return;
+        //        }
         //        connectionsClient
         //            .requestConnection(name, endpointID, connectionLifecycleCallback, connectionOptions.build())
         //            .addOnSuccessListener(callback::success)

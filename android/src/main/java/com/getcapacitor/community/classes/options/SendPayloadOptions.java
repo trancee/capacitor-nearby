@@ -19,12 +19,14 @@ public class SendPayloadOptions {
     public SendPayloadOptions(PluginCall call) throws JSONException {
         List<String> endpointIDs = new ArrayList<>();
 
-        String endpointID = call.getString("endpointID", null);
+        @Nullable
+        String endpointID = call.getString("endpointID");
         if (endpointID != null) {
             endpointIDs.add(endpointID);
         }
 
-        JSArray endpointArray = call.getArray("endpointIDs", null);
+        @Nullable
+        JSArray endpointArray = call.getArray("endpointIDs");
         if (endpointArray != null) {
             for (var item : endpointArray.toList()) {
                 endpointIDs.add((String) item);
@@ -33,7 +35,8 @@ public class SendPayloadOptions {
 
         this.setEndpointIDs(endpointIDs);
 
-        String payload = call.getString("payload", null);
+        @Nullable
+        String payload = call.getString("payload");
         this.setPayload(payload);
     }
 

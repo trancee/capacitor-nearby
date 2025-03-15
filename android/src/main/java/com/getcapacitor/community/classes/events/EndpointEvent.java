@@ -1,7 +1,6 @@
 package com.getcapacitor.community.classes.events;
 
-import static com.getcapacitor.community.NearbyHelper.EndpointID;
-
+import android.util.Base64;
 import androidx.annotation.NonNull;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.community.classes.Endpoint;
@@ -21,9 +20,10 @@ public class EndpointEvent {
 
         result.put("endpointID", endpoint.endpointID());
 
-        //        if (endpoint.endpointName() != null) {
-        //            result.put("endpointName", endpoint.endpointName());
-        //        }
+        byte[] endpointInfo = endpoint.endpointInfo();
+        if (endpointInfo != null && endpointInfo.length > 0) {
+            result.put("endpointInfo", Base64.encodeToString(endpointInfo, Base64.NO_WRAP));
+        }
 
         return result;
     }

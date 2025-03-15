@@ -8,12 +8,9 @@ import android.bluetooth.le.AdvertiseCallback;
 import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
-import android.bluetooth.le.TransportDiscoveryData;
 import android.os.ParcelUuid;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.UUID;
 
 public class NearbyAdvertiser {

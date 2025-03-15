@@ -8,7 +8,7 @@ const config: CapacitorConfig = {
   webDir: "dist",
   plugins: {
     Nearby: {
-      endpointName: "My App",
+      endpointInfo: "My App",
 
       serviceID: "com.example.myapp",
     },

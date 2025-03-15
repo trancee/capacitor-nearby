@@ -3,6 +3,7 @@ package com.getcapacitor.community;
 import static java.lang.Math.min;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Random;
@@ -17,7 +18,7 @@ public class NearbyHelper {
 
     public static final int ENDPOINT_ID_LENGTH = 4;
 
-    private static Integer nonce = new Random().nextInt();
+    private static final Random random = new Random();
     private static final char[] kEndpointIdChars = {
         'A',
         'B',
@@ -57,10 +58,18 @@ public class NearbyHelper {
         '0'
     };
 
-    public static EndpointID generateEndpointID(String name) {
+    public static EndpointID generateEndpointID(@Nullable byte[] name) {
         StringBuilder endpointID = new StringBuilder(ENDPOINT_ID_LENGTH);
 
-        byte[] data = hash(name + ++nonce, ENDPOINT_ID_LENGTH);
+        byte[] input = new byte[1 + (name != null ? name.length : 0)];
+
+        input[0] = (byte) (random.nextInt() & 0xff);
+
+        if (name != null) {
+            System.arraycopy(name, 0, input, 1, name.length);
+        }
+
+        byte[] data = hash(input, ENDPOINT_ID_LENGTH);
 
         for (byte c : data) {
             endpointID.append(kEndpointIdChars[(c & 0xff) % kEndpointIdChars.length]);
@@ -69,11 +78,11 @@ public class NearbyHelper {
         return new EndpointID(endpointID.toString());
     }
 
-    public static byte[] hash(String data, Integer length) {
+    public static byte[] hash(byte[] data, Integer length) {
         byte[] output = new byte[0];
 
         try {
-            output = MessageDigest.getInstance("SHA-256").digest(data.getBytes());
+            output = MessageDigest.getInstance("SHA-256").digest(data);
         } catch (NoSuchAlgorithmException ignored) {}
 
         if (output.length < length) {
@@ -138,9 +147,9 @@ public class NearbyHelper {
             assert data.length == ENDPOINT_ID_LENGTH : "name must be 4 characters in length";
 
             long msb = ((long) (data[0]) << 56) | ((long) (data[1]) << 48) | ((long) (data[2]) << 40) | ((long) (data[3]) << 32);
-            long lsb = 0;
+            long lsb = 0L;
 
-            return new UUID(BLUETOOTH_BASE_UUID_MSB | (msb & 0xffffffff), BLUETOOTH_BASE_UUID_LSB | (lsb & 0xffffffff));
+            return new UUID(BLUETOOTH_BASE_UUID_MSB | (msb & 0xffffffffL), BLUETOOTH_BASE_UUID_LSB | lsb);
         }
 
         @NonNull

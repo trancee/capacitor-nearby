@@ -5,7 +5,7 @@ import static com.getcapacitor.community.NearbyHelper.EndpointID;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-public record Endpoint(@NonNull EndpointID endpointID, @Nullable String endpointInfo) {
+public record Endpoint(@NonNull EndpointID endpointID, @Nullable byte[] endpointInfo) {
     public Endpoint(@NonNull EndpointID endpointID) {
         this(endpointID, null);
     }

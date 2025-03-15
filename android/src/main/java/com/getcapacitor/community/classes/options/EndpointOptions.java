@@ -1,5 +1,6 @@
 package com.getcapacitor.community.classes.options;
 
+import android.util.Base64;
 import androidx.annotation.Nullable;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.community.NearbyConfig;
@@ -10,14 +11,28 @@ public abstract class EndpointOptions {
     private String endpointID;
 
     @Nullable
-    private String endpointInfo;
+    private byte[] endpointInfo;
 
     public EndpointOptions(PluginCall call, @Nullable NearbyConfig config) {
         String endpointID = call.getString("endpointID");
         this.setEndpointID(endpointID);
 
-        String endpointInfo = call.getString("endpointInfo", (config == null) ? null : config.getEndpointInfo());
-        this.setEndpointInfo(endpointInfo);
+        if (config != null) {
+            @Nullable
+            byte[] endpointInfo = config.getEndpointInfo();
+
+            @Nullable
+            String value = call.getString("endpointInfo");
+            if (value != null && !value.isEmpty()) {
+                try {
+                    endpointInfo = Base64.decode(value, Base64.NO_WRAP);
+                } catch (IllegalArgumentException ignored) {
+                    endpointInfo = value.getBytes();
+                }
+            }
+
+            this.setEndpointInfo(endpointInfo);
+        }
     }
 
     public EndpointOptions(PluginCall call) {
@@ -28,7 +43,7 @@ public abstract class EndpointOptions {
         this.endpointID = endpointID;
     }
 
-    public void setEndpointInfo(@Nullable String endpointInfo) {
+    public void setEndpointInfo(@Nullable byte[] endpointInfo) {
         this.endpointInfo = endpointInfo;
     }
 
@@ -38,7 +53,7 @@ public abstract class EndpointOptions {
     }
 
     @Nullable
-    public String getEndpointInfo() {
+    public byte[] getEndpointInfo() {
         return endpointInfo;
     }
 }

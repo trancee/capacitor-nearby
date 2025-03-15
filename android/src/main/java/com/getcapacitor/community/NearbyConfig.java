@@ -7,32 +7,40 @@ import androidx.annotation.Nullable;
 
 public class NearbyConfig {
 
-    private static EndpointID endpointID;
+    static EndpointID endpointID;
 
     @Nullable
-    String endpointInfo;
+    byte[] endpointInfo;
 
     @Nullable
     String serviceID;
 
-    public NearbyConfig(@Nullable String endpointInfo, @Nullable String serviceID) {
+    public NearbyConfig(@Nullable byte[] endpointInfo, @Nullable String serviceID) {
         this.endpointInfo = endpointInfo;
         this.serviceID = serviceID;
 
         endpointID = generateEndpointID(endpointInfo);
     }
 
-    EndpointID getEndpointID() {
-        return endpointID;
+    public void setEndpointInfo(@Nullable byte[] endpointInfo) {
+        this.endpointInfo = endpointInfo;
+    }
+
+    public void setServiceID(@Nullable String serviceID) {
+        this.serviceID = serviceID;
     }
 
     @Nullable
-    public String getEndpointInfo() {
+    public byte[] getEndpointInfo() {
         return endpointInfo;
     }
 
     @Nullable
     public String getServiceID() {
         return serviceID;
+    }
+
+    EndpointID getEndpointID() {
+        return endpointID;
     }
 }
