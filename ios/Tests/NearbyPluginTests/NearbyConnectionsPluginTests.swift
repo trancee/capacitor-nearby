@@ -1,12 +1,12 @@
 import XCTest
-@testable import NearbyPlugin
+@testable import NearbyConnectionsPlugin
 
-class NearbyTests: XCTestCase {
+class NearbyConnectionsTests: XCTestCase {
     func testEcho() {
         // This is an example of a functional test case for a plugin.
         // Use XCTAssert and related functions to verify your tests produce the correct results.
 
-        let implementation = Nearby()
+        let implementation = NearbyConnections()
         let value = "Hello, World!"
         let result = implementation.echo(value)
 

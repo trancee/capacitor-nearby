@@ -11,14 +11,6 @@
         android:maxSdkVersion="30" />
 
     <uses-permission
-        android:name="android.permission.ACCESS_COARSE_LOCATION"
-        android:maxSdkVersion="28" />
-    <uses-permission
-        android:name="android.permission.ACCESS_FINE_LOCATION"
-        android:maxSdkVersion="31"
-        android:minSdkVersion="29" />
-
-    <uses-permission
         android:name="android.permission.BLUETOOTH_ADVERTISE"
         android:minSdkVersion="31" />
     <uses-permission
@@ -29,6 +21,15 @@
         android:minSdkVersion="31"
         android:usesPermissionFlags="neverForLocation"
         tools:targetApi="s" />
+
+    <uses-permission
+        android:name="android.permission.ACCESS_COARSE_LOCATION"
+        android:maxSdkVersion="28" />
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="31"
+        android:minSdkVersion="29"
+        tools:ignore="CoarseFineLocation" />
 
     <!-- https://developer.android.com/develop/connectivity/bluetooth/bt-permissions#features -->
     <uses-feature

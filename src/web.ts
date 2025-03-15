@@ -4,6 +4,7 @@ import type {
   NearbyPlugin,
   PermissionStatus,
   InitializeOptions,
+  InitializeResult,
   StartAdvertisingOptions,
   RequestConnectionOptions,
   AcceptConnectionOptions,
@@ -17,9 +18,12 @@ import type {
 import { PayloadTransferUpdateStatus } from './definitions';
 
 export class NearbyWeb extends WebPlugin implements NearbyPlugin {
-  async initialize(options?: InitializeOptions): Promise<void> {
+  async initialize(options?: InitializeOptions): Promise<InitializeResult> {
     console.info('initialize', options);
     // throw this.unimplemented('Method not implemented.');
+    return {
+      endpointID: 'XXXX',
+    };
   }
   async reset(): Promise<void> {
     console.info('reset');

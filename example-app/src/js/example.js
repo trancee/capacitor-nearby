@@ -3,11 +3,11 @@ import { Nearby } from '@capacitor-trancee/nearby';
 window.testInitialize = async () => {
     let options = {}
 
-    const endpointName = document.getElementById("initialize-endpointName").value;
+    const endpointInfo = document.getElementById("initialize-endpointInfo").value;
     const serviceID = document.getElementById("initialize-serviceID").value;
 
-    if (endpointName !== undefined && endpointName.length > 0) {
-        options.endpointName = endpointName
+    if (endpointInfo !== undefined && endpointInfo.length > 0) {
+        options.endpointInfo = endpointInfo
     }
     if (serviceID !== undefined && serviceID.length > 0) {
         options.serviceID = serviceID
@@ -28,10 +28,10 @@ window.testReset = async () => {
 window.testStartAdvertising = async () => {
     let options = {}
 
-    const endpointName = document.getElementById("startAdvertising-endpointName").value;
+    const endpointInfo = document.getElementById("startAdvertising-endpointInfo").value;
 
-    if (endpointName !== undefined && endpointName.length > 0) {
-        options.endpointName = endpointName
+    if (endpointInfo !== undefined && endpointInfo.length > 0) {
+        options.endpointInfo = endpointInfo
     }
 
     const result = await window.execute("startAdvertising", options)

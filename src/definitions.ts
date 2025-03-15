@@ -2,34 +2,6 @@
 
 import type { PermissionState, PluginListenerHandle } from '@capacitor/core';
 
-export interface PermissionStatus {
-  /**
-   * `BLUETOOTH_ADVERTISE` Required to be able to advertise to nearby Bluetooth devices.
-   * `BLUETOOTH_CONNECT` Required to be able to connect to paired Bluetooth devices.
-   * `BLUETOOTH_SCAN` Required to be able to discover and pair nearby Bluetooth devices.
-   *
-   * `BLUETOOTH` Allows applications to connect to paired bluetooth devices.
-   * `BLUETOOTH_ADMIN` Allows applications to discover and pair bluetooth devices.
-   *
-   * @since 4.1.0
-   */
-  bluetooth: PermissionState;
-  /**
-   * `ACCESS_FINE_LOCATION` Allows an app to access precise location.
-   *
-   * `ACCESS_COARSE_LOCATION` Allows an app to access approximate location.
-   *
-   * @since 4.1.0
-   */
-  location: PermissionState;
-}
-
-export type NearbyPermissionType = 'bluetooth' | 'location';
-
-export interface NearbyPermissions {
-  permissions: NearbyPermissionType[];
-}
-
 declare module '@capacitor/cli' {
   export interface PluginsConfig {
     /**
@@ -37,12 +9,12 @@ declare module '@capacitor/cli' {
      */
     Nearby?: {
       /**
-       * A human readable name for this endpoint, to appear on the remote device.
+       * Identifing information about this endpoint.
        *
        * @since 4.1.0
        * @example "My App"
        */
-      endpointName?: string;
+      endpointInfo?: string;
 
       /**
        * An identifier to advertise your app to other endpoints.
@@ -64,7 +36,7 @@ export interface NearbyPlugin {
    *
    * @since 4.1.0
    */
-  initialize(options?: InitializeOptions): Promise<void>;
+  initialize(options?: InitializeOptions): Promise<InitializeResult>;
   /**
    * Stops and resets advertising and discovering of endpoints.
    *
@@ -268,11 +240,11 @@ export interface Endpoint {
   endpointID: EndpointID;
 
   /**
-   * A human readable name for this endpoint, to appear on the remote device.
+   * Identifing information about this endpoint.
    *
    * @since 4.1.0
    */
-  endpointName?: string;
+  endpointInfo?: string;
 }
 
 // Endpoint Discovery
@@ -432,12 +404,12 @@ export interface PayloadTransferUpdate {
 
 export interface InitializeOptions {
   /**
-   * A human readable name for this endpoint, to appear on the remote device.
+   * Identifing information about this endpoint.
    *
    * @since 4.1.0
    * @example "My App"
    */
-  endpointName?: string;
+  endpointInfo?: string;
 
   /**
    * An identifier to advertise your app to other endpoints.
@@ -451,13 +423,22 @@ export interface InitializeOptions {
   serviceID?: ServiceID;
 }
 
-export interface StartAdvertisingOptions {
+export interface InitializeResult {
   /**
-   * A human readable name for this endpoint, to appear on the remote device.
+   * A unique identifier for this endpoint.
    *
    * @since 4.1.0
    */
-  endpointName?: string;
+  endpointID: EndpointID;
+}
+
+export interface StartAdvertisingOptions {
+  /**
+   * Identifing information about this endpoint.
+   *
+   * @since 4.1.0
+   */
+  endpointInfo?: string;
 }
 
 export interface RequestConnectionOptions {
@@ -469,11 +450,11 @@ export interface RequestConnectionOptions {
   endpointID: EndpointID;
 
   /**
-   * A human readable name for this endpoint, to appear on the remote device.
+   * Identifing information about this endpoint.
    *
    * @since 4.1.0
    */
-  endpointName?: string;
+  endpointInfo?: string;
 }
 
 export interface AcceptConnectionOptions {
@@ -593,4 +574,32 @@ export enum BluetoothState {
    * @since 1.0.0
    */
   POWERED_ON = 'poweredOn',
+}
+
+export interface PermissionStatus {
+  /**
+   * `BLUETOOTH_ADVERTISE` Required to be able to advertise to nearby Bluetooth devices.
+   * `BLUETOOTH_CONNECT` Required to be able to connect to paired Bluetooth devices.
+   * `BLUETOOTH_SCAN` Required to be able to discover and pair nearby Bluetooth devices.
+   *
+   * `BLUETOOTH` Allows applications to connect to paired bluetooth devices.
+   * `BLUETOOTH_ADMIN` Allows applications to discover and pair bluetooth devices.
+   *
+   * @since 4.1.0
+   */
+  bluetooth: PermissionState;
+  /**
+   * `ACCESS_FINE_LOCATION` Allows an app to access precise location.
+   *
+   * `ACCESS_COARSE_LOCATION` Allows an app to access approximate location.
+   *
+   * @since 4.1.0
+   */
+  location: PermissionState;
+}
+
+export type NearbyPermissionType = 'bluetooth' | 'location';
+
+export interface NearbyPermissions {
+  permissions: NearbyPermissionType[];
 }

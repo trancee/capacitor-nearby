@@ -16,6 +16,47 @@ npx cap sync
 
 ## Configuration
 
+### Android
+
+```java
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <!-- https://developer.android.com/develop/connectivity/bluetooth/bt-permissions#discover-local-devices -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADVERTISE"
+        android:minSdkVersion="31" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_CONNECT"
+        android:minSdkVersion="31" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:minSdkVersion="31"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
+
+    <uses-permission
+        android:name="android.permission.ACCESS_COARSE_LOCATION"
+        android:maxSdkVersion="28" />
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="31"
+        android:minSdkVersion="29"
+        tools:ignore="CoarseFineLocation" />
+
+    <!-- https://developer.android.com/develop/connectivity/bluetooth/bt-permissions#features -->
+    <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="true" />
+```
+
 <docgen-config>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
 
@@ -23,7 +64,7 @@ These configuration values are available:
 
 | Prop               | Type                                            | Description                                                                                                                                                                                             | Since |
 | ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| **`endpointName`** | <code>string</code>                             | A human readable name for this endpoint, to appear on the remote device.                                                                                                                                | 4.1.0 |
+| **`endpointInfo`** | <code>string</code>                             | Identifing information about this endpoint.                                                                                                                                                             | 4.1.0 |
 | **`serviceID`**    | <code><a href="#serviceid">ServiceID</a></code> | An identifier to advertise your app to other endpoints. The `serviceID` value must uniquely identify your app. As a best practice, use the package name of your app (for example, `com.example.myapp`). | 4.1.0 |
 
 ### Examples
@@ -34,7 +75,7 @@ In `capacitor.config.json`:
 {
   "plugins": {
     "Nearby": {
-      "endpointName": "My App",
+      "endpointInfo": "My App",
       "serviceID": "com.example.myapp"
     }
   }
@@ -51,7 +92,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   plugins: {
     Nearby: {
-      endpointName: "My App",
+      endpointInfo: "My App",
       serviceID: "com.example.myapp",
     },
   },
@@ -104,7 +145,7 @@ export default config;
 ### initialize(...)
 
 ```typescript
-initialize(options?: InitializeOptions | undefined) => Promise<void>
+initialize(options?: InitializeOptions | undefined) => Promise<InitializeResult>
 ```
 
 Initializes Nearby for advertising and discovering of endpoints.
@@ -112,6 +153,8 @@ Initializes Nearby for advertising and discovering of endpoints.
 | Param         | Type                                                            |
 | ------------- | --------------------------------------------------------------- |
 | **`options`** | <code><a href="#initializeoptions">InitializeOptions</a></code> |
+
+**Returns:** <code>Promise&lt;<a href="#initializeresult">InitializeResult</a>&gt;</code>
 
 **Since:** 4.1.0
 
@@ -563,19 +606,26 @@ Called with progress information about an active <a href="#payload">`Payload`</a
 ### Interfaces
 
 
+#### InitializeResult
+
+| Prop             | Type                                              | Description                            | Since |
+| ---------------- | ------------------------------------------------- | -------------------------------------- | ----- |
+| **`endpointID`** | <code><a href="#endpointid">EndpointID</a></code> | A unique identifier for this endpoint. | 4.1.0 |
+
+
 #### InitializeOptions
 
 | Prop               | Type                                            | Description                                                                                                                                                                                             | Since |
 | ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| **`endpointName`** | <code>string</code>                             | A human readable name for this endpoint, to appear on the remote device.                                                                                                                                | 4.1.0 |
+| **`endpointInfo`** | <code>string</code>                             | Identifing information about this endpoint.                                                                                                                                                             | 4.1.0 |
 | **`serviceID`**    | <code><a href="#serviceid">ServiceID</a></code> | An identifier to advertise your app to other endpoints. The `serviceID` value must uniquely identify your app. As a best practice, use the package name of your app (for example, `com.example.myapp`). | 4.1.0 |
 
 
 #### StartAdvertisingOptions
 
-| Prop               | Type                | Description                                                              | Since |
-| ------------------ | ------------------- | ------------------------------------------------------------------------ | ----- |
-| **`endpointName`** | <code>string</code> | A human readable name for this endpoint, to appear on the remote device. | 4.1.0 |
+| Prop               | Type                | Description                                 | Since |
+| ------------------ | ------------------- | ------------------------------------------- | ----- |
+| **`endpointInfo`** | <code>string</code> | Identifing information about this endpoint. | 4.1.0 |
 
 
 #### RequestConnectionOptions
@@ -583,7 +633,7 @@ Called with progress information about an active <a href="#payload">`Payload`</a
 | Prop               | Type                                              | Description                                                                        | Since |
 | ------------------ | ------------------------------------------------- | ---------------------------------------------------------------------------------- | ----- |
 | **`endpointID`**   | <code><a href="#endpointid">EndpointID</a></code> | The identifier for the remote endpoint to which a connection request will be sent. | 4.1.0 |
-| **`endpointName`** | <code>string</code>                               | A human readable name for this endpoint, to appear on the remote device.           | 4.1.0 |
+| **`endpointInfo`** | <code>string</code>                               | Identifing information about this endpoint.                                        | 4.1.0 |
 
 
 #### AcceptConnectionOptions
@@ -663,10 +713,10 @@ Called with progress information about an active <a href="#payload">`Payload`</a
 
 #### Endpoint
 
-| Prop               | Type                                              | Description                                                              | Since |
-| ------------------ | ------------------------------------------------- | ------------------------------------------------------------------------ | ----- |
-| **`endpointID`**   | <code><a href="#endpointid">EndpointID</a></code> | The ID of the remote endpoint that was discovered.                       | 4.1.0 |
-| **`endpointName`** | <code>string</code>                               | A human readable name for this endpoint, to appear on the remote device. | 4.1.0 |
+| Prop               | Type                                              | Description                                        | Since |
+| ------------------ | ------------------------------------------------- | -------------------------------------------------- | ----- |
+| **`endpointID`**   | <code><a href="#endpointid">EndpointID</a></code> | The ID of the remote endpoint that was discovered. | 4.1.0 |
+| **`endpointInfo`** | <code>string</code>                               | Identifing information about this endpoint.        | 4.1.0 |
 
 
 #### Payload
@@ -694,16 +744,16 @@ Describes the status for an active <a href="#payload">`Payload`</a> transfer, ei
 ### Type Aliases
 
 
-#### ServiceID
+#### EndpointID
 
-Used to represent a service identifier.
+Used to represent an endpoint.
 
 <code>string</code>
 
 
-#### EndpointID
+#### ServiceID
 
-Used to represent an endpoint.
+Used to represent a service identifier.
 
 <code>string</code>
 

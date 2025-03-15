@@ -26,9 +26,8 @@
     <div style="width: 50%; float: left;">
       <fieldset>
         <legend>Initializes Nearby for advertising and discovering of endpoints.</legend>
-        <label for="initialize-endpointName">A human readable name for this endpoint, to appear on the remote
-          device.</label><br>
-        <input type="text" id="initialize-endpointName" name="initialize-endpointName" value="My App" /><br>
+        <label for="initialize-endpointInfo">Identifing information about this endpoint.</label><br>
+        <input type="text" id="initialize-endpointInfo" name="initialize-endpointInfo" value="My App" /><br>
         <label for="initialize-serviceID">An identifier to advertise your app to other endpoints.</label><br>
         <input type="text" id="initialize-serviceID" name="initialize-serviceID" value="com.example.myapp" /><br>
         <button onclick="testInitialize()">Initialize</button>
@@ -43,9 +42,8 @@
 
       <fieldset>
         <legend>Starts advertising an endpoint for a local app.</legend>
-        <label for="startAdvertising-endpointName">A human readable name for this endpoint, to appear on the remote
-          device.</label><br>
-        <input type="text" id="startAdvertising-endpointName" name="startAdvertising-endpointName" value="" /><br>
+        <label for="startAdvertising-endpointInfo">Identifing information about this endpoint.</label><br>
+        <input type="text" id="startAdvertising-endpointInfo" name="startAdvertising-endpointInfo" value="" /><br>
         <button onclick="testStartAdvertising()">Start Advertising</button>
       </fieldset>
 

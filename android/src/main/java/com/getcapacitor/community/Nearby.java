@@ -1,195 +1,408 @@
 package com.getcapacitor.community;
 
-import android.util.Log;
+import static com.getcapacitor.community.NearbyHelper.BLUETOOTH_BASE_UUID_LSB;
+import static com.getcapacitor.community.NearbyHelper.BLUETOOTH_BASE_UUID_MSB;
+import static com.getcapacitor.community.NearbyHelper.EndpointID;
+
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.le.AdvertiseSettings;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import com.getcapacitor.JSArray;
-import com.getcapacitor.JSObject;
-import com.getcapacitor.community.classes.options.PublishOptions;
+import com.getcapacitor.community.classes.Endpoint;
+import com.getcapacitor.community.classes.options.AcceptConnectionOptions;
+import com.getcapacitor.community.classes.options.CancelPayloadOptions;
+import com.getcapacitor.community.classes.options.ConnectOptions;
+import com.getcapacitor.community.classes.options.DisconnectOptions;
+import com.getcapacitor.community.classes.options.InitializeOptions;
+import com.getcapacitor.community.classes.options.RejectConnectionOptions;
+import com.getcapacitor.community.classes.options.RequestConnectionOptions;
+import com.getcapacitor.community.classes.options.SendPayloadOptions;
+import com.getcapacitor.community.classes.options.StartAdvertisingOptions;
+import com.getcapacitor.community.classes.results.InitializeResult;
 import com.getcapacitor.community.classes.results.StatusResult;
-import com.getcapacitor.community.interfaces.EmptyCallback;
-import com.getcapacitor.community.interfaces.NonEmptyCallback;
-import com.google.android.gms.nearby.connection.AdvertisingOptions;
-import com.google.android.gms.nearby.connection.ConnectionInfo;
-import com.google.android.gms.nearby.connection.ConnectionLifecycleCallback;
-import com.google.android.gms.nearby.connection.ConnectionResolution;
-import com.google.android.gms.nearby.connection.ConnectionsClient;
-import com.google.android.gms.nearby.connection.DiscoveredEndpointInfo;
-import com.google.android.gms.nearby.connection.DiscoveryOptions;
-import com.google.android.gms.nearby.connection.EndpointDiscoveryCallback;
-import com.google.android.gms.nearby.connection.Payload;
-import com.google.android.gms.nearby.connection.PayloadCallback;
-import com.google.android.gms.nearby.connection.PayloadTransferUpdate;
-import java.util.Collections;
+import com.getcapacitor.community.interfaces.Callback;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.UUID;
 
 public class Nearby {
 
-    interface EndpointListener {
-        void onEndpointFound(String id, String name);
+    private static final String NOT_INITIALIZED = "not initialized";
 
-        void onEndpointLost(String id);
-    }
+    private static final String MISSING_ENDPOINT_ID = "missing endpoint identifier";
+    private static final String MISSING_ENDPOINT_INFO = "missing endpoint information";
+    private static final String MISSING_SERVICE_ID = "missing service identifier";
 
-    @Nullable
-    private EndpointListener endpointListener;
-
-    public void setEndpointListener(@Nullable EndpointListener listener) {
-        this.endpointListener = listener;
-    }
-
-    @Nullable
-    public EndpointListener getEndpointListener() {
-        return endpointListener;
-    }
+    private static final String MISSING_PAYLOAD_ID = "missing payload identifier";
+    private static final String MISSING_PAYLOAD = "missing payload";
 
     @NonNull
     private final NearbyPlugin plugin;
 
     @NonNull
-    private final ConnectionsClient connectionsClient;
+    private final NearbyConfig config;
 
-    private String name;
-
-    /**
-     * True if we are asking a discovered device to connect to us. While we ask, we cannot ask another
-     * device.
-     */
-    private boolean isConnecting = false;
-
-    /**
-     * True if we are discovering.
-     */
+    private boolean isAdvertising = false;
     private boolean isDiscovering = false;
 
-    /**
-     * True if we are advertising.
-     */
-    private boolean isAdvertising = false;
+    private BluetoothAdapter bluetoothAdapter;
 
-    /**
-     * The devices we've discovered near us.
-     */
-    private final Map<String, NearbyPlugin.Endpoint> discoveredEndpoints = new HashMap<>();
+    private NearbyScanner nearbyScanner;
+    private NearbyAdvertiser nearbyAdvertiser;
 
-    /**
-     * The devices we have pending connections to. They will stay pending until we call {@link
-     * #acceptConnection(NearbyPlugin.Endpoint)} or {@link #rejectConnection(NearbyPlugin.Endpoint)}.
-     */
-    private final Map<String, NearbyPlugin.Endpoint> pendingConnections = new HashMap<>();
+    protected UUID serviceUUID;
+    protected UUID serviceMask = UUID.fromString("ffffffff-0000-0000-0000-000000000000");
 
-    /**
-     * The devices we are currently connected to. For advertisers, this may be large. For discoverers,
-     * there will only be one entry in this map.
-     */
-    private final Map<String, NearbyPlugin.Endpoint> establishedConnections = new HashMap<>();
+    public static Map<EndpointID, NearbyEndpoint> endpoints;
 
-    public Nearby(@NonNull NearbyPlugin plugin) {
+    public Nearby(@NonNull NearbyConfig config, @NonNull NearbyPlugin plugin) {
+        this.config = config;
         this.plugin = plugin;
 
-        connectionsClient = com.google.android.gms.nearby.Nearby.getConnectionsClient(plugin.getActivity());
+        endpoints = new HashMap<>();
     }
 
-    public void reset() {
+    /**
+     * Initialize
+     */
+    public void initialize(@NonNull InitializeOptions options, @NonNull Callback callback) {
+        if (config.getEndpointInfo() == null) {
+            Exception exception = new Exception(MISSING_ENDPOINT_INFO);
+            callback.error(exception);
+            return;
+        }
+
+        if (config.getServiceID() == null) {
+            Exception exception = new Exception(MISSING_SERVICE_ID);
+            callback.error(exception);
+            return;
+        }
+
+        {
+            byte[] data = NearbyHelper.hash(config.getServiceID(), 8 + 8);
+
+            //          0000-1000-8000-00805f9b34fb
+            // ffffffff-0000-0000-0000-000000000000
+
+            long msb =
+                (((long) data[0] & 0xff) << 56) |
+                (((long) data[1] & 0xff) << 48) | // 16-bits UUID
+                (((long) data[2] & 0xff) << 40) |
+                (((long) data[3] & 0xff) << 32); // 32-bits UUID
+            long lsb = 0;
+
+            this.serviceUUID = new UUID(BLUETOOTH_BASE_UUID_MSB | (msb & 0xffffffff), BLUETOOTH_BASE_UUID_LSB | (lsb & 0xffffffff));
+        }
+
+        bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (bluetoothAdapter == null) {
+            callback.error(new Exception("no bluetooth adapter"));
+            return;
+        }
+
+        nearbyScanner = NearbyScanner.getInstance(this.bluetoothAdapter, this.serviceUUID, this.serviceMask);
+
+        // if (scanMode != null) {
+        //     nearbyScanner.setScanMode(scanMode);
+        // }
+
+        nearbyAdvertiser = NearbyAdvertiser.getInstance(this.bluetoothAdapter, this.serviceUUID, config.getEndpointID());
+
+        // if (advertiseMode != null) {
+        //     nearbyAdvertiser.setAdvertiseMode(advertiseMode);
+        // }
+        // if (txPowerLevel != null) {
+        //     nearbyAdvertiser.setTxPowerLevel(txPowerLevel);
+        // }
+
+        endpoints.clear();
+
+        InitializeResult result = new InitializeResult(config.getEndpointID());
+        callback.success(result);
+    }
+
+    /**
+     * Reset
+     */
+    public void reset(@NonNull Callback callback) {
         stop();
 
-        name = null;
+        callback.success();
     }
 
     /**
-     * Publish
+     * Advertising
      */
-
-    public void publish(@NonNull PublishOptions options, @NonNull EmptyCallback callback) {
-        name = options.getName();
-
-        if (isAdvertising()) {
-            stopAdvertising();
+    public void startAdvertising(@NonNull StartAdvertisingOptions options, @NonNull Callback callback) {
+        if (bluetoothAdapter == null || nearbyAdvertiser == null) {
+            Exception exception = new Exception(NOT_INITIALIZED);
+            callback.error(exception);
         }
 
-        AdvertisingOptions.Builder advertisingOptions = new AdvertisingOptions.Builder();
-        advertisingOptions.setStrategy(getStrategy());
+        String endpointInfo = options.getEndpointInfo();
+        if (endpointInfo == null || endpointInfo.isEmpty()) {
+            Exception exception = new Exception(MISSING_ENDPOINT_INFO);
+            callback.error(exception);
+            return;
+        }
 
-        connectionsClient
-            .startAdvertising(name, getServiceId(), connectionLifecycleCallback, advertisingOptions.build())
-            .addOnSuccessListener(unusedResult -> {
-                Log.v(getLogTag(), "Now advertising endpoint " + getName());
-                onAdvertisingStarted();
+        String serviceID = config.getServiceID();
+        if (serviceID == null || serviceID.isEmpty()) {
+            Exception exception = new Exception(MISSING_SERVICE_ID);
+            callback.error(exception);
+            return;
+        }
 
-                callback.success();
-            })
-            .addOnFailureListener(exception -> {
-                isAdvertising = false;
+        nearbyAdvertiser.start(
+            endpointInfo.getBytes(StandardCharsets.UTF_8),
+            new NearbyAdvertiser.Callback() {
+                @Override
+                public void onSuccess(AdvertiseSettings settings) {
+                    isAdvertising = true;
 
-                Log.w(getLogTag(), "startAdvertising failed.", e);
-                onAdvertisingFailed();
+                    callback.success();
+                }
 
-                callback.error(exception);
-            });
+                @Override
+                public void onFailure(Exception exception) {
+                    isAdvertising = false;
+
+                    callback.error(exception);
+                }
+            }
+        );
+        //        connectionsClient
+        //            .startAdvertising(name, serviceID, connectionLifecycleCallback, advertisingOptions.build())
+        //            .addOnSuccessListener(unusedResult -> {
+        //                isAdvertising = true;
+        //
+        //                callback.success();
+        //            })
+        //            .addOnFailureListener(exception -> {
+        //                isAdvertising = false;
+        //
+        //                callback.error(exception);
+        //            });
     }
 
-    public void unpublish(@NonNull EmptyCallback callback) {
+    public void stopAdvertising(@NonNull Callback callback) {
         stopAdvertising();
 
-        name = null;
+        callback.success();
     }
 
     /**
-     * Subscribe
+     * Discovery
      */
-
-    public void subscribe(@NonNull EmptyCallback callback) {
-        if (isDiscovering()) {
-            stopDiscovering();
+    public void startDiscovering(@NonNull Callback callback) {
+        if (bluetoothAdapter == null || nearbyScanner == null) {
+            Exception exception = new Exception(NOT_INITIALIZED);
+            callback.error(exception);
         }
 
-        discoveredEndpoints.clear();
+        nearbyScanner.start(
+            new NearbyScanner.Callback() {
+                @Override
+                public void onFound(EndpointID endpointID, @Nullable byte[] endpointInfo, Integer rssi, BluetoothDevice device) {
+                    NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
+                    if (nearbyEndpoint != null) {
+                        nearbyEndpoint.alive();
+                    } else {
+                        new NearbyEndpoint(endpointID, endpointInfo, rssi, device, () -> {
+                            if (nearbyScanner.isScanning()) {
+                                Endpoint endpoint = new Endpoint(endpointID, new String(endpointInfo));
 
-        DiscoveryOptions.Builder discoveryOptions = new DiscoveryOptions.Builder();
-        discoveryOptions.setStrategy(getStrategy());
+                                plugin.onEndpointLost(endpoint);
+                            }
 
-        connectionsClient
-            .startDiscovery(getServiceId(), endpointDiscoveryCallback, discoveryOptions.build())
-            .addOnSuccessListener(unusedResult -> {
-                Log.v(getLogTag(), "Now starting discovery");
-                onDiscoveryStarted();
+                            NearbyEndpoint endpoint = endpoints.get(endpointID);
+                            if (endpoint != null) {
+                                endpoint.kill();
+                            }
+                        });
+                        // endpoints.put(endpointID, nearbyEndpoint);
 
-                callback.success();
-            })
-            .addOnFailureListener(e -> {
-                isDiscovering = false;
+                        if (nearbyScanner.isScanning()) {
+                            Endpoint endpoint = new Endpoint(endpointID);
 
-                Log.w(getLogTag(), "startDiscovering failed.", e);
-                onDiscoveryFailed();
+                            plugin.onEndpointFound(endpoint);
+                        }
+                    }
+                }
 
-                callback.error(exception);
-            });
+                @Override
+                public void onLost(EndpointID endpointID) {
+                    NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
+                    if (nearbyEndpoint != null) {
+                        nearbyEndpoint.kill();
+                    }
+                    // endpoints.remove(endpointID);
+
+                    {
+                        Endpoint endpoint = new Endpoint(endpointID);
+
+                        plugin.onEndpointLost(endpoint);
+                    }
+                }
+
+                @Override
+                public void onSuccess() {
+                    isDiscovering = true;
+
+                    callback.success();
+                }
+
+                @Override
+                public void onFailure(Exception exception) {
+                    isDiscovering = false;
+
+                    callback.error(exception);
+                }
+            }
+        );
+        //        connectionsClient
+        //            .startDiscovery(serviceID, endpointDiscoveryCallback, discoveryOptions.build())
+        //            .addOnSuccessListener(unusedResult -> {
+        //                isDiscovering = true;
+        //
+        //                callback.success();
+        //            })
+        //            .addOnFailureListener(exception -> {
+        //                isDiscovering = false;
+        //
+        //                callback.error(exception);
+        //            });
     }
 
-    public void unsubscribe(@NonNull EmptyCallback callback) {
+    public void stopDiscovering(@NonNull Callback callback) {
         stopDiscovering();
+
+        callback.success();
+    }
+
+    /**
+     * Connection
+     */
+    public void connect(@NonNull ConnectOptions options, @NonNull Callback callback) {
+        if (bluetoothAdapter == null) {
+            Exception exception = new Exception(NOT_INITIALIZED);
+            callback.error(exception);
+        }
+
+        String endpointID = options.getEndpointID();
+        if (endpointID == null) {
+            Exception exception = new Exception(MISSING_ENDPOINT_ID);
+            callback.error(exception);
+            return;
+        }
+
+        String endpointInfo = options.getEndpointInfo();
+        if (endpointInfo == null || endpointInfo.isEmpty()) {
+            Exception exception = new Exception(MISSING_ENDPOINT_INFO);
+            callback.error(exception);
+            return;
+        }
+
+        callback.success();
+    }
+
+    public void requestConnection(@NonNull RequestConnectionOptions options, @NonNull Callback callback) {
+        String endpointID = options.getEndpointID();
+        if (endpointID == null) {
+            Exception exception = new Exception(MISSING_ENDPOINT_ID);
+            callback.error(exception);
+            return;
+        }
+
+        String endpointInfo = options.getEndpointInfo();
+        if (endpointInfo == null || endpointInfo.isEmpty()) {
+            Exception exception = new Exception(MISSING_ENDPOINT_INFO);
+            callback.error(exception);
+            return;
+        }
+        //        connectionsClient
+        //            .requestConnection(name, endpointID, connectionLifecycleCallback, connectionOptions.build())
+        //            .addOnSuccessListener(callback::success)
+        //            .addOnFailureListener(callback::error);
+    }
+
+    public void acceptConnection(@NonNull AcceptConnectionOptions options, @NonNull Callback callback) {
+        String endpointID = options.getEndpointID();
+        if (endpointID == null) {
+            Exception exception = new Exception(MISSING_ENDPOINT_ID);
+            callback.error(exception);
+            return;
+        }
+        //        connectionsClient
+        //            .acceptConnection(endpointID, payloadCallback)
+        //            .addOnSuccessListener(callback::success)
+        //            .addOnFailureListener(callback::error);
+    }
+
+    public void rejectConnection(@NonNull RejectConnectionOptions options, @NonNull Callback callback) {
+        String endpointID = options.getEndpointID();
+        if (endpointID == null) {
+            Exception exception = new Exception(MISSING_ENDPOINT_ID);
+            callback.error(exception);
+            return;
+        }
+        //        connectionsClient.rejectConnection(endpointID).addOnSuccessListener(callback::success).addOnFailureListener(callback::error);
+    }
+
+    public void disconnect(@NonNull DisconnectOptions options, @NonNull Callback callback) {
+        String endpointID = options.getEndpointID();
+        if (endpointID == null) {
+            Exception exception = new Exception(MISSING_ENDPOINT_ID);
+            callback.error(exception);
+            return;
+        }
+        //        connectionsClient.disconnectFromEndpoint(endpointID);
+    }
+
+    /**
+     * Payload
+     */
+    public void sendPayload(@NonNull SendPayloadOptions options, @NonNull Callback callback) {
+        List<String> endpointIDs = options.getEndpointIDs();
+        if (endpointIDs == null || endpointIDs.isEmpty()) {
+            Exception exception = new Exception(MISSING_ENDPOINT_ID);
+            callback.error(exception);
+            return;
+        }
+
+        byte[] payload = options.getPayload();
+        if (payload == null) {
+            Exception exception = new Exception(MISSING_PAYLOAD);
+            callback.error(exception);
+            return;
+        }
+        //        connectionsClient
+        //            .sendPayload(endpointIDs, Payload.fromBytes(payload))
+        //            .addOnSuccessListener(callback::success)
+        //            .addOnFailureListener(callback::error);
+    }
+
+    public void cancelPayload(@NonNull CancelPayloadOptions options, @NonNull Callback callback) {
+        Long payloadID = options.getPayloadID();
+        if (payloadID == null) {
+            Exception exception = new Exception(MISSING_PAYLOAD_ID);
+            callback.error(exception);
+            return;
+        }
+        //        connectionsClient.cancelPayload(payloadID).addOnSuccessListener(callback::success).addOnFailureListener(callback::error);
     }
 
     /**
      * Status
      */
-
-    public void status(@NonNull NonEmptyCallback callback) {
-        boolean isPublishing = isAdvertising();
-        boolean isSubscribing = isDiscovering();
-
-        String[] uuids = establishedConnections.keySet().toArray(new String[0]);
-
-        StatusResult result = new StatusResult(isPublishing, isSubscribing, uuids);
+    public void status(@NonNull Callback callback) {
+        StatusResult result = new StatusResult(isAdvertising, isDiscovering);
 
         callback.success(result);
     }
-
-    /**
-     * Helper
-     */
 
     /**
      * Stops advertising.
@@ -197,7 +410,8 @@ public class Nearby {
     protected void stopAdvertising() {
         isAdvertising = false;
 
-        connectionsClient.stopAdvertising();
+        nearbyAdvertiser.stop();
+        // connectionsClient.stopAdvertising();
     }
 
     /**
@@ -206,138 +420,142 @@ public class Nearby {
     protected void stopDiscovering() {
         isDiscovering = false;
 
-        connectionsClient.stopDiscovery();
+        nearbyScanner.stop();
+        // connectionsClient.stopDiscovery();
+
+        // Make sure to clear all found beacons.
+        for (NearbyEndpoint endpoint : endpoints.values()) {
+            endpoint.kill();
+        }
+        endpoints.clear();
     }
 
-    /**
-     * Returns {@code true} if currently advertising.
-     */
-    public boolean isAdvertising() {
-        return isAdvertising;
-    }
+    private void stop() {
+        stopAdvertising();
+        stopDiscovering();
+        // connectionsClient.stopAllEndpoints();
 
-    /**
-     * Returns {@code true} if currently discovering.
-     */
-    protected boolean isDiscovering() {
-        return isDiscovering;
+        // isAdvertising = false;
+        // isDiscovering = false;
     }
-
     /**
      * Callback for discovering endpoints.
      */
-    private final EndpointDiscoveryCallback endpointDiscoveryCallback = new EndpointDiscoveryCallback() {
-        @Override
-        public void onEndpointFound(@NonNull String endpointId, @NonNull DiscoveredEndpointInfo info) {
-            if (getServiceId().equals(info.getServiceId())) {
-                NearbyPlugin.Endpoint endpoint = new NearbyPlugin.Endpoint(endpointId, info.getEndpointName());
-                discoveredEndpoints.put(endpointId, endpoint);
 
-                plugin.onEndpointFound(endpointId, info);
-            }
-        }
+    //    private final EndpointDiscoveryCallback endpointDiscoveryCallback = new EndpointDiscoveryCallback() {
+    //        @Override
+    //        public void onEndpointFound(@NonNull String endpointID, @NonNull DiscoveredEndpointInfo info) {
+    //            String serviceID = config.serviceID();
+    //
+    //            if (serviceID != null && serviceID.equals(info.getServiceId())) {
+    //                Endpoint endpoint = new Endpoint(endpointID, info.getEndpointName());
+    //
+    //                plugin.onEndpointFound(endpoint);
+    //            }
+    //        }
+    //
+    //        @Override
+    //        public void onEndpointLost(@NonNull String endpointID) {
+    //            Endpoint endpoint = new Endpoint(endpointID, null);
+    //
+    //            plugin.onEndpointLost(endpoint);
+    //        }
+    //    };
 
-        @Override
-        public void onEndpointLost(@NonNull String endpointId) {
-            plugin.onEndpointLost(endpointId);
-        }
-    };
+    //    /**
+    //     * Listener for lifecycle events associated with a connection to a remote endpoint.
+    //     */
+    //    private final ConnectionLifecycleCallback connectionLifecycleCallback = new ConnectionLifecycleCallback() {
+    //        /**
+    //         * A basic encrypted channel has been created between you and the endpoint.
+    //         * Both sides are now asked if they wish to accept or reject the connection before any data can be sent over this channel.
+    //         *
+    //         * @param endpointID The identifier for the remote endpoint.
+    //         * @param connectionInfo Other relevant information about the connection.
+    //         */
+    //        @Override
+    //        public void onConnectionInitiated(@NonNull String endpointID, @NonNull ConnectionInfo connectionInfo) {
+    //            Endpoint endpoint = new Endpoint(endpointID, connectionInfo.getEndpointName());
+    //
+    //            plugin.onEndpointInitiated(endpoint);
+    //        }
+    //
+    //        /**
+    //         * Called after both sides have either accepted or rejected the connection.
+    //         *
+    //         * @param endpointID The identifier for the remote endpoint.
+    //         * @param resolution The final result after tallying both devices' accept/reject responses.
+    //         */
+    //        @Override
+    //        public void onConnectionResult(@NonNull String endpointID, @NonNull ConnectionResolution resolution) {
+    //            Endpoint endpoint = new Endpoint(endpointID, null);
+    //            Status status = resolution.getStatus();
+    //
+    //            if (status.isSuccess()) {
+    //                acceptedEndpoint(endpoint);
+    //            } else if (status.getStatusCode() == ConnectionsStatusCodes.STATUS_CONNECTION_REJECTED) {
+    //                rejectedEndpoint(endpoint);
+    //            } else {
+    //                failedEndpoint(endpoint, ConnectionsStatusCodes.getStatusCodeString(status.getStatusCode()));
+    //            }
+    //        }
+    //
+    //        /**
+    //         * Called when a remote endpoint is disconnected or has become unreachable.
+    //         *
+    //         * @param endpointID The identifier for the remote endpoint that disconnected.
+    //         */
+    //        @Override
+    //        public void onDisconnected(@NonNull String endpointID) {
+    //            Endpoint endpoint = new Endpoint(endpointID, null);
+    //
+    //            disconnectedEndpoint(endpoint);
+    //        }
+    //    };
+    //
+    //    private void acceptedEndpoint(@NonNull Endpoint endpoint) {
+    //        plugin.onEndpointConnected(endpoint);
+    //    }
+    //
+    //    private void rejectedEndpoint(@NonNull Endpoint endpoint) {
+    //        plugin.onEndpointRejected(endpoint);
+    //    }
+    //
+    //    private void failedEndpoint(@NonNull Endpoint endpoint, @NonNull String status) {
+    //        plugin.onEndpointFailed(endpoint, status);
+    //    }
+    //
+    //    private void disconnectedEndpoint(@NonNull Endpoint endpoint) {
+    //        plugin.onEndpointDisconnected(endpoint);
+    //    }
 
-    /**
-     * Callbacks for connections to other devices.
-     */
-    private final ConnectionLifecycleCallback mConnectionLifecycleCallback = new ConnectionLifecycleCallback() {
-        @Override
-        public void onConnectionInitiated(@NonNull String endpointId, ConnectionInfo connectionInfo) {
-            Log.d(
-                getLogTag(),
-                String.format("onConnectionInitiated(endpointId=%s, endpointName=%s)", endpointId, connectionInfo.getEndpointName())
-            );
-
-            NearbyPlugin.Endpoint endpoint = new NearbyPlugin.Endpoint(endpointId, connectionInfo.getEndpointName());
-            mPendingConnections.put(endpointId, endpoint);
-
-            NearbyPlugin.this.onConnectionInitiated(endpoint, connectionInfo);
-        }
-
-        @Override
-        public void onConnectionResult(@NonNull String endpointId, @NonNull ConnectionResolution result) {
-            Log.d(getLogTag(), String.format("onConnectionResponse(endpointId=%s, result=%s)", endpointId, result));
-
-            // We're no longer connecting
-            mIsConnecting = false;
-
-            if (!result.getStatus().isSuccess()) {
-                Log.w(getLogTag(), String.format("Connection failed. Received status %s.", NearbyPlugin.toString(result.getStatus())));
-
-                onConnectionFailed(mPendingConnections.remove(endpointId));
-                return;
-            }
-
-            connectedToEndpoint(mPendingConnections.remove(endpointId));
-        }
-
-        @Override
-        public void onDisconnected(@NonNull String endpointId) {
-            if (!mEstablishedConnections.containsKey(endpointId)) {
-                Log.w(getLogTag(), "Unexpected disconnection from endpoint " + endpointId);
-                return;
-            }
-
-            disconnectedFromEndpoint(mEstablishedConnections.get(endpointId));
-        }
-    };
-
-    /**
-     * Callback for payloads (bytes of data) sent from another device to us.
-     */
-    private final PayloadCallback mPayloadCallback = new PayloadCallback() {
-        @Override
-        public void onPayloadReceived(@NonNull String endpointId, @NonNull Payload payload) {
-            Log.d(getLogTag(), String.format("onPayloadReceived(endpointId=%s, payload=%s)", endpointId, payload));
-
-            onReceive(mEstablishedConnections.get(endpointId), payload);
-        }
-
-        @Override
-        public void onPayloadTransferUpdate(@NonNull String endpointId, @NonNull PayloadTransferUpdate update) {
-            Log.d(getLogTag(), String.format("onPayloadTransferUpdate(endpointId=%s, update=%s)", endpointId, update));
-        }
-    };
-
-    private void stop() {
-        connectionsClient.stopAllEndpoints();
-
-        isAdvertising = false;
-        isDiscovering = false;
-        isConnecting = false;
-
-        discoveredEndpoints.clear();
-        pendingConnections.clear();
-        establishedConnections.clear();
-    }
-
-    /**
-     * Listeners
-     */
-
-    /**
-     * Called when advertising successfully starts. Override this method to act on the event.
-     */
-    protected void onAdvertisingStarted() {}
-
-    /**
-     * Called when advertising fails to start. Override this method to act on the event.
-     */
-    protected void onAdvertisingFailed() {}
-
-    /**
-     * Called when discovery successfully starts. Override this method to act on the event.
-     */
-    protected void onDiscoveryStarted() {}
-
-    /**
-     * Called when discovery fails to start. Override this method to act on the event.
-     */
-    protected void onDiscoveryFailed() {}
+    //    /**
+    //     * Callbacks for payloads (bytes of data) sent from another device to us.
+    //     */
+    //    private final PayloadCallback payloadCallback = new PayloadCallback() {
+    //        @Override
+    //        public void onPayloadReceived(@NonNull String endpointID, @NonNull Payload payload) {
+    //            Endpoint endpoint = new Endpoint(endpointID, null);
+    //
+    //            plugin.onPayloadReceived(
+    //                endpoint,
+    //                new com.getcapacitor.community.classes.Payload(payload.getId(), payload.getType(), payload.asBytes())
+    //            );
+    //        }
+    //
+    //        @Override
+    //        public void onPayloadTransferUpdate(@NonNull String endpointID, @NonNull PayloadTransferUpdate update) {
+    //            Endpoint endpoint = new Endpoint(endpointID, null);
+    //
+    //            plugin.onPayloadTransferUpdate(
+    //                endpoint,
+    //                new com.getcapacitor.community.classes.PayloadTransferUpdate(
+    //                    update.getPayloadId(),
+    //                    update.getStatus(),
+    //                    update.getBytesTransferred(),
+    //                    update.getTotalBytes()
+    //                )
+    //            );
+    //        }
+    //    };
 }
