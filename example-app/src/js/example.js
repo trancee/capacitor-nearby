@@ -55,6 +55,30 @@ window.testStopDiscovering = async () => {
     const result = await window.execute("stopDiscovering", options);
 }
 
+window.testConnect = async () => {
+    let options = {};
+
+    const endpointID = document.getElementById("endpoints").value;
+
+    if (endpointID !== undefined && endpointID.length > 0) {
+        options.endpointID = endpointID
+    }
+
+    const result = await window.execute("connect", options);
+}
+
+window.testDisconnect = async () => {
+    let options = {};
+
+    const endpointID = document.getElementById("endpoints").value;
+
+    if (endpointID !== undefined && endpointID.length > 0) {
+        options.endpointID = endpointID
+    }
+
+    const result = await window.execute("disconnect", options);
+}
+
 window.testStatus = async () => {
     let options = {};
 
@@ -99,12 +123,20 @@ Nearby.addListener('onEndpointFound', (endpoint) => {
     console.log('onEndpointFound', endpoint);
 
     document.getElementById("events").value += `⚡ onEndpointFound(${JSON.stringify(endpoint) || ""})` + "\n";
+
+    document.getElementById("endpoints").add(new Option(endpoint.endpointID, endpoint.endpointID));
 });
 
 Nearby.addListener('onEndpointLost', (endpoint) => {
     console.log('onEndpointLost', endpoint);
 
     document.getElementById("events").value += `⚡ onEndpointLost(${JSON.stringify(endpoint) || ""})` + "\n";
+
+    document.getElementById("endpoints").options.forEach((option, index) => {
+        if (option.value === endpoint.endpointID) {
+            selectElement.remove(index);
+        }
+    })
 });
 
 Nearby.addListener('onEndpointInitiated', (endpoint) => {

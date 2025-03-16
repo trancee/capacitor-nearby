@@ -4,6 +4,7 @@ import android.Manifest;
 import android.os.Build;
 import android.util.Base64;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresPermission;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
@@ -27,6 +28,7 @@ import com.getcapacitor.community.classes.events.PayloadReceivedEvent;
 import com.getcapacitor.community.classes.events.PayloadTransferUpdateEvent;
 import com.getcapacitor.community.classes.options.AcceptConnectionOptions;
 import com.getcapacitor.community.classes.options.CancelPayloadOptions;
+import com.getcapacitor.community.classes.options.ConnectOptions;
 import com.getcapacitor.community.classes.options.DisconnectOptions;
 import com.getcapacitor.community.classes.options.InitializeOptions;
 import com.getcapacitor.community.classes.options.RejectConnectionOptions;
@@ -228,6 +230,20 @@ public class NearbyPlugin extends Plugin {
             RejectConnectionOptions options = new RejectConnectionOptions(call);
 
             implementation.rejectConnection(options, callback);
+        } catch (Exception exception) {
+            callback.error(exception);
+        }
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    @PluginMethod
+    public void connect(PluginCall call) {
+        Callback callback = new Callback(call) {};
+
+        try {
+            ConnectOptions options = new ConnectOptions(call);
+
+            implementation.connect(options, callback);
         } catch (Exception exception) {
             callback.error(exception);
         }

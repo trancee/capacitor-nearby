@@ -89,6 +89,12 @@ export interface NearbyPlugin {
    */
   rejectConnection(options: RejectConnectionOptions): Promise<void>;
   /**
+   * Connects to a remote endpoint.
+   *
+   * @since 4.1.0
+   */
+  connect(options: ConnectOptions): Promise<void>;
+  /**
    * Disconnects from a remote endpoint.
    * `Payload`s can no longer be sent to or received from the endpoint after this method is called.
    *
@@ -521,6 +527,15 @@ export interface CancelPayloadOptions {
    * @since 4.1.0
    */
   payloadID: PayloadID;
+}
+
+export interface ConnectOptions {
+  /**
+   * The identifier for the remote endpoint to connect to.
+   *
+   * @since 4.1.0
+   */
+  endpointID: EndpointID;
 }
 
 export interface DisconnectOptions {

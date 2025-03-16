@@ -116,6 +116,7 @@ export default config;
 * [`requestConnection(...)`](#requestconnection)
 * [`acceptConnection(...)`](#acceptconnection)
 * [`rejectConnection(...)`](#rejectconnection)
+* [`connect(...)`](#connect)
 * [`disconnect(...)`](#disconnect)
 * [`sendPayload(...)`](#sendpayload)
 * [`cancelPayload(...)`](#cancelpayload)
@@ -275,6 +276,23 @@ Rejects a connection to a remote endpoint.
 | Param         | Type                                                                        |
 | ------------- | --------------------------------------------------------------------------- |
 | **`options`** | <code><a href="#rejectconnectionoptions">RejectConnectionOptions</a></code> |
+
+**Since:** 4.1.0
+
+--------------------
+
+
+### connect(...)
+
+```typescript
+connect(options: ConnectOptions) => Promise<void>
+```
+
+Connects to a remote endpoint.
+
+| Param         | Type                                                      |
+| ------------- | --------------------------------------------------------- |
+| **`options`** | <code><a href="#connectoptions">ConnectOptions</a></code> |
 
 **Since:** 4.1.0
 
@@ -648,6 +666,13 @@ Called with progress information about an active <a href="#payload">`Payload`</a
 | Prop             | Type                                              | Description                             | Since |
 | ---------------- | ------------------------------------------------- | --------------------------------------- | ----- |
 | **`endpointID`** | <code><a href="#endpointid">EndpointID</a></code> | The identifier for the remote endpoint. | 4.1.0 |
+
+
+#### ConnectOptions
+
+| Prop             | Type                                              | Description                                           | Since |
+| ---------------- | ------------------------------------------------- | ----------------------------------------------------- | ----- |
+| **`endpointID`** | <code><a href="#endpointid">EndpointID</a></code> | The identifier for the remote endpoint to connect to. | 4.1.0 |
 
 
 #### DisconnectOptions

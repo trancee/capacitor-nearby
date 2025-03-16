@@ -112,32 +112,6 @@ public class NearbyScanner {
                     BluetoothDevice device = result.getDevice();
                     if (device == null) return;
 
-                    /*
-                            Map<ParcelUuid, byte[]> map = record.getServiceData();
-                            if (map != null) {
-                                for (ParcelUuid key : map.keySet()) {
-                                    UUID uuid = key.getUuid();
-
-                                    if (uuid.compareTo(serviceUUID) == 0) {
-                                        continue;
-                                    }
-
-                                    synchronized (beacons) {
-                                        Beacon beacon = beacons.get(uuid);
-                                        if (beacon != null) {
-                                            beacon.alive();
-                                        } else {
-                                            beacons.put(uuid, new Beacon(uuid, rssi));
-
-                                            if (beaconCallback != null) {
-                                                beaconCallback.onFound(uuid, rssi);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            */
-
                     List<ParcelUuid> serviceUuids = record.getServiceUuids();
                     if (serviceUuids != null) {
                         EndpointID endpointID = null;

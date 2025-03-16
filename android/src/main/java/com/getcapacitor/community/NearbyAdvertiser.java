@@ -24,7 +24,7 @@ public class NearbyAdvertiser {
     private final UUID serviceUUID;
 
     @NonNull
-    private final EndpointID endpointID;
+    private final UUID endpointUUID;
 
     Integer advertiseMode = AdvertiseSettings.ADVERTISE_MODE_BALANCED;
     Integer txPowerLevel = AdvertiseSettings.ADVERTISE_TX_POWER_HIGH;
@@ -50,7 +50,7 @@ public class NearbyAdvertiser {
         this.adapter = adapter;
 
         this.serviceUUID = serviceUUID;
-        this.endpointID = endpointID;
+        this.endpointUUID = endpointID.uuid();
     }
 
     public Integer getAdvertiseMode() {
@@ -105,7 +105,6 @@ public class NearbyAdvertiser {
             .setTxPowerLevel(txPowerLevel)
             // Limit advertising to a given amount of time.
             // .setTimeout(30 * 1000)  // May not exceed 180000 milliseconds. A value of 0 will disable the time limit.
-            .setTimeout(0)
             // Set whether the advertisement type should be connectable or non-connectable.
             .setConnectable(true)
             .build();
@@ -115,12 +114,11 @@ public class NearbyAdvertiser {
         AdvertiseData.Builder builder = new AdvertiseData.Builder()
             // Add a service UUID to advertise data.
             .addServiceUuid(new ParcelUuid(serviceUUID))
+            .addServiceUuid(new ParcelUuid(endpointUUID))
             // Whether the transmission power level should be included in the advertise packet.
             .setIncludeTxPowerLevel(false)
             // Set whether the device name should be included in advertise packet.
             .setIncludeDeviceName(false);
-
-        builder.addServiceUuid(new ParcelUuid(endpointID.uuid()));
 
         if (data != null && data.length > 0) {
             UUID dataUUID = NearbyHelper.makeUUID(data);

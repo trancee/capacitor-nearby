@@ -1,9 +1,8 @@
 package com.getcapacitor.community;
 
-import static java.lang.Math.min;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Random;
@@ -99,16 +98,10 @@ public class NearbyHelper {
     }
 
     public static UUID makeUUID(byte[] data) {
-        long msb = 0;
-        long lsb = 0;
+        ByteBuffer byteBuffer = ByteBuffer.allocate(16).put(data);
 
-        assert data.length <= 16 : "data must be 16 bytes or less in length";
-
-        for (int i = 0; i < min(8, data.length); i++) msb = (msb << 8) | (data[i] & 0xff);
-
-        if (data.length >= 8) {
-            for (int i = 8; i < data.length; i++) lsb = (lsb << 8) | (data[i] & 0xff);
-        }
+        long msb = byteBuffer.getLong(0);
+        long lsb = byteBuffer.getLong(8);
 
         return new UUID(msb, lsb);
     }
@@ -117,16 +110,7 @@ public class NearbyHelper {
         long msb = uuid.getMostSignificantBits();
         long lsb = uuid.getLeastSignificantBits();
 
-        byte[] bytes = new byte[16];
-
-        for (int i = 0; i < 8; i++) {
-            bytes[i] = (byte) ((msb >> (8 * (7 - i))) & 0xff);
-        }
-        for (int i = 0; i < 8; i++) {
-            bytes[i + 8] = (byte) ((lsb >> (8 * (7 - i))) & 0xff);
-        }
-
-        return bytes;
+        return ByteBuffer.allocate(16).putLong(msb).putLong(lsb).array();
     }
 
     public static String makeString(UUID uuid) {
@@ -146,10 +130,15 @@ public class NearbyHelper {
             byte[] data = bytes();
             assert data.length == ENDPOINT_ID_LENGTH : "name must be 4 characters in length";
 
-            long msb = ((long) (data[0]) << 56) | ((long) (data[1]) << 48) | ((long) (data[2]) << 40) | ((long) (data[3]) << 32);
-            long lsb = 0L;
+            ByteBuffer byteBuffer = ByteBuffer.allocate(16).putLong(BLUETOOTH_BASE_UUID_MSB).putLong(BLUETOOTH_BASE_UUID_LSB);
 
-            return new UUID(BLUETOOTH_BASE_UUID_MSB | (msb & 0xffffffffL), BLUETOOTH_BASE_UUID_LSB | lsb);
+            byteBuffer.rewind();
+            byteBuffer.put(data);
+
+            long msb = byteBuffer.getLong(0);
+            long lsb = byteBuffer.getLong(8);
+
+            return new UUID(msb, lsb);
         }
 
         @NonNull

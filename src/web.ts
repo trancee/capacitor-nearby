@@ -9,6 +9,7 @@ import type {
   RequestConnectionOptions,
   AcceptConnectionOptions,
   RejectConnectionOptions,
+  ConnectOptions,
   DisconnectOptions,
   SendPayloadOptions,
   SendPayloadResult,
@@ -58,6 +59,10 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
   }
   async rejectConnection(options: RejectConnectionOptions): Promise<void> {
     console.info('rejectConnection', options);
+    // throw this.unimplemented('Method not implemented.');
+  }
+  async connect(options: ConnectOptions): Promise<void> {
+    console.info('connect', options);
     // throw this.unimplemented('Method not implemented.');
   }
   async disconnect(options: DisconnectOptions): Promise<void> {
