@@ -3,6 +3,7 @@ package com.getcapacitor.community;
 import static com.getcapacitor.community.NearbyHelper.BLUETOOTH_BASE_UUID_LSB;
 import static com.getcapacitor.community.NearbyHelper.BLUETOOTH_BASE_UUID_MSB;
 import static com.getcapacitor.community.NearbyHelper.EndpointID;
+import static com.getcapacitor.community.NearbyHelper.makeBytes;
 
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
@@ -18,9 +19,11 @@ import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.AdvertiseSettings;
 import android.content.Context;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresPermission;
+
 import com.getcapacitor.community.classes.Endpoint;
 import com.getcapacitor.community.classes.options.AcceptConnectionOptions;
 import com.getcapacitor.community.classes.options.CancelPayloadOptions;
@@ -34,10 +37,12 @@ import com.getcapacitor.community.classes.options.StartAdvertisingOptions;
 import com.getcapacitor.community.classes.results.InitializeResult;
 import com.getcapacitor.community.classes.results.StatusResult;
 import com.getcapacitor.community.interfaces.Callback;
+
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 
 public class Nearby {
@@ -152,6 +157,11 @@ public class Nearby {
             this.serviceUUID = new UUID(msb, lsb);
         }
 
+        @NonNull
+        String endpointID = config.getEndpointID();
+        @Nullable
+        UUID endpointUUID = EndpointID.toUUID(endpointID);
+
         //        bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         //        if (bluetoothAdapter == null) {
         //            callback.error(new Exception("no bluetooth adapter"));
@@ -164,7 +174,7 @@ public class Nearby {
         //     nearbyScanner.setScanMode(scanMode);
         // }
 
-        nearbyAdvertiser = NearbyAdvertiser.getInstance(this.bluetoothAdapter, this.serviceUUID, config.getEndpointID());
+        nearbyAdvertiser = NearbyAdvertiser.getInstance(this.bluetoothAdapter, this.serviceUUID, endpointUUID);
 
         // if (advertiseMode != null) {
         //     nearbyAdvertiser.setAdvertiseMode(advertiseMode);
@@ -175,7 +185,7 @@ public class Nearby {
 
         endpoints.clear();
 
-        InitializeResult result = new InitializeResult(config.getEndpointID());
+        InitializeResult result = new InitializeResult(endpointID);
         callback.success(result);
     }
 
@@ -214,25 +224,25 @@ public class Nearby {
         }
 
         nearbyAdvertiser.start(
-            endpointInfo,
-            new NearbyAdvertiser.Callback() {
-                @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-                @Override
-                public void onSuccess(AdvertiseSettings settings) {
-                    startGattServer();
+                endpointInfo,
+                new NearbyAdvertiser.Callback() {
+                    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                    @Override
+                    public void onSuccess(AdvertiseSettings settings) {
+                        startGattServer();
 
-                    isAdvertising = true;
+                        isAdvertising = true;
 
-                    callback.success();
+                        callback.success();
+                    }
+
+                    @Override
+                    public void onFailure(Exception exception) {
+                        isAdvertising = false;
+
+                        callback.error(exception);
+                    }
                 }
-
-                @Override
-                public void onFailure(Exception exception) {
-                    isAdvertising = false;
-
-                    callback.error(exception);
-                }
-            }
         );
     }
 
@@ -246,71 +256,85 @@ public class Nearby {
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private void startGattServer() {
         bluetoothGattServer = bluetoothManager.openGattServer(
-            context,
-            new BluetoothGattServerCallback() {
-                @Override
-                public void onConnectionStateChange(BluetoothDevice device, int status, int newState) {
-                    super.onConnectionStateChange(device, status, newState);
-                    // Handle the connection state change
+                context,
+                new BluetoothGattServerCallback() {
+                    @Override
+                    // Callback indicating when a remote device has been connected or disconnected.
+                    public void onConnectionStateChange(BluetoothDevice device, int status, int newState) {
+                        super.onConnectionStateChange(device, status, newState);
+
+                        for (Entry<String, NearbyEndpoint> entry : endpoints.entrySet()) {
+                            NearbyEndpoint endpoint = entry.getValue();
+
+                            if (endpoint.getAddress().equals(device.getAddress())) {
+                                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                                    endpoint.isConnected(true);
+                                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                                    endpoint.isConnected(false);
+                                }
+
+                                break;
+                            }
+                        }
+                    }
+
+                    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                    @Override
+                    public void onCharacteristicReadRequest(
+                            BluetoothDevice device,
+                            int requestId,
+                            int offset,
+                            BluetoothGattCharacteristic characteristic
+                    ) {
+                        super.onCharacteristicReadRequest(device, requestId, offset, characteristic);
+
+                        byte[] dataToSend = "Hello World".getBytes();
+                        bluetoothGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, dataToSend);
+                    }
+
+                    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                    @Override
+                    public void onCharacteristicWriteRequest(
+                            BluetoothDevice device,
+                            int requestId,
+                            BluetoothGattCharacteristic characteristic,
+                            boolean preparedWrite,
+                            boolean responseNeeded,
+                            int offset,
+                            byte[] value
+                    ) {
+                        super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value);
+
+                        // Handle the write request here
+                        bluetoothGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null);
+                    }
+
+                    @Override
+                    public void onDescriptorReadRequest(BluetoothDevice device, int requestId, int offset, BluetoothGattDescriptor descriptor) {
+                        super.onDescriptorReadRequest(device, requestId, offset, descriptor);
+                    }
+
+                    @Override
+                    public void onDescriptorWriteRequest(
+                            BluetoothDevice device,
+                            int requestId,
+                            BluetoothGattDescriptor descriptor,
+                            boolean preparedWrite,
+                            boolean responseNeeded,
+                            int offset,
+                            byte[] value
+                    ) {
+                        super.onDescriptorWriteRequest(device, requestId, descriptor, preparedWrite, responseNeeded, offset, value);
+                    }
                 }
-
-                @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-                @Override
-                public void onCharacteristicReadRequest(
-                    BluetoothDevice device,
-                    int requestId,
-                    int offset,
-                    BluetoothGattCharacteristic characteristic
-                ) {
-                    super.onCharacteristicReadRequest(device, requestId, offset, characteristic);
-
-                    byte[] dataToSend = "Hello World".getBytes();
-                    bluetoothGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, dataToSend);
-                }
-
-                @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-                @Override
-                public void onCharacteristicWriteRequest(
-                    BluetoothDevice device,
-                    int requestId,
-                    BluetoothGattCharacteristic characteristic,
-                    boolean preparedWrite,
-                    boolean responseNeeded,
-                    int offset,
-                    byte[] value
-                ) {
-                    super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value);
-
-                    // Handle the write request here
-                    bluetoothGattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null);
-                }
-
-                @Override
-                public void onDescriptorReadRequest(BluetoothDevice device, int requestId, int offset, BluetoothGattDescriptor descriptor) {
-                    super.onDescriptorReadRequest(device, requestId, offset, descriptor);
-                }
-
-                @Override
-                public void onDescriptorWriteRequest(
-                    BluetoothDevice device,
-                    int requestId,
-                    BluetoothGattDescriptor descriptor,
-                    boolean preparedWrite,
-                    boolean responseNeeded,
-                    int offset,
-                    byte[] value
-                ) {
-                    super.onDescriptorWriteRequest(device, requestId, descriptor, preparedWrite, responseNeeded, offset, value);
-                }
-            }
         );
 
         BluetoothGattService service = new BluetoothGattService(SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY);
 
         BluetoothGattCharacteristic characteristic = new BluetoothGattCharacteristic(
-            CHARACTERISTIC_UUID,
-            BluetoothGattCharacteristic.PROPERTY_READ | BluetoothGattCharacteristic.PROPERTY_WRITE,
-            BluetoothGattCharacteristic.PERMISSION_READ | BluetoothGattCharacteristic.PERMISSION_WRITE
+                CHARACTERISTIC_UUID,
+                BluetoothGattCharacteristic.PROPERTY_READ | BluetoothGattCharacteristic.PROPERTY_WRITE,
+                BluetoothGattCharacteristic.PERMISSION_READ | BluetoothGattCharacteristic.PERMISSION_WRITE
         );
 
         service.addCharacteristic(characteristic);
@@ -328,64 +352,78 @@ public class Nearby {
         }
 
         nearbyScanner.start(
-            new NearbyScanner.Callback() {
-                @Override
-                public void onFound(EndpointID endpointID, @Nullable byte[] endpointInfo, Integer rssi, BluetoothDevice device) {
-                    NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID.toString());
-                    if (nearbyEndpoint != null) {
-                        nearbyEndpoint.alive();
-                    } else {
-                        new NearbyEndpoint(endpointID, endpointInfo, rssi, device, () -> {
+                new NearbyScanner.Callback() {
+                    @Override
+                    public void onFound(@Nullable UUID id, @Nullable UUID info, Integer rssi, String address) {
+                        @Nullable
+                        String endpointID = EndpointID.fromUUID(id);
+                        @Nullable
+                        byte[] endpointInfo = makeBytes(info);
+
+                        if (endpointID == null)
+                            return;
+
+                        NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
+                        if (nearbyEndpoint != null) {
+                            nearbyEndpoint.alive();
+                        } else {
+                            new NearbyEndpoint(endpointID, endpointInfo, rssi, address, () -> {
+                                if (nearbyScanner.isScanning()) {
+                                    Endpoint endpoint = new Endpoint(endpointID);
+
+                                    plugin.onEndpointLost(endpoint);
+                                }
+
+                                NearbyEndpoint endpoint = endpoints.get(endpointID);
+                                if (endpoint != null) {
+                                    endpoint.kill();
+                                }
+                            });
+                            // endpoints.put(endpointID, nearbyEndpoint);
+
                             if (nearbyScanner.isScanning()) {
                                 Endpoint endpoint = new Endpoint(endpointID, endpointInfo);
 
-                                plugin.onEndpointLost(endpoint);
+                                plugin.onEndpointFound(endpoint);
                             }
-
-                            NearbyEndpoint endpoint = endpoints.get(endpointID.toString());
-                            if (endpoint != null) {
-                                endpoint.kill();
-                            }
-                        });
-                        // endpoints.put(endpointID, nearbyEndpoint);
-
-                        if (nearbyScanner.isScanning()) {
-                            Endpoint endpoint = new Endpoint(endpointID);
-
-                            plugin.onEndpointFound(endpoint);
                         }
                     }
-                }
 
-                @Override
-                public void onLost(EndpointID endpointID) {
-                    NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID.toString());
-                    if (nearbyEndpoint != null) {
-                        nearbyEndpoint.kill();
+                    @Override
+                    public void onLost(@Nullable UUID id) {
+                        @Nullable
+                        String endpointID = EndpointID.fromUUID(id);
+
+                        if (endpointID == null)
+                            return;
+
+                        NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
+                        if (nearbyEndpoint != null) {
+                            nearbyEndpoint.kill();
+                        }
+                        // endpoints.remove(endpointID);
+
+                        {
+                            Endpoint endpoint = new Endpoint(endpointID);
+
+                            plugin.onEndpointLost(endpoint);
+                        }
                     }
-                    // endpoints.remove(endpointID);
 
-                    {
-                        Endpoint endpoint = new Endpoint(endpointID);
+                    @Override
+                    public void onSuccess() {
+                        isDiscovering = true;
 
-                        plugin.onEndpointLost(endpoint);
+                        callback.success();
+                    }
+
+                    @Override
+                    public void onFailure(Exception exception) {
+                        isDiscovering = false;
+
+                        callback.error(exception);
                     }
                 }
-
-                @Override
-                public void onSuccess() {
-                    isDiscovering = true;
-
-                    callback.success();
-                }
-
-                @Override
-                public void onFailure(Exception exception) {
-                    isDiscovering = false;
-
-                    callback.error(exception);
-                }
-            }
         );
         //        connectionsClient
         //            .startDiscovery(serviceID, endpointDiscoveryCallback, discoveryOptions.build())
@@ -436,93 +474,93 @@ public class Nearby {
             return;
         }
 
-        final BluetoothDevice device = endpoint.getDevice();
+        final BluetoothDevice device = bluetoothAdapter.getRemoteDevice(endpoint.getAddress());
 
         // Connect to the GATT server
         final BluetoothGatt gatt = device.connectGatt(
-            context,
-            false,
-            new BluetoothGattCallback() {
-                @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-                @Override
-                public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-                    super.onConnectionStateChange(gatt, status, newState);
+                context,
+                false,
+                new BluetoothGattCallback() {
+                    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                    @Override
+                    public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+                        super.onConnectionStateChange(gatt, status, newState);
 
-                    if (newState == BluetoothProfile.STATE_CONNECTED) {
-                        // Attempts to discover services after successful connection.
-                        gatt.discoverServices();
+                        if (newState == BluetoothProfile.STATE_CONNECTED) {
+                            // Attempts to discover services after successful connection.
+                            gatt.discoverServices();
 
-                        plugin.onEndpointConnected(new Endpoint(endpoint.endpointID));
-                    } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                        gatt.close();
-                        endpoint.closeGatt();
+                            plugin.onEndpointConnected(new Endpoint(endpoint.endpointID));
+                        } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                            gatt.close();
+                            endpoint.closeGatt();
 
-                        plugin.onEndpointDisconnected(new Endpoint(endpoint.endpointID));
-                    }
-                }
-
-                @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-                @Override
-                public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-                    super.onServicesDiscovered(gatt, status);
-
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        // gatt.requestMtu(512); // Request a higher MTU size if needed
-
-                        byte[] data = new byte[100];
-
-                        BluetoothGattService service = gatt.getService(SERVICE_UUID);
-                        if (service != null) {
-                            BluetoothGattCharacteristic characteristic = service.getCharacteristic(CHARACTERISTIC_UUID);
-
-                            if (
-                                characteristic != null &&
-                                (characteristic.getProperties() & BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) > 0
-                            ) {
-                                characteristic.setValue(data);
-
-                                boolean success = gatt.writeCharacteristic(characteristic);
-                            }
+                            plugin.onEndpointDisconnected(new Endpoint(endpoint.endpointID));
                         }
-                    } else {
-                        // Log.w(TAG, "onServicesDiscovered received: " + status);
                     }
-                }
 
-                @Override
-                public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        //Log.d("BLE", "MTU changed to: " + mtu);
-                        // Proceed with data exchange
-                    } else {
-                        //Log.e("BLE", "Failed to change MTU");
+                    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                    @Override
+                    public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+                        super.onServicesDiscovered(gatt, status);
+
+                        if (status == BluetoothGatt.GATT_SUCCESS) {
+                            // gatt.requestMtu(512); // Request a higher MTU size if needed
+
+                            byte[] data = new byte[100];
+
+                            BluetoothGattService service = gatt.getService(SERVICE_UUID);
+                            if (service != null) {
+                                BluetoothGattCharacteristic characteristic = service.getCharacteristic(CHARACTERISTIC_UUID);
+
+                                if (
+                                        characteristic != null &&
+                                                (characteristic.getProperties() & BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) > 0
+                                ) {
+                                    characteristic.setValue(data);
+
+                                    boolean success = gatt.writeCharacteristic(characteristic);
+                                }
+                            }
+                        } else {
+                            // Log.w(TAG, "onServicesDiscovered received: " + status);
+                        }
                     }
-                }
 
-                @Override
-                public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                    @Override
+                    public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
+                        if (status == BluetoothGatt.GATT_SUCCESS) {
+                            //Log.d("BLE", "MTU changed to: " + mtu);
+                            // Proceed with data exchange
+                        } else {
+                            //Log.e("BLE", "Failed to change MTU");
+                        }
+                    }
+
+                    @Override
+                    public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+                        if (status == BluetoothGatt.GATT_SUCCESS) {
+                            byte[] data = characteristic.getValue();
+                            // Log.d(TAG, "onCharacteristicRead: " + new String(data));
+                        }
+                    }
+
+                    @Override
+                    public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+                        if (status == BluetoothGatt.GATT_SUCCESS) {
+                            byte[] data = characteristic.getValue();
+                            // Log.d(TAG, "onCharacteristicWrite: " + new String(data));
+                        }
+                    }
+
+                    @Override
+                    public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+                        final int format = BluetoothGattCharacteristic.FORMAT_UINT8;
+                        final int offset = 0;
                         byte[] data = characteristic.getValue();
-                        // Log.d(TAG, "onCharacteristicRead: " + new String(data));
+                        // Log.d(TAG, "onCharacteristicChanged: " + new String(data));
                     }
                 }
-
-                @Override
-                public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        byte[] data = characteristic.getValue();
-                        // Log.d(TAG, "onCharacteristicWrite: " + new String(data));
-                    }
-                }
-
-                @Override
-                public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-                    final int format = BluetoothGattCharacteristic.FORMAT_UINT8;
-                    final int offset = 0;
-                    byte[] data = characteristic.getValue();
-                    // Log.d(TAG, "onCharacteristicChanged: " + new String(data));
-                }
-            }
         );
 
         endpoint.setGatt(gatt);
@@ -699,7 +737,6 @@ public class Nearby {
     private void stop() {
         stopAdvertising();
         stopDiscovering();
-
         // connectionsClient.stopAllEndpoints();
     }
     /**

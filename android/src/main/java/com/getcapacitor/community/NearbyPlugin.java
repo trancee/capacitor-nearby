@@ -127,6 +127,7 @@ public class NearbyPlugin extends Plugin {
      * Reset
      */
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @PluginMethod
     public void reset(PluginCall call) {
         Callback callback = new Callback(call) {};
@@ -155,6 +156,7 @@ public class NearbyPlugin extends Plugin {
         }
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @PluginMethod
     public void stopAdvertising(PluginCall call) {
         Callback callback = new Callback(call) {};
@@ -249,6 +251,7 @@ public class NearbyPlugin extends Plugin {
         }
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @PluginMethod
     public void disconnect(PluginCall call) {
         Callback callback = new Callback(call) {};

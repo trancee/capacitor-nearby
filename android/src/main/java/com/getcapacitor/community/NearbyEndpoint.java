@@ -1,10 +1,8 @@
 package com.getcapacitor.community;
 
 import static com.getcapacitor.community.Nearby.endpoints;
-import static com.getcapacitor.community.NearbyHelper.EndpointID;
 
 import android.Manifest;
-import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.os.Handler;
 import androidx.annotation.NonNull;
@@ -13,18 +11,22 @@ import androidx.annotation.RequiresPermission;
 
 public class NearbyEndpoint {
 
-    EndpointID endpointID;
+    @NonNull
+    String endpointID;
 
     @Nullable
     byte[] endpointInfo;
 
+    @Nullable
     Integer rssi;
 
     @NonNull
-    private final BluetoothDevice device;
+    private final String address;
 
     @Nullable
     private BluetoothGatt gatt;
+
+    private boolean isConnected;
 
     long timestamp;
 
@@ -36,17 +38,19 @@ public class NearbyEndpoint {
     public static long ttlSeconds = 10;
 
     public NearbyEndpoint(
-        EndpointID endpointID,
+        @NonNull String endpointID,
         @Nullable byte[] endpointInfo,
-        Integer rssi,
-        @NonNull final BluetoothDevice device,
+        @Nullable Integer rssi,
+        @NonNull String address,
         final Runnable runnable
     ) {
         this.endpointID = endpointID;
         this.endpointInfo = endpointInfo;
 
         this.rssi = rssi;
-        this.device = device;
+        this.address = address;
+
+        this.isConnected = false;
 
         this.runnable = runnable;
 
@@ -55,21 +59,21 @@ public class NearbyEndpoint {
         lastSeen = System.currentTimeMillis();
         handler.postDelayed(runnable, ttlSeconds * 1000);
 
-        endpoints.put(endpointID.toString(), this);
+        endpoints.put(endpointID, this);
     }
 
     public void kill() {
         handler.removeCallbacks(runnable);
 
         // Kill yourself.
-        endpoints.remove(endpointID.toString());
+        endpoints.remove(endpointID);
     }
 
     public void alive() {
         handler.removeCallbacks(runnable);
 
         // Check if we are still alive.
-        if (endpoints.containsKey(endpointID.toString())) {
+        if (endpoints.containsKey(endpointID)) {
             lastSeen = System.currentTimeMillis();
             handler.postDelayed(runnable, ttlSeconds * 1000);
         }
@@ -89,12 +93,17 @@ public class NearbyEndpoint {
     }
 
     @NonNull
-    public BluetoothDevice getDevice() {
-        return device;
+    public String getAddress() {
+        return address;
     }
 
     @Nullable
     public BluetoothGatt getGatt() {
         return gatt;
     }
+
+    public void isConnected(boolean isConnected) {
+        this.isConnected = isConnected;
+    }
+    public boolean isConnected() { return isConnected; }
 }

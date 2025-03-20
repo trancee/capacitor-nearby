@@ -9,9 +9,9 @@ import com.getcapacitor.community.interfaces.Result;
 public class InitializeResult implements Result {
 
     @NonNull
-    private final EndpointID endpointID;
+    final String endpointID;
 
-    public InitializeResult(@NonNull EndpointID endpointID) {
+    public InitializeResult(@NonNull String endpointID) {
         this.endpointID = endpointID;
     }
 

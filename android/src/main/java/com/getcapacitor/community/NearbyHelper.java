@@ -5,6 +5,7 @@ import androidx.annotation.Nullable;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
 
@@ -57,26 +58,6 @@ public class NearbyHelper {
         '0'
     };
 
-    public static EndpointID generateEndpointID(@Nullable byte[] name) {
-        StringBuilder endpointID = new StringBuilder(ENDPOINT_ID_LENGTH);
-
-        byte[] input = new byte[1 + (name != null ? name.length : 0)];
-
-        input[0] = (byte) (random.nextInt() & 0xff);
-
-        if (name != null) {
-            System.arraycopy(name, 0, input, 1, name.length);
-        }
-
-        byte[] data = hash(input, ENDPOINT_ID_LENGTH);
-
-        for (byte c : data) {
-            endpointID.append(kEndpointIdChars[(c & 0xff) % kEndpointIdChars.length]);
-        }
-
-        return new EndpointID(endpointID.toString());
-    }
-
     public static byte[] hash(byte[] data, Integer length) {
         byte[] output = new byte[0];
 
@@ -93,11 +74,11 @@ public class NearbyHelper {
         }
     }
 
-    public static UUID makeUUID(String data) {
-        return makeUUID(data.getBytes());
-    }
+    @Nullable
+    public static UUID makeUUID(@Nullable byte[] data) {
+        if (data == null)
+            return null;
 
-    public static UUID makeUUID(byte[] data) {
         ByteBuffer byteBuffer = ByteBuffer.allocate(16).put(data);
 
         long msb = byteBuffer.getLong(0);
@@ -106,28 +87,37 @@ public class NearbyHelper {
         return new UUID(msb, lsb);
     }
 
-    public static byte[] makeBytes(UUID uuid) {
+    @Nullable
+    public static byte[] makeBytes(@Nullable UUID uuid) {
+        if (uuid == null)
+            return null;
+
         long msb = uuid.getMostSignificantBits();
         long lsb = uuid.getLeastSignificantBits();
 
         return ByteBuffer.allocate(16).putLong(msb).putLong(lsb).array();
     }
 
-    public static String makeString(UUID uuid) {
-        return new String(makeBytes(uuid));
-    }
+    public record EndpointID() {
+        @Nullable
+        public static String fromUUID(@Nullable UUID uuid) {
+            if (uuid == null)
+                return null;
 
-    public record EndpointID(@NonNull String name) {
-        public EndpointID {
-            if (name.length() > 4) name = name.substring(0, 4);
+            byte[] array = makeBytes(uuid);
+
+            if (array == null)
+                return null;
+
+            return new String(Arrays.copyOfRange(array, 0, ENDPOINT_ID_LENGTH));
         }
 
-        public byte[] bytes() {
-            return name.getBytes();
-        }
+        @Nullable
+        public static UUID toUUID(@Nullable String id) {
+            if (id == null)
+                return null;
 
-        public UUID uuid() {
-            byte[] data = bytes();
+            byte[] data = id.getBytes();
             assert data.length == ENDPOINT_ID_LENGTH : "name must be 4 characters in length";
 
             ByteBuffer byteBuffer = ByteBuffer.allocate(16).putLong(BLUETOOTH_BASE_UUID_MSB).putLong(BLUETOOTH_BASE_UUID_LSB);
@@ -142,9 +132,24 @@ public class NearbyHelper {
         }
 
         @NonNull
-        @Override
-        public String toString() {
-            return name;
+        public static String fromBytes(@Nullable byte[] name) {
+            StringBuilder endpointID = new StringBuilder(ENDPOINT_ID_LENGTH);
+
+            byte[] input = new byte[1 + (name != null ? name.length : 0)];
+
+            input[0] = (byte) (random.nextInt() & 0xff);
+
+            if (name != null) {
+                System.arraycopy(name, 0, input, 1, name.length);
+            }
+
+            byte[] data = hash(input, ENDPOINT_ID_LENGTH);
+
+            for (byte c : data) {
+                endpointID.append(kEndpointIdChars[(c & 0xff) % kEndpointIdChars.length]);
+            }
+
+            return endpointID.toString();
         }
     }
 }

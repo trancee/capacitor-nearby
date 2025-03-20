@@ -1,13 +1,14 @@
 package com.getcapacitor.community;
 
 import static com.getcapacitor.community.NearbyHelper.EndpointID;
-import static com.getcapacitor.community.NearbyHelper.generateEndpointID;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 public class NearbyConfig {
 
-    static EndpointID endpointID;
+    @NonNull
+    final String endpointID;
 
     @Nullable
     byte[] endpointInfo;
@@ -19,7 +20,7 @@ public class NearbyConfig {
         this.endpointInfo = endpointInfo;
         this.serviceID = serviceID;
 
-        endpointID = generateEndpointID(endpointInfo);
+        endpointID = EndpointID.fromBytes(endpointInfo);
     }
 
     public void setEndpointInfo(@Nullable byte[] endpointInfo) {
@@ -40,7 +41,8 @@ public class NearbyConfig {
         return serviceID;
     }
 
-    EndpointID getEndpointID() {
+    @NonNull
+    String getEndpointID() {
         return endpointID;
     }
 }
