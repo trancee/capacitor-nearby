@@ -2,13 +2,16 @@ package com.getcapacitor.community;
 
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.le.AdvertiseCallback;
 import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeAdvertiser;
+import android.os.Build;
 import android.os.ParcelUuid;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 
 public class NearbyAdvertiser {
@@ -18,8 +21,14 @@ public class NearbyAdvertiser {
     @NonNull
     private final BluetoothAdapter adapter;
 
+    @Nullable
+    private BluetoothServerSocket socket;
+
     @NonNull
     private final UUID serviceUUID;
+
+    @NonNull
+    private final String endpointName;
 
     @Nullable
     private final UUID endpointUUID;
@@ -35,23 +44,27 @@ public class NearbyAdvertiser {
     public static synchronized NearbyAdvertiser getInstance(
         @NonNull BluetoothAdapter adapter,
         @NonNull UUID serviceUUID,
-        @Nullable  UUID endpointUUID
+        @NonNull String endpointName,
+        @Nullable UUID endpointUUID
     ) {
         if (instance == null) {
-            instance = new NearbyAdvertiser(adapter, serviceUUID, endpointUUID);
+            instance = new NearbyAdvertiser(adapter, serviceUUID, endpointName, endpointUUID);
         }
 
         return instance;
     }
 
     NearbyAdvertiser(
-            @NonNull BluetoothAdapter adapter,
-            @NonNull UUID serviceUUID,
-            @Nullable UUID endpointUUID
+        @NonNull BluetoothAdapter adapter,
+        @NonNull UUID serviceUUID,
+        @NonNull String endpointName,
+        @Nullable UUID endpointUUID
     ) {
         this.adapter = adapter;
 
         this.serviceUUID = serviceUUID;
+
+        this.endpointName = endpointName;
         this.endpointUUID = endpointUUID;
     }
 
@@ -83,6 +96,29 @@ public class NearbyAdvertiser {
     public void start(@Nullable byte[] data, Callback callback) {
         if (isAdvertising) {
             stop();
+        }
+
+        @Nullable
+        Short channel = null;
+
+        try {
+            if (socket != null) {
+                socket.close();
+                socket = null;
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // L2CAP (>= Android 10)
+                socket = adapter.listenUsingL2capChannel();
+                channel = (short) socket.getPsm();
+            } else {
+                // RFCOMM (< Android 10)
+                socket = adapter.listenUsingInsecureRfcommWithServiceRecord(endpointName, endpointUUID);
+                // socket = adapter.listenUsingRfcommWithServiceRecord(endpointName, endpointUUID);
+            }
+        } catch (Exception exception) {
+            callback.onFailure(exception);
+            return;
         }
 
         advertiser = adapter.getBluetoothLeAdvertiser();
@@ -123,6 +159,16 @@ public class NearbyAdvertiser {
 
         if (endpointUUID != null) {
             builder.addServiceUuid(new ParcelUuid(endpointUUID));
+        }
+
+        if (channel != null) {
+            ByteBuffer uuid = ByteBuffer.allocate(4);
+            uuid.putChar('\u4348');
+            uuid.putShort(channel);
+
+            UUID channelUUID = NearbyHelper.makeUUID(uuid.array(), true);
+
+            builder.addServiceUuid(new ParcelUuid(channelUUID));
         }
 
         if (data != null && data.length > 0) {
@@ -189,6 +235,13 @@ public class NearbyAdvertiser {
             advertiseCallback = null;
         }
 
+        try {
+            if (socket != null) {
+                socket.close();
+                socket = null;
+            }
+        } catch (Exception ignored) {}
+
         isAdvertising = false;
     }
 
@@ -217,10 +270,8 @@ public class NearbyAdvertiser {
 
     public abstract static class Callback {
 
-        public void onSuccess(AdvertiseSettings settings) {
-        }
+        public void onSuccess(AdvertiseSettings settings) {}
 
-        public void onFailure(Exception exception) {
-        }
+        public void onFailure(Exception exception) {}
     }
 }

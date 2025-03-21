@@ -8,7 +8,10 @@ import androidx.annotation.Nullable;
 public class NearbyConfig {
 
     @NonNull
-    final String endpointID;
+    String endpointID;
+
+    @Nullable
+    String endpointName;
 
     @Nullable
     byte[] endpointInfo;
@@ -16,11 +19,17 @@ public class NearbyConfig {
     @Nullable
     String serviceID;
 
-    public NearbyConfig(@Nullable byte[] endpointInfo, @Nullable String serviceID) {
-        this.endpointInfo = endpointInfo;
-        this.serviceID = serviceID;
+    public NearbyConfig(@Nullable String endpointName, @Nullable byte[] endpointInfo, @Nullable String serviceID) {
+        this.setEndpointName(endpointName);
+        this.setEndpointInfo(endpointInfo);
 
-        endpointID = EndpointID.fromBytes(endpointInfo);
+        this.setServiceID(serviceID);
+    }
+
+    public void setEndpointName(@Nullable String endpointName) {
+        this.endpointName = endpointName;
+
+        endpointID = EndpointID.fromString(endpointName);
     }
 
     public void setEndpointInfo(@Nullable byte[] endpointInfo) {
@@ -29,6 +38,11 @@ public class NearbyConfig {
 
     public void setServiceID(@Nullable String serviceID) {
         this.serviceID = serviceID;
+    }
+
+    @Nullable
+    public String getEndpointName() {
+        return endpointName;
     }
 
     @Nullable

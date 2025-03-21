@@ -9,10 +9,18 @@ declare module '@capacitor/cli' {
      */
     Nearby?: {
       /**
-       * Identifing information about this endpoint.
+       * A human readable name for this endpoint, to appear on the remote device.
        *
        * @since 4.1.0
        * @example "My App"
+       */
+      endpointName?: string;
+      /**
+       * Identifing information about this endpoint, to appear on the remote device.
+       *
+       * @since 4.1.0
+       * @type Base64 encoded string
+       * @example "TXkgQXBw"
        */
       endpointInfo?: string;
 
@@ -246,6 +254,12 @@ export interface Endpoint {
   endpointID: EndpointID;
 
   /**
+   * A human readable name for this endpoint.
+   *
+   * @since 4.1.0
+   */
+  endpointName?: string;
+  /**
    * Identifing information about this endpoint.
    *
    * @since 4.1.0
@@ -410,7 +424,14 @@ export interface PayloadTransferUpdate {
 
 export interface InitializeOptions {
   /**
-   * Identifing information about this endpoint.
+   * A human readable name for this endpoint, to appear on the remote device.
+   *
+   * @since 4.1.0
+   * @example "My App"
+   */
+  endpointName?: string;
+  /**
+   * Identifing information about this endpoint, to appear on the remote device.
    *
    * @since 4.1.0
    * @example "My App"

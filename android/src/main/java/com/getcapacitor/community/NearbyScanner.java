@@ -11,10 +11,9 @@ import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.os.Handler;
 import android.os.ParcelUuid;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -28,6 +27,7 @@ public class NearbyScanner {
 
     @NonNull
     private final UUID serviceUUID;
+
     @NonNull
     private final UUID serviceMask;
 
@@ -39,9 +39,9 @@ public class NearbyScanner {
     private boolean isScanning;
 
     public static synchronized NearbyScanner getInstance(
-            @NonNull BluetoothAdapter adapter,
-            @NonNull UUID serviceUUID,
-            @NonNull UUID serviceMask
+        @NonNull BluetoothAdapter adapter,
+        @NonNull UUID serviceUUID,
+        @NonNull UUID serviceMask
     ) {
         if (instance == null) {
             instance = new NearbyScanner(adapter, serviceUUID, serviceMask);
@@ -50,11 +50,7 @@ public class NearbyScanner {
         return instance;
     }
 
-    NearbyScanner(
-            @NonNull BluetoothAdapter adapter,
-            @NonNull UUID serviceUUID,
-            @NonNull UUID serviceMask
-    ) {
+    NearbyScanner(@NonNull BluetoothAdapter adapter, @NonNull UUID serviceUUID, @NonNull UUID serviceMask) {
         this.adapter = adapter;
 
         this.serviceUUID = serviceUUID;
@@ -100,9 +96,9 @@ public class NearbyScanner {
 
         // https://developer.android.com/reference/android/bluetooth/le/ScanSettings.Builder
         ScanSettings settings = new ScanSettings.Builder()
-                // Set scan mode for Bluetooth LE scan.
-                .setScanMode(scanMode)
-                .build();
+            // Set scan mode for Bluetooth LE scan.
+            .setScanMode(scanMode)
+            .build();
 
         if (scanCallback == null) {
             // Bluetooth LE scan callbacks. Scan results are reported using these callbacks.
@@ -122,18 +118,37 @@ public class NearbyScanner {
                     BluetoothDevice device = result.getDevice();
                     if (device == null) return;
 
-                    String address = device.getAddress();
+                    // String address = device.getAddress();
 
                     List<ParcelUuid> serviceUuids = record.getServiceUuids();
                     if (serviceUuids != null) {
+                        @Nullable
                         UUID id = null;
+                        @Nullable
                         UUID info = null;
+                        @Nullable
+                        Short channel = null;
 
                         for (ParcelUuid serviceUuid : serviceUuids) {
                             UUID uuid = serviceUuid.getUuid();
 
                             if (uuid.compareTo(serviceUUID) == 0) {
                                 continue;
+                            }
+
+                            if (
+                                ((uuid.getMostSignificantBits() >>> 56) & 0xff) == 'C' &&
+                                ((uuid.getMostSignificantBits() >>> 48) & 0xff) == 'H'
+                            ) {
+                                long msb = uuid.getMostSignificantBits();
+
+                                ByteBuffer buffer = ByteBuffer.allocate(8);
+                                buffer.putLong(msb);
+
+                                if (buffer.getChar() == '\u4348') {
+                                    channel = buffer.getShort();
+                                    continue;
+                                }
                             }
 
                             if (id == null) {
@@ -146,7 +161,7 @@ public class NearbyScanner {
                         }
 
                         if (callback != null) {
-                            callback.onFound(id, info, rssi, address);
+                            callback.onFound(id, info, channel, rssi, device);
                         }
                     }
                 }
@@ -182,14 +197,14 @@ public class NearbyScanner {
 
         Handler handler = new Handler();
         handler.postDelayed(
-                () -> {
-                    if (isScanning) {
-                        if (callback != null) {
-                            callback.onSuccess();
-                        }
+            () -> {
+                if (isScanning) {
+                    if (callback != null) {
+                        callback.onSuccess();
                     }
-                },
-                100
+                }
+            },
+            100
         );
     }
 
@@ -216,18 +231,12 @@ public class NearbyScanner {
 
     private String scanFailed(int errorCode) {
         return switch (errorCode) {
-            case ScanCallback.SCAN_FAILED_ALREADY_STARTED ->
-                    "Failed to start scan as BLE scan with the same settings is already started by the app.";
-            case ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED ->
-                    "Failed to start scan as app cannot be registered.";
-            case ScanCallback.SCAN_FAILED_INTERNAL_ERROR ->
-                    "Failed to start scan due an internal error.";
-            case ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED ->
-                    "Failed to start power optimized scan as this feature is not supported.";
-            case ScanCallback.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES ->
-                    "Failed to start scan as it is out of hardware resources.";
-            case ScanCallback.SCAN_FAILED_SCANNING_TOO_FREQUENTLY ->
-                    "Failed to start scan as application tries to scan too frequently.";
+            case ScanCallback.SCAN_FAILED_ALREADY_STARTED -> "Failed to start scan as BLE scan with the same settings is already started by the app.";
+            case ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> "Failed to start scan as app cannot be registered.";
+            case ScanCallback.SCAN_FAILED_INTERNAL_ERROR -> "Failed to start scan due an internal error.";
+            case ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED -> "Failed to start power optimized scan as this feature is not supported.";
+            case ScanCallback.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES -> "Failed to start scan as it is out of hardware resources.";
+            case ScanCallback.SCAN_FAILED_SCANNING_TOO_FREQUENTLY -> "Failed to start scan as application tries to scan too frequently.";
             default -> "Unknown error.";
         };
     }
@@ -238,16 +247,12 @@ public class NearbyScanner {
 
     public abstract static class Callback {
 
-        public void onFound(@Nullable UUID id, @Nullable UUID info, Integer rssi, String address) {
-        }
+        public void onFound(@Nullable UUID id, @Nullable UUID info, @Nullable Short channel, Integer rssi, BluetoothDevice device) {}
 
-        public void onLost(@Nullable UUID id) {
-        }
+        public void onLost(@Nullable UUID id) {}
 
-        public void onSuccess() {
-        }
+        public void onSuccess() {}
 
-        public void onFailure(Exception exception) {
-        }
+        public void onFailure(Exception exception) {}
     }
 }

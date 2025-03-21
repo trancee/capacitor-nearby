@@ -76,10 +76,21 @@ public class NearbyHelper {
 
     @Nullable
     public static UUID makeUUID(@Nullable byte[] data) {
-        if (data == null)
-            return null;
+        return makeUUID(data, false);
+    }
 
-        ByteBuffer byteBuffer = ByteBuffer.allocate(16).put(data);
+    @Nullable
+    public static UUID makeUUID(@Nullable byte[] data, boolean withBase) {
+        if (data == null) return null;
+
+        ByteBuffer byteBuffer = ByteBuffer.allocate(16);
+
+        if (withBase && data.length <= 8) {
+            byteBuffer.putLong(BLUETOOTH_BASE_UUID_MSB).putLong(BLUETOOTH_BASE_UUID_LSB);
+            byteBuffer.rewind();
+        }
+
+        byteBuffer.put(data);
 
         long msb = byteBuffer.getLong(0);
         long lsb = byteBuffer.getLong(8);
@@ -89,8 +100,7 @@ public class NearbyHelper {
 
     @Nullable
     public static byte[] makeBytes(@Nullable UUID uuid) {
-        if (uuid == null)
-            return null;
+        if (uuid == null) return null;
 
         long msb = uuid.getMostSignificantBits();
         long lsb = uuid.getLeastSignificantBits();
@@ -101,21 +111,18 @@ public class NearbyHelper {
     public record EndpointID() {
         @Nullable
         public static String fromUUID(@Nullable UUID uuid) {
-            if (uuid == null)
-                return null;
+            if (uuid == null) return null;
 
             byte[] array = makeBytes(uuid);
 
-            if (array == null)
-                return null;
+            if (array == null) return null;
 
             return new String(Arrays.copyOfRange(array, 0, ENDPOINT_ID_LENGTH));
         }
 
         @Nullable
         public static UUID toUUID(@Nullable String id) {
-            if (id == null)
-                return null;
+            if (id == null) return null;
 
             byte[] data = id.getBytes();
             assert data.length == ENDPOINT_ID_LENGTH : "name must be 4 characters in length";
@@ -129,6 +136,11 @@ public class NearbyHelper {
             long lsb = byteBuffer.getLong(8);
 
             return new UUID(msb, lsb);
+        }
+
+        @NonNull
+        public static String fromString(@Nullable String name) {
+            return fromBytes(name != null ? name.getBytes() : null);
         }
 
         @NonNull

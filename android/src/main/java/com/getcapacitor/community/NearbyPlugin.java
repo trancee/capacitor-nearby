@@ -269,6 +269,7 @@ public class NearbyPlugin extends Plugin {
      * Payload
      */
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @PluginMethod
     public void sendPayload(PluginCall call) {
         Callback callback = new Callback(call) {};
@@ -410,6 +411,8 @@ public class NearbyPlugin extends Plugin {
 
     private NearbyConfig getNearbyConfig() {
         @Nullable
+        String endpointName = getConfig().getString("endpointName");
+        @Nullable
         byte[] endpointInfo = null;
 
         @Nullable
@@ -425,7 +428,7 @@ public class NearbyPlugin extends Plugin {
         @Nullable
         String serviceID = getConfig().getString("serviceID");
 
-        return new NearbyConfig(endpointInfo, serviceID);
+        return new NearbyConfig(endpointName, endpointInfo, serviceID);
     }
 
     /**

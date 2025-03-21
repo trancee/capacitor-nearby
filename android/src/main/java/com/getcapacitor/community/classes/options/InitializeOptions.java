@@ -8,12 +8,23 @@ import com.getcapacitor.community.NearbyConfig;
 public class InitializeOptions {
 
     @Nullable
+    private String endpointName;
+
+    @Nullable
     private byte[] endpointInfo;
 
     @Nullable
     private String serviceID;
 
     public InitializeOptions(PluginCall call, NearbyConfig config) {
+        @Nullable
+        String endpointName = call.getString("endpointName");
+        if (endpointName != null && !endpointName.isEmpty()) {
+            config.setEndpointName(endpointName);
+        }
+
+        this.setEndpointName(endpointName);
+
         @Nullable
         byte[] endpointInfo = null;
 
@@ -38,12 +49,21 @@ public class InitializeOptions {
         this.setServiceID(serviceID);
     }
 
+    public void setEndpointName(@Nullable String endpointName) {
+        this.endpointName = endpointName;
+    }
+
     public void setEndpointInfo(@Nullable byte[] endpointInfo) {
         this.endpointInfo = endpointInfo;
     }
 
     public void setServiceID(@Nullable String serviceID) {
         this.serviceID = serviceID;
+    }
+
+    @Nullable
+    public String getEndpointName() {
+        return endpointName;
     }
 
     @Nullable

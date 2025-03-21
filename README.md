@@ -64,7 +64,8 @@ These configuration values are available:
 
 | Prop               | Type                                            | Description                                                                                                                                                                                             | Since |
 | ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| **`endpointInfo`** | <code>string</code>                             | Identifing information about this endpoint.                                                                                                                                                             | 4.1.0 |
+| **`endpointName`** | <code>string</code>                             | A human readable name for this endpoint, to appear on the remote device.                                                                                                                                | 4.1.0 |
+| **`endpointInfo`** | <code>string</code>                             | Identifing information about this endpoint, to appear on the remote device.                                                                                                                             | 4.1.0 |
 | **`serviceID`**    | <code><a href="#serviceid">ServiceID</a></code> | An identifier to advertise your app to other endpoints. The `serviceID` value must uniquely identify your app. As a best practice, use the package name of your app (for example, `com.example.myapp`). | 4.1.0 |
 
 ### Examples
@@ -75,7 +76,8 @@ In `capacitor.config.json`:
 {
   "plugins": {
     "Nearby": {
-      "endpointInfo": "My App",
+      "endpointName": "My App",
+      "endpointInfo": "TXkgQXBw",
       "serviceID": "com.example.myapp"
     }
   }
@@ -92,7 +94,8 @@ import { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   plugins: {
     Nearby: {
-      endpointInfo: "My App",
+      endpointName: "My App",
+      endpointInfo: "TXkgQXBw",
       serviceID: "com.example.myapp",
     },
   },
@@ -635,7 +638,8 @@ Called with progress information about an active <a href="#payload">`Payload`</a
 
 | Prop               | Type                                            | Description                                                                                                                                                                                             | Since |
 | ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| **`endpointInfo`** | <code>string</code>                             | Identifing information about this endpoint.                                                                                                                                                             | 4.1.0 |
+| **`endpointName`** | <code>string</code>                             | A human readable name for this endpoint, to appear on the remote device.                                                                                                                                | 4.1.0 |
+| **`endpointInfo`** | <code>string</code>                             | Identifing information about this endpoint, to appear on the remote device.                                                                                                                             | 4.1.0 |
 | **`serviceID`**    | <code><a href="#serviceid">ServiceID</a></code> | An identifier to advertise your app to other endpoints. The `serviceID` value must uniquely identify your app. As a best practice, use the package name of your app (for example, `com.example.myapp`). | 4.1.0 |
 
 
@@ -741,6 +745,7 @@ Called with progress information about an active <a href="#payload">`Payload`</a
 | Prop               | Type                                              | Description                                        | Since |
 | ------------------ | ------------------------------------------------- | -------------------------------------------------- | ----- |
 | **`endpointID`**   | <code><a href="#endpointid">EndpointID</a></code> | The ID of the remote endpoint that was discovered. | 4.1.0 |
+| **`endpointName`** | <code>string</code>                               | A human readable name for this endpoint.           | 4.1.0 |
 | **`endpointInfo`** | <code>string</code>                               | Identifing information about this endpoint.        | 4.1.0 |
 
 
