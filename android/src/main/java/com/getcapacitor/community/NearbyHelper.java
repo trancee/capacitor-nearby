@@ -98,14 +98,19 @@ public class NearbyHelper {
         return new UUID(msb, lsb);
     }
 
+    @NonNull
+    public static ByteBuffer makeBuffer(@NonNull UUID uuid) {
+        long msb = uuid.getMostSignificantBits();
+        long lsb = uuid.getLeastSignificantBits();
+
+        return ByteBuffer.allocate(16).putLong(msb).putLong(lsb);
+    }
+
     @Nullable
     public static byte[] makeBytes(@Nullable UUID uuid) {
         if (uuid == null) return null;
 
-        long msb = uuid.getMostSignificantBits();
-        long lsb = uuid.getLeastSignificantBits();
-
-        return ByteBuffer.allocate(16).putLong(msb).putLong(lsb).array();
+        return makeBuffer(uuid).array();
     }
 
     public record EndpointID() {
@@ -114,8 +119,6 @@ public class NearbyHelper {
             if (uuid == null) return null;
 
             byte[] array = makeBytes(uuid);
-
-            if (array == null) return null;
 
             return new String(Arrays.copyOfRange(array, 0, ENDPOINT_ID_LENGTH));
         }

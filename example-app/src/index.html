@@ -8,95 +8,185 @@
     content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="format-detection" content="telephone=no" />
   <style>
-    html,
     body {
-      height: 100%;
+      margin: 0;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    p {
+      margin-block-start: 0.5em;
+    }
+
+    p:empty {
+      display: none;
+    }
+
+    fieldset {
+      position: relative;
+    }
+
+    fieldset+fieldset {
+      margin-top: 0.25em;
+    }
+
+    legend:empty {
+      display: none;
+    }
+
+    select,
+    textarea,
+    input {
+      width: -webkit-fill-available;
+    }
+
+    button {
+      width: calc(100% - 2.75em);
+    }
+
+    .half {
+      width: 50%;
+      float: left;
+    }
+
+    .full {
+      width: 100%;
+    }
+
+    .float {
+      width: initial;
+      position: absolute;
+      bottom: 0.75em;
+      right: 0.75em;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: row;
+    }
+
+    .notification {
+      display: flex;
+      flex-direction: column;
     }
   </style>
 </head>
 
 <body>
   <main>
-    <h1>Capacitor Test Plugin Project</h1>
-    <p>
-      This project can be used to test out the functionality of your plugin. Nothing in the
-      <em>example-app/</em> folder will be published to npm when using this template, so you can create away!
-    </p>
+    <h1>Capacitor Nearby Plugin</h1>
 
-    <div style="width: 50%; float: left;">
-      <fieldset>
-        <legend>Initializes Nearby for advertising and discovering of endpoints.</legend>
-        <label for="initialize-endpointInfo">Identifing information about this endpoint.</label><br>
-        <input type="text" id="initialize-endpointInfo" name="initialize-endpointInfo" value="My App" /><br>
-        <label for="initialize-serviceID">An identifier to advertise your app to other endpoints.</label><br>
-        <input type="text" id="initialize-serviceID" name="initialize-serviceID" value="com.example.myapp" /><br>
-        <button onclick="testInitialize()">Initialize</button>
-      </fieldset>
+    <div class="container">
+      <div style="flex: 1;">
+        <fieldset>
+          <legend title="Initializes Nearby for advertising and discovering of endpoints."></legend>
+          <button onclick="toggle(this)" class="float">▼</button>
+          <p style="display: none;">
+            <label for="initialize-endpointName">A human readable name for this endpoint.</label><br>
+            <input type="text" id="initialize-endpointName" name="initialize-endpointName" value="My App" /><br>
+            <label for="initialize-endpointInfo">Identifing information about this endpoint.</label><br>
+            <input type="text" id="initialize-endpointInfo" name="initialize-endpointInfo" value="TXkgQXBw" /><br>
+            <label for="initialize-serviceID">An identifier to advertise your app to other endpoints.</label><br>
+            <input type="text" id="initialize-serviceID" name="initialize-serviceID" value="com.example.myapp" /><br>
+          </p>
+          <button onclick="testInitialize()">Initialize</button>
+        </fieldset>
 
-      <fieldset>
-        <legend>Stops and resets advertising and discovering of endpoints.</legend>
-        <button onclick="testReset()">Reset</button>
-      </fieldset>
+        <fieldset>
+          <legend title="Stops and resets advertising and discovering of endpoints."></legend>
+          <button onclick="toggle(this)" class="float">▼</button>
+          <p style="display: none;"></p>
+          <button onclick="testReset()">Reset</button>
+        </fieldset>
 
-      <hr>
+        <hr>
 
-      <fieldset>
-        <legend>Starts advertising an endpoint for a local app.</legend>
-        <label for="startAdvertising-endpointInfo">Identifing information about this endpoint.</label><br>
-        <input type="text" id="startAdvertising-endpointInfo" name="startAdvertising-endpointInfo" value="" /><br>
-        <button onclick="testStartAdvertising()">Start Advertising</button>
-      </fieldset>
+        <fieldset>
+          <legend title="Starts advertising an endpoint for a local app."></legend>
+          <button onclick="toggle(this)" class="float">▼</button>
+          <p style="display: none;">
+            <label for="startAdvertising-endpointInfo">Identifing information about this endpoint.</label><br>
+            <input type="text" id="startAdvertising-endpointInfo" name="startAdvertising-endpointInfo" value="" /><br>
+          </p>
+          <button onclick="testStartAdvertising()">Start Advertising</button>
+        </fieldset>
 
-      <fieldset>
-        <legend>Stops advertising a local endpoint.</legend>
-        <button onclick="testStopAdvertising()">Stop Advertising</button>
-      </fieldset>
+        <fieldset>
+          <legend title="Stops advertising a local endpoint."></legend>
+          <button onclick="toggle(this)" class="float">▼</button>
+          <p style="display: none;"></p>
+          <button onclick="testStopAdvertising()">Stop Advertising</button>
+        </fieldset>
 
-      <hr>
+        <hr>
 
-      <fieldset>
-        <legend>Starts discovering remote endpoints with the specified service ID.</legend>
-        <button onclick="testStartDiscovering()">Start Discovering</button>
-      </fieldset>
+        <fieldset>
+          <legend title="Starts discovering remote endpoints with the specified service ID."></legend>
+          <button onclick="toggle(this)" class="float">▼</button>
+          <p style="display: none;"></p>
+          <button onclick="testStartDiscovering()">Start Discovering</button>
+        </fieldset>
 
-      <fieldset>
-        <legend>Stops discovering remote endpoints.</legend>
-        <button onclick="testStopDiscovering()">Stop Discovering</button>
-      </fieldset>
+        <fieldset>
+          <legend title="Stops discovering remote endpoints."></legend>
+          <button onclick="toggle(this)" class="float">▼</button>
+          <p style="display: none;"></p>
+          <button onclick="testStopDiscovering()">Stop Discovering</button>
+        </fieldset>
 
-      <hr>
+        <hr>
 
-      <fieldset>
-        <legend>Connect to and disconnect from remote endpoints.</legend>
-        <select id="endpoints" name="endpoints" size="5" style="width: 100%;"></select>
-        <br>
-        <button onclick="testConnect()">Connect</button>
-        <button onclick="testDisconnect()">Disconnect</button>
-      </fieldset>
+        <fieldset>
+          <legend title="Connect to and disconnect from remote endpoints."></legend>
+          <button onclick="toggle(this)" class="float">▼</button>
+          <p style="display: none;"></p>
+          <select id="endpoints" name="endpoints" multiple size="5">
+          <!-- 
+            <option value="endpoint1">Endpoint 1</option>
+            <option value="endpoint2">Endpoint 2</option>
+            <option value="endpoint3">Endpoint 3</option>
+          -->
+          </select>
+          <br>
+          <button onclick="testConnect()" class="half">Connect</button>
+          <button onclick="testDisconnect()" class="half">Disconnect</button>
+          <br>
 
-      <hr>
+          <hr>
 
-      <fieldset>
-        <legend>Returns advertising and discovering status, and discovered endpoints.</legend>
-        <button onclick="testStatus()">Status</button>
-      </fieldset>
+          <!-- <label for="sendPayload-payload">Sends a `Payload` to a remote endpoint.</label><br> -->
+          <textarea id="sendPayload-payload" name="sendPayload-payload">TXkgQXBw</textarea><br>
+          <button onclick="testSendPayload()">Send Payload</button>
+        </fieldset>
 
-      <hr>
+        <hr>
 
-      <fieldset>
-        <button onclick="testCheckPermissions()">Check Permissions</button>
-        <br>
-        <select id="aliases" name="aliases" multiple>
-          <option value="bluetooth">Bluetooth</option>
-          <option value="location">Location</option>
-        </select><br>
-        <button onclick="testRequestPermissions()">Request Permissions</button>
-      </fieldset>
-    </div>
+        <fieldset>
+          <legend title="Returns advertising and discovering status, and discovered endpoints."></legend>
+          <button onclick="toggle(this)" class="float">▼</button>
+          <p style="display: none;"></p>
+          <button onclick="testStatus()">Status</button>
+        </fieldset>
 
-    <div style="width: 50%; float: right;">
-      <textarea id="status" rows="30" cols="50" style="width: 100%; height: 50%;"></textarea>
-      <textarea id="events" rows="30" cols="50" style="width: 100%; height: 50%;"></textarea>
+        <hr>
+
+        <fieldset>
+          <button onclick="testCheckPermissions()" class="full">Check Permissions</button>
+          <br>
+          <select id="aliases" name="aliases" multiple size="2">
+            <option value="bluetooth">Bluetooth</option>
+            <option value="location">Location</option>
+          </select><br>
+          <button onclick="testRequestPermissions()" class="full">Request Permissions</button>
+        </fieldset>
+      </div>
+
+      <div class="notification" style="flex: 1;">
+        <textarea id="status" disabled style="flex: 1;"></textarea>
+        <textarea id="events" disabled style="flex: 1;"></textarea>
+      </div>
     </div>
 
   </main>

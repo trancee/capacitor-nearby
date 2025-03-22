@@ -1,5 +1,8 @@
 package com.getcapacitor.community;
 
+import static com.getcapacitor.community.NearbyHelper.BLUETOOTH_BASE_UUID_LSB;
+import static com.getcapacitor.community.NearbyHelper.makeBuffer;
+
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -118,14 +121,16 @@ public class NearbyScanner {
                     BluetoothDevice device = result.getDevice();
                     if (device == null) return;
 
-                    // String address = device.getAddress();
+                    String address = device.getAddress();
 
                     List<ParcelUuid> serviceUuids = record.getServiceUuids();
                     if (serviceUuids != null) {
                         @Nullable
                         UUID id = null;
                         @Nullable
-                        UUID info = null;
+                        String name = null;
+                        @Nullable
+                        byte[] info = null;
                         @Nullable
                         Short channel = null;
 
@@ -136,32 +141,30 @@ public class NearbyScanner {
                                 continue;
                             }
 
-                            if (
-                                ((uuid.getMostSignificantBits() >>> 56) & 0xff) == 'C' &&
-                                ((uuid.getMostSignificantBits() >>> 48) & 0xff) == 'H'
-                            ) {
-                                long msb = uuid.getMostSignificantBits();
-
-                                ByteBuffer buffer = ByteBuffer.allocate(8);
-                                buffer.putLong(msb);
-
-                                if (buffer.getChar() == '\u4348') {
-                                    channel = buffer.getShort();
-                                    continue;
-                                }
-                            }
-
-                            if (id == null) {
+                            if (id == null && uuid.getLeastSignificantBits() == BLUETOOTH_BASE_UUID_LSB) {
                                 id = uuid;
                                 continue;
                             }
 
-                            info = uuid;
+                            ByteBuffer buffer = makeBuffer(uuid);
+                            buffer.rewind();
+
+                            byte size = buffer.get();
+
+                            info = new byte[size & 0x7f];
+                            buffer.get(info);
+
+                            if ((size & 0x80) != 0) {
+                                channel = (short) (buffer.get() & 0xff);
+                            }
+
                             break;
                         }
 
+                        // device.setAlias(id);
+
                         if (callback != null) {
-                            callback.onFound(id, info, channel, rssi, device);
+                            callback.onFound(id, name, info, channel, rssi, address);
                         }
                     }
                 }
@@ -247,7 +250,7 @@ public class NearbyScanner {
 
     public abstract static class Callback {
 
-        public void onFound(@Nullable UUID id, @Nullable UUID info, @Nullable Short channel, Integer rssi, BluetoothDevice device) {}
+        public void onFound(@Nullable UUID id, @Nullable String name, @Nullable byte[] info, @Nullable Short channel, Integer rssi, String address) {}
 
         public void onLost(@Nullable UUID id) {}
 

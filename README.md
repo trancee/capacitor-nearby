@@ -14,6 +14,14 @@ npx cap sync
 ```typescript
 ```
 
+## Bluetooth
+
+BLUETOOTH CORE SPECIFICATION Version 5.1 | Vol 3, Part A
+
+4.22 LE CREDIT BASED CONNECTION REQUEST (CODE 0x14)
+
+![LE Protocol/Service Multiplexer - LE_PSM](docs/le_psm.png "LE Protocol/Service Multiplexer - LE_PSM")
+
 ## Configuration
 
 ### Android
@@ -65,7 +73,7 @@ These configuration values are available:
 | Prop               | Type                                            | Description                                                                                                                                                                                             | Since |
 | ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
 | **`endpointName`** | <code>string</code>                             | A human readable name for this endpoint, to appear on the remote device.                                                                                                                                | 4.1.0 |
-| **`endpointInfo`** | <code>string</code>                             | Identifing information about this endpoint, to appear on the remote device.                                                                                                                             | 4.1.0 |
+| **`endpointInfo`** | <code>string</code>                             | Identifing information about this endpoint, to appear on the remote device. ___Note: maximum length is 14 bytes.___                                                                                     | 4.1.0 |
 | **`serviceID`**    | <code><a href="#serviceid">ServiceID</a></code> | An identifier to advertise your app to other endpoints. The `serviceID` value must uniquely identify your app. As a best practice, use the package name of your app (for example, `com.example.myapp`). | 4.1.0 |
 
 ### Examples
@@ -122,7 +130,6 @@ export default config;
 * [`connect(...)`](#connect)
 * [`disconnect(...)`](#disconnect)
 * [`sendPayload(...)`](#sendpayload)
-* [`cancelPayload(...)`](#cancelpayload)
 * [`status()`](#status)
 * [`checkPermissions()`](#checkpermissions)
 * [`requestPermissions(...)`](#requestpermissions)
@@ -136,7 +143,6 @@ export default config;
 * [`addListener('onEndpointFailed', ...)`](#addlisteneronendpointfailed-)
 * [`addListener('onEndpointDisconnected', ...)`](#addlisteneronendpointdisconnected-)
 * [`addListener('onPayloadReceived', ...)`](#addlisteneronpayloadreceived-)
-* [`addListener('onPayloadTransferUpdate', ...)`](#addlisteneronpayloadtransferupdate-)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 * [Enums](#enums)
@@ -323,7 +329,7 @@ Disconnects from a remote endpoint.
 ### sendPayload(...)
 
 ```typescript
-sendPayload(options: SendPayloadOptions) => Promise<SendPayloadResult>
+sendPayload(options: SendPayloadOptions) => Promise<void>
 ```
 
 Sends a <a href="#payload">`Payload`</a> to a remote endpoint.
@@ -331,25 +337,6 @@ Sends a <a href="#payload">`Payload`</a> to a remote endpoint.
 | Param         | Type                                                              |
 | ------------- | ----------------------------------------------------------------- |
 | **`options`** | <code><a href="#sendpayloadoptions">SendPayloadOptions</a></code> |
-
-**Returns:** <code>Promise&lt;<a href="#sendpayloadresult">SendPayloadResult</a>&gt;</code>
-
-**Since:** 4.1.0
-
---------------------
-
-
-### cancelPayload(...)
-
-```typescript
-cancelPayload(options: CancelPayloadOptions) => Promise<void>
-```
-
-Cancels a <a href="#payload">`Payload`</a> currently in-flight to or from remote endpoint(s).
-
-| Param         | Type                                                                  |
-| ------------- | --------------------------------------------------------------------- |
-| **`options`** | <code><a href="#cancelpayloadoptions">CancelPayloadOptions</a></code> |
 
 **Since:** 4.1.0
 
@@ -604,26 +591,6 @@ Called when a <a href="#payload">`Payload`</a> is received from a remote endpoin
 --------------------
 
 
-### addListener('onPayloadTransferUpdate', ...)
-
-```typescript
-addListener(eventName: 'onPayloadTransferUpdate', listenerFunc: PayloadTransferUpdateCallback) => Promise<PluginListenerHandle>
-```
-
-Called with progress information about an active <a href="#payload">`Payload`</a> transfer, either incoming or outgoing.
-
-| Param              | Type                                                                                    |
-| ------------------ | --------------------------------------------------------------------------------------- |
-| **`eventName`**    | <code>'onPayloadTransferUpdate'</code>                                                  |
-| **`listenerFunc`** | <code><a href="#payloadtransferupdatecallback">PayloadTransferUpdateCallback</a></code> |
-
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
-
-**Since:** 4.1.0
-
---------------------
-
-
 ### Interfaces
 
 
@@ -639,23 +606,23 @@ Called with progress information about an active <a href="#payload">`Payload`</a
 | Prop               | Type                                            | Description                                                                                                                                                                                             | Since |
 | ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
 | **`endpointName`** | <code>string</code>                             | A human readable name for this endpoint, to appear on the remote device.                                                                                                                                | 4.1.0 |
-| **`endpointInfo`** | <code>string</code>                             | Identifing information about this endpoint, to appear on the remote device.                                                                                                                             | 4.1.0 |
+| **`endpointInfo`** | <code>string</code>                             | Identifing information about this endpoint, to appear on the remote device. ___Note: maximum length is 14 bytes.___                                                                                     | 4.1.0 |
 | **`serviceID`**    | <code><a href="#serviceid">ServiceID</a></code> | An identifier to advertise your app to other endpoints. The `serviceID` value must uniquely identify your app. As a best practice, use the package name of your app (for example, `com.example.myapp`). | 4.1.0 |
 
 
 #### StartAdvertisingOptions
 
-| Prop               | Type                | Description                                 | Since |
-| ------------------ | ------------------- | ------------------------------------------- | ----- |
-| **`endpointInfo`** | <code>string</code> | Identifing information about this endpoint. | 4.1.0 |
+| Prop               | Type                | Description                                                                         | Since |
+| ------------------ | ------------------- | ----------------------------------------------------------------------------------- | ----- |
+| **`endpointInfo`** | <code>string</code> | Identifing information about this endpoint. ___Note: maximum length is 14 bytes.___ | 4.1.0 |
 
 
 #### RequestConnectionOptions
 
-| Prop               | Type                                              | Description                                                                        | Since |
-| ------------------ | ------------------------------------------------- | ---------------------------------------------------------------------------------- | ----- |
-| **`endpointID`**   | <code><a href="#endpointid">EndpointID</a></code> | The identifier for the remote endpoint to which a connection request will be sent. | 4.1.0 |
-| **`endpointInfo`** | <code>string</code>                               | Identifing information about this endpoint.                                        | 4.1.0 |
+| Prop               | Type                                              | Description                                                                         | Since |
+| ------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------- | ----- |
+| **`endpointID`**   | <code><a href="#endpointid">EndpointID</a></code> | The identifier for the remote endpoint to which a connection request will be sent.  | 4.1.0 |
+| **`endpointInfo`** | <code>string</code>                               | Identifing information about this endpoint. ___Note: maximum length is 14 bytes.___ | 4.1.0 |
 
 
 #### AcceptConnectionOptions
@@ -686,14 +653,6 @@ Called with progress information about an active <a href="#payload">`Payload`</a
 | **`endpointID`** | <code><a href="#endpointid">EndpointID</a></code> | The identifier for the remote endpoint to disconnect from. | 4.1.0 |
 
 
-#### SendPayloadResult
-
-| Prop            | Type                                                                                | Description                           | Since |
-| --------------- | ----------------------------------------------------------------------------------- | ------------------------------------- | ----- |
-| **`payloadID`** | <code><a href="#payloadid">PayloadID</a></code>                                     | A unique identifier for this payload. | 4.1.0 |
-| **`status`**    | <code><a href="#payloadtransferupdatestatus">PayloadTransferUpdateStatus</a></code> | The status of the payload.            | 4.1.0 |
-
-
 #### SendPayloadOptions
 
 | Prop              | Type                                              | Description                                                                   | Since |
@@ -701,13 +660,6 @@ Called with progress information about an active <a href="#payload">`Payload`</a
 | **`endpointID`**  | <code><a href="#endpointid">EndpointID</a></code> | The identifier for the remote endpoint to which the payload should be sent.   | 4.1.0 |
 | **`endpointIDs`** | <code>string[]</code>                             | The identifiers for the remote endpoints to which the payload should be sent. | 4.1.0 |
 | **`payload`**     | <code>string</code>                               | The <a href="#payload">`Payload`</a> to be sent.                              | 4.1.0 |
-
-
-#### CancelPayloadOptions
-
-| Prop            | Type                                            | Description                                                           | Since |
-| --------------- | ----------------------------------------------- | --------------------------------------------------------------------- | ----- |
-| **`payloadID`** | <code><a href="#payloadid">PayloadID</a></code> | The identifier for the <a href="#payload">Payload</a> to be canceled. | 4.1.0 |
 
 
 #### StatusResult
@@ -742,33 +694,20 @@ Called with progress information about an active <a href="#payload">`Payload`</a
 
 #### Endpoint
 
-| Prop               | Type                                              | Description                                        | Since |
-| ------------------ | ------------------------------------------------- | -------------------------------------------------- | ----- |
-| **`endpointID`**   | <code><a href="#endpointid">EndpointID</a></code> | The ID of the remote endpoint that was discovered. | 4.1.0 |
-| **`endpointName`** | <code>string</code>                               | A human readable name for this endpoint.           | 4.1.0 |
-| **`endpointInfo`** | <code>string</code>                               | Identifing information about this endpoint.        | 4.1.0 |
+| Prop               | Type                                              | Description                                                                         | Since |
+| ------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------- | ----- |
+| **`endpointID`**   | <code><a href="#endpointid">EndpointID</a></code> | The ID of the remote endpoint that was discovered.                                  | 4.1.0 |
+| **`endpointName`** | <code>string</code>                               | A human readable name for this endpoint.                                            | 4.1.0 |
+| **`endpointInfo`** | <code>string</code>                               | Identifing information about this endpoint. ___Note: maximum length is 14 bytes.___ | 4.1.0 |
 
 
 #### Payload
 
 A <a href="#payload">Payload</a> sent between devices.
 
-| Prop            | Type                                            | Description                           | Since |
-| --------------- | ----------------------------------------------- | ------------------------------------- | ----- |
-| **`payloadID`** | <code><a href="#payloadid">PayloadID</a></code> | A unique identifier for this payload. | 4.1.0 |
-| **`payload`**   | <code>string</code>                             | <a href="#payload">Payload</a> data.  | 4.1.0 |
-
-
-#### PayloadTransferUpdate
-
-Describes the status for an active <a href="#payload">`Payload`</a> transfer, either incoming or outgoing.
-
-| Prop                   | Type                                                                                | Description                               | Since |
-| ---------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------- | ----- |
-| **`payloadID`**        | <code><a href="#payloadid">PayloadID</a></code>                                     | The payload identifier.                   | 4.1.0 |
-| **`status`**           | <code><a href="#payloadtransferupdatestatus">PayloadTransferUpdateStatus</a></code> | The status of the payload.                | 4.1.0 |
-| **`bytesTransferred`** | <code>number</code>                                                                 | The number of bytes transferred so far.   | 4.1.0 |
-| **`totalBytes`**       | <code>number</code>                                                                 | The total number of bytes in the payload. | 4.1.0 |
+| Prop          | Type                | Description                          | Since |
+| ------------- | ------------------- | ------------------------------------ | ----- |
+| **`payload`** | <code>string</code> | <a href="#payload">Payload</a> data. | 4.1.0 |
 
 
 ### Type Aliases
@@ -786,13 +725,6 @@ Used to represent an endpoint.
 Used to represent a service identifier.
 
 <code>string</code>
-
-
-#### PayloadID
-
-Used to represent a payload.
-
-<code>number</code>
 
 
 #### PermissionState
@@ -864,24 +796,7 @@ all of the data may or may not have been received at the time of this call.
 <code>(_: <a href="#endpoint">Endpoint</a> & <a href="#payload">Payload</a>): void</code>
 
 
-#### PayloadTransferUpdateCallback
-
-Called with progress information about an active payload transfer, either incoming or outgoing.
-
-<code>(_: <a href="#endpoint">Endpoint</a> & <a href="#payloadtransferupdate">PayloadTransferUpdate</a>): void</code>
-
-
 ### Enums
-
-
-#### PayloadTransferUpdateStatus
-
-| Members        | Value                   | Description                                                                  | Since |
-| -------------- | ----------------------- | ---------------------------------------------------------------------------- | ----- |
-| **`SUCCESS`**  | <code>'success'</code>  | The remote endpoint has successfully received the full transfer.             | 4.1.0 |
-| **`CANCELED`** | <code>'canceled'</code> | Either the local or remote endpoint has canceled the transfer.               | 4.1.0 |
-| **`FAILURE`**  | <code>'failure'</code>  | The remote endpoint failed to receive the transfer.                          | 4.1.0 |
-| **`PROGRESS`** | <code>'progress'</code> | The the transfer is currently in progress with an associated progress value. | 4.1.0 |
 
 
 #### BluetoothState

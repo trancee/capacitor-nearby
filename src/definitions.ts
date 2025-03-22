@@ -18,6 +18,8 @@ declare module '@capacitor/cli' {
       /**
        * Identifing information about this endpoint, to appear on the remote device.
        *
+       * ___Note: maximum length is 14 bytes.___
+       *
        * @since 4.1.0
        * @type Base64 encoded string
        * @example "TXkgQXBw"
@@ -115,13 +117,7 @@ export interface NearbyPlugin {
    *
    * @since 4.1.0
    */
-  sendPayload(options: SendPayloadOptions): Promise<SendPayloadResult>;
-  /**
-   * Cancels a `Payload` currently in-flight to or from remote endpoint(s).
-   *
-   * @since 4.1.0
-   */
-  cancelPayload(options: CancelPayloadOptions): Promise<void>;
+  sendPayload(options: SendPayloadOptions): Promise<void>;
 
   /**
    * Returns advertising and discovering status, and discovered endpoints.
@@ -213,15 +209,6 @@ export interface NearbyPlugin {
    * @since 4.1.0
    */
   addListener(eventName: 'onPayloadReceived', listenerFunc: PayloadReceivedCallback): Promise<PluginListenerHandle>;
-  /**
-   * Called with progress information about an active `Payload` transfer, either incoming or outgoing.
-   *
-   * @since 4.1.0
-   */
-  addListener(
-    eventName: 'onPayloadTransferUpdate',
-    listenerFunc: PayloadTransferUpdateCallback,
-  ): Promise<PluginListenerHandle>;
 }
 
 /**
@@ -238,33 +225,28 @@ export type ServiceID = string;
  */
 export type EndpointID = string;
 
-/**
- * Used to represent a payload.
- *
- * @since 4.1.0
- */
-export type PayloadID = number;
-
 export interface Endpoint {
   /**
    * The ID of the remote endpoint that was discovered.
    *
    * @since 4.1.0
    */
-  endpointID: EndpointID;
+  readonly endpointID: EndpointID;
 
   /**
    * A human readable name for this endpoint.
    *
    * @since 4.1.0
    */
-  endpointName?: string;
+  readonly endpointName?: string;
   /**
    * Identifing information about this endpoint.
    *
+   * ___Note: maximum length is 14 bytes.___
+   *
    * @since 4.1.0
    */
-  endpointInfo?: string;
+  readonly endpointInfo?: string;
 }
 
 // Endpoint Discovery
@@ -323,12 +305,6 @@ export type EndpointDisconnectedCallback = (_: Endpoint) => void;
  * @since 4.1.0
  */
 export type PayloadReceivedCallback = (_: Endpoint & Payload) => void;
-/**
- * Called with progress information about an active payload transfer, either incoming or outgoing.
- *
- * @since 4.1.0
- */
-export type PayloadTransferUpdateCallback = (_: Endpoint & PayloadTransferUpdate) => void;
 
 /**
  * A Payload sent between devices.
@@ -337,87 +313,12 @@ export type PayloadTransferUpdateCallback = (_: Endpoint & PayloadTransferUpdate
  */
 export interface Payload {
   /**
-   * A unique identifier for this payload.
-   *
-   * @since 4.1.0
-   */
-  readonly payloadID: PayloadID;
-
-  /**
    * Payload data.
    *
    * @since 4.1.0
    * @example "Hello, World!"
    */
   readonly payload: string;
-}
-
-/**
- * The status of the payload transfer at the time of this update.
- *
- * @since 4.1.0
- * @link https://developers.google.com/android/reference/com/google/android/gms/nearby/connection/PayloadTransferUpdate.Status
- */
-export enum PayloadTransferUpdateStatus {
-  /**
-   * The remote endpoint has successfully received the full transfer.
-   *
-   * @since 4.1.0
-   */
-  SUCCESS = 'success',
-  /**
-   * Either the local or remote endpoint has canceled the transfer.
-   *
-   * @since 4.1.0
-   */
-  CANCELED = 'canceled',
-  /**
-   * The remote endpoint failed to receive the transfer.
-   *
-   * @since 4.1.0
-   */
-  FAILURE = 'failure',
-  /**
-   * The the transfer is currently in progress with an associated progress value.
-   *
-   * @since 4.1.0
-   */
-  PROGRESS = 'progress',
-}
-
-/**
- * Describes the status for an active `Payload` transfer, either incoming or outgoing.
- *
- * @since 4.1.0
- */
-export interface PayloadTransferUpdate {
-  /**
-   * The payload identifier.
-   *
-   * @since 4.1.0
-   */
-  readonly payloadID: PayloadID;
-
-  /**
-   * The status of the payload.
-   *
-   * @since 4.1.0
-   */
-  readonly status: PayloadTransferUpdateStatus;
-
-  /**
-   * The number of bytes transferred so far.
-   *
-   * @since 4.1.0
-   */
-  readonly bytesTransferred: number;
-
-  /**
-   * The total number of bytes in the payload.
-   *
-   * @since 4.1.0
-   */
-  readonly totalBytes: number;
 }
 
 // Options
@@ -432,6 +333,8 @@ export interface InitializeOptions {
   endpointName?: string;
   /**
    * Identifing information about this endpoint, to appear on the remote device.
+   *
+   * ___Note: maximum length is 14 bytes.___
    *
    * @since 4.1.0
    * @example "My App"
@@ -463,6 +366,8 @@ export interface StartAdvertisingOptions {
   /**
    * Identifing information about this endpoint.
    *
+   * ___Note: maximum length is 14 bytes.___
+   *
    * @since 4.1.0
    */
   endpointInfo?: string;
@@ -478,6 +383,8 @@ export interface RequestConnectionOptions {
 
   /**
    * Identifing information about this endpoint.
+   *
+   * ___Note: maximum length is 14 bytes.___
    *
    * @since 4.1.0
    */
@@ -523,31 +430,6 @@ export interface SendPayloadOptions {
    * @type Base64 encoded string
    */
   payload: string;
-}
-
-export interface SendPayloadResult {
-  /**
-   * A unique identifier for this payload.
-   *
-   * @since 4.1.0
-   */
-  readonly payloadID: PayloadID;
-
-  /**
-   * The status of the payload.
-   *
-   * @since 4.1.0
-   */
-  readonly status: PayloadTransferUpdateStatus;
-}
-
-export interface CancelPayloadOptions {
-  /**
-   * The identifier for the Payload to be canceled.
-   *
-   * @since 4.1.0
-   */
-  payloadID: PayloadID;
 }
 
 export interface ConnectOptions {

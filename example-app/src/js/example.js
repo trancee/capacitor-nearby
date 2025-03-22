@@ -1,11 +1,37 @@
-import { Nearby } from '@capacitor-trancee/nearby';
+import { Nearby } from '@capacitor-trancee/nearby'
+
+const scrollToBottom = t => t.scrollTop = t.scrollHeight
+
+const statusEl = document.querySelector("#status")
+statusEl.addEventListener("change", () => {
+    scrollToBottom(this)
+})
+const logStatus = (status) => {
+    statusEl.value += `${status}` + "\n"
+    scrollToBottom(statusEl)
+}
+
+const eventsEl = document.querySelector("#events")
+eventsEl.addEventListener("change", () => {
+    scrollToBottom(this)
+})
+const logEvent = (event) => {
+    eventsEl.value += `⚡ ${event}` + "\n"
+    scrollToBottom(eventsEl)
+}
+
+const endpointsEl = document.querySelector("#endpoints")
 
 window.testInitialize = async () => {
     let options = {}
 
-    const endpointInfo = document.getElementById("initialize-endpointInfo").value;
-    const serviceID = document.getElementById("initialize-serviceID").value;
+    const endpointName = document.getElementById("initialize-endpointName").value
+    const endpointInfo = document.getElementById("initialize-endpointInfo").value
+    const serviceID = document.getElementById("initialize-serviceID").value
 
+    if (endpointName !== undefined && endpointName.length > 0) {
+        options.endpointName = endpointName
+    }
     if (endpointInfo !== undefined && endpointInfo.length > 0) {
         options.endpointInfo = endpointInfo
     }
@@ -21,14 +47,16 @@ window.testReset = async () => {
 
     const result = await window.execute("reset", options)
 
-    document.getElementById("status").value = ""
-    document.getElementById("events").value = ""
+    endpointsEl.options.length = 0
+
+    statusEl.value = ""
+    eventsEl.value = ""
 }
 
 window.testStartAdvertising = async () => {
     let options = {}
 
-    const endpointInfo = document.getElementById("startAdvertising-endpointInfo").value;
+    const endpointInfo = document.getElementById("startAdvertising-endpointInfo").value
 
     if (endpointInfo !== undefined && endpointInfo.length > 0) {
         options.endpointInfo = endpointInfo
@@ -50,140 +78,187 @@ window.testStartDiscovering = async () => {
 }
 
 window.testStopDiscovering = async () => {
-    let options = {};
+    let options = {}
 
-    const result = await window.execute("stopDiscovering", options);
+    const result = await window.execute("stopDiscovering", options)
 }
 
 window.testConnect = async () => {
-    let options = {};
+    let options = {}
 
-    const endpointID = document.getElementById("endpoints").value;
+    const endpointID = endpointsEl.value
 
     if (endpointID !== undefined && endpointID.length > 0) {
         options.endpointID = endpointID
     }
 
-    const result = await window.execute("connect", options);
+    const result = await window.execute("connect", options)
 }
 
 window.testDisconnect = async () => {
-    let options = {};
+    let options = {}
 
-    const endpointID = document.getElementById("endpoints").value;
+    const endpointID = endpointsEl.value
 
     if (endpointID !== undefined && endpointID.length > 0) {
         options.endpointID = endpointID
     }
 
-    const result = await window.execute("disconnect", options);
+    const result = await window.execute("disconnect", options)
+}
+
+window.testSendPayload = async () => {
+    let options = {}
+
+    if (endpointsEl.selectedOptions.length > 1) {
+        const endpointIDs = []
+
+        for (const option of endpointsEl.selectedOptions) {
+            endpointIDs.push(option.value)
+        }
+
+        options.endpointIDs = endpointIDs
+    } else {
+        const endpointID = endpointsEl.value
+
+        options.endpointID = endpointID
+    }
+
+    const payload = document.getElementById("sendPayload-payload").value
+
+    if (payload !== undefined && payload.length > 0) {
+        options.payload = payload
+    }
+
+    const result = await window.execute("sendPayload", options)
 }
 
 window.testStatus = async () => {
-    let options = {};
+    let options = {}
 
-    const result = await window.execute("status", options);
+    const result = await window.execute("status", options)
 }
 
 window.testCheckPermissions = async () => {
-    let options = {};
+    let options = {}
 
-    const result = await window.execute("checkPermissions", options);
+    const result = await window.execute("checkPermissions", options)
 }
 
 window.testRequestPermissions = async () => {
-    let options = {};
+    let options = {}
 
-    const aliases = document.getElementById("aliases").selectedOptions;
+    const aliases = document.getElementById("aliases").selectedOptions
 
     if (aliases !== undefined && aliases.length > 0) {
         options.permissions = Array.from(aliases).map(option => option.value)
     }
 
-    const result = await window.execute("requestPermissions", options);
+    const result = await window.execute("requestPermissions", options)
 }
 
 window.execute = async (method, options) => {
     try {
         options = Object.keys(options).length > 0 ? options : undefined
 
-        document.getElementById("status").value += `⚪ ${method}(${JSON.stringify(options) || ""})` + "\n"
+        logStatus(`⚪ ${method}(${JSON.stringify(options) || ""})`)
 
         const result = await Nearby[method](options)
 
-        document.getElementById("status").value += `⚫ ${method}(${JSON.stringify(result) || ""})` + "\n"
+        logStatus(`⚫ ${method}(${JSON.stringify(result) || ""})`)
 
         return result
     } catch (error) {
-        document.getElementById("status").value += `⛔ ${error}` + "\n";
+        logStatus(`⛔ ${error}`)
     }
 }
 
 Nearby.addListener('onEndpointFound', (endpoint) => {
-    console.log('onEndpointFound', endpoint);
+    console.log('onEndpointFound', endpoint)
 
-    document.getElementById("events").value += `⚡ onEndpointFound(${JSON.stringify(endpoint) || ""})` + "\n";
+    logEvent(`onEndpointFound(${JSON.stringify(endpoint) || ""})`)
 
-    document.getElementById("endpoints").add(new Option(endpoint.endpointID, endpoint.endpointID));
-});
+    endpointsEl.add(
+        new Option(
+            endpoint.endpointID,
+            endpoint.endpointID,
+        )
+    )
+})
 
 Nearby.addListener('onEndpointLost', (endpoint) => {
-    console.log('onEndpointLost', endpoint);
+    console.log('onEndpointLost', endpoint)
 
-    document.getElementById("events").value += `⚡ onEndpointLost(${JSON.stringify(endpoint) || ""})` + "\n";
+    logEvent(`onEndpointLost(${JSON.stringify(endpoint) || ""})`)
 
-    document.getElementById("endpoints").options.forEach((option, index) => {
+    for (const option of endpointsEl.options) {
         if (option.value === endpoint.endpointID) {
-            selectElement.remove(index);
+            option.remove()
         }
-    })
-});
+    }
+})
 
 Nearby.addListener('onEndpointInitiated', (endpoint) => {
-    console.log('onEndpointInitiated', endpoint);
+    console.log('onEndpointInitiated', endpoint)
 
-    document.getElementById("events").value += `⚡ onEndpointInitiated(${JSON.stringify(endpoint) || ""})` + "\n";
-});
+    logEvent(`onEndpointInitiated(${JSON.stringify(endpoint) || ""})`)
+})
 
 Nearby.addListener('onEndpointConnected', (endpoint) => {
-    console.log('onEndpointConnected', endpoint);
+    console.log('onEndpointConnected', endpoint)
 
-    document.getElementById("events").value += `⚡ onEndpointConnected(${JSON.stringify(endpoint) || ""})` + "\n";
-});
+    logEvent(`onEndpointConnected(${JSON.stringify(endpoint) || ""})`)
+})
 
 Nearby.addListener('onEndpointRejected', (endpoint) => {
-    console.log('onEndpointRejected', endpoint);
+    console.log('onEndpointRejected', endpoint)
 
-    document.getElementById("events").value += `⚡ onEndpointRejected(${JSON.stringify(endpoint) || ""})` + "\n";
-});
+    logEvent(`onEndpointRejected(${JSON.stringify(endpoint) || ""})`)
+})
 
 Nearby.addListener('onEndpointFailed', (endpoint) => {
-    console.log('onEndpointFailed', endpoint);
+    console.log('onEndpointFailed', endpoint)
 
-    document.getElementById("events").value += `⚡ onEndpointFailed(${JSON.stringify(endpoint) || ""})` + "\n";
-});
+    logEvent(`onEndpointFailed(${JSON.stringify(endpoint) || ""})`)
+})
 
 Nearby.addListener('onEndpointDisconnected', (endpoint) => {
-    console.log('onEndpointDisconnected', endpoint);
+    console.log('onEndpointDisconnected', endpoint)
 
-    document.getElementById("events").value += `⚡ onEndpointDisconnected(${JSON.stringify(endpoint) || ""})` + "\n";
-});
+    logEvent(`onEndpointDisconnected(${JSON.stringify(endpoint) || ""})`)
+})
 
 Nearby.addListener('onPayloadReceived', (endpoint) => {
-    console.log('onPayloadReceived', endpoint);
+    console.log('onPayloadReceived', endpoint)
 
-    document.getElementById("events").value += `⚡ onPayloadReceived(${JSON.stringify(endpoint) || ""})` + "\n";
-});
+    logEvent(`onPayloadReceived(${JSON.stringify(endpoint) || ""})`)
+})
 
 Nearby.addListener('onPayloadTransferUpdate', (endpoint) => {
-    console.log('onPayloadTransferUpdate', endpoint);
+    console.log('onPayloadTransferUpdate', endpoint)
 
-    document.getElementById("events").value += `⚡ onPayloadTransferUpdate(${JSON.stringify(endpoint) || ""})` + "\n";
-});
+    logEvent(`onPayloadTransferUpdate(${JSON.stringify(endpoint) || ""})`)
+})
 
-document.getElementById("status").onchange = () => {
-    document.getElementById("status").scrollTop = document.getElementById("status").scrollHeight;
-}
-document.getElementById("events").onchange = () => {
-    document.getElementById("events").scrollTop = document.getElementById("events").scrollHeight;
+window.toggle = async (element) => {
+    const legend = element.previousElementSibling
+    const sibling = element.nextElementSibling
+
+    const title = legend.title
+
+    if (sibling.style.display === "none") {
+        sibling.style.display = ""
+
+        legend.title = legend.innerText
+        legend.innerText = title
+
+        element.innerText = "▲"
+    } else {
+        sibling.style.display = "none"
+
+        legend.title = legend.innerText
+        legend.innerText = title
+
+        element.innerText = "▼"
+    }
 }

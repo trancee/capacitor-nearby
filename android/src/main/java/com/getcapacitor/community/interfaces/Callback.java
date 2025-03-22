@@ -17,10 +17,6 @@ public abstract class Callback {
         call.resolve();
     }
 
-    public void success(Void unused) {
-        call.resolve();
-    }
-
     public void success(@NonNull Result result) {
         call.resolve(result.toJSObject());
     }
@@ -29,6 +25,10 @@ public abstract class Callback {
         String message = exception.getMessage();
         if (message == null) {
             message = UNKNOWN_ERROR;
+        }
+        Throwable cause;
+        if ((cause = exception.getCause()) != null) {
+            message = cause.getMessage() + ": " + message;
         }
 
         call.reject(message, exception);

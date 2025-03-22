@@ -3,29 +3,21 @@ package com.getcapacitor.community;
 import static com.getcapacitor.community.NearbyHelper.BLUETOOTH_BASE_UUID_LSB;
 import static com.getcapacitor.community.NearbyHelper.BLUETOOTH_BASE_UUID_MSB;
 import static com.getcapacitor.community.NearbyHelper.EndpointID;
-import static com.getcapacitor.community.NearbyHelper.makeBytes;
 
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
-import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattServer;
-import android.bluetooth.BluetoothGattServerCallback;
-import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
-import android.bluetooth.BluetoothProfile;
-import android.bluetooth.BluetoothSocket;
 import android.bluetooth.le.AdvertiseSettings;
 import android.content.Context;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresPermission;
+
 import com.getcapacitor.community.classes.Endpoint;
 import com.getcapacitor.community.classes.options.AcceptConnectionOptions;
-import com.getcapacitor.community.classes.options.CancelPayloadOptions;
 import com.getcapacitor.community.classes.options.ConnectOptions;
 import com.getcapacitor.community.classes.options.DisconnectOptions;
 import com.getcapacitor.community.classes.options.InitializeOptions;
@@ -36,19 +28,19 @@ import com.getcapacitor.community.classes.options.StartAdvertisingOptions;
 import com.getcapacitor.community.classes.results.InitializeResult;
 import com.getcapacitor.community.classes.results.StatusResult;
 import com.getcapacitor.community.interfaces.Callback;
-import java.io.IOException;
+
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.UUID;
 
 public class Nearby {
 
     private static final String NOT_INITIALIZED = "not initialized";
+    private static final String NOT_CONNECTED = "not connected";
 
-    private static final String MISSING_ENDPOINT_ID = "missing endpoint identifier";
+    static final String MISSING_ENDPOINT_ID = "missing endpoint identifier";
     private static final String MISSING_ENDPOINT_NAME = "missing endpoint name";
     private static final String MISSING_ENDPOINT_INFO = "missing endpoint information";
     private static final String MISSING_ENDPOINT = "missing endpoint";
@@ -233,25 +225,46 @@ public class Nearby {
         }
 
         nearbyAdvertiser.start(
-            endpointInfo,
-            new NearbyAdvertiser.Callback() {
-                @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-                @Override
-                public void onSuccess(AdvertiseSettings settings) {
-                    // startGattServer();
+                endpointInfo,
+                new NearbyAdvertiser.Callback() {
+                    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                    @Override
+                    public void onSuccess(AdvertiseSettings settings) {
+                        // startGattServer();
 
-                    isAdvertising = true;
+                        isAdvertising = true;
 
-                    callback.success();
+                        callback.success();
+                    }
+
+                    @Override
+                    public void onFailure(Exception exception) {
+                        isAdvertising = false;
+
+                        callback.error(exception);
+                    }
+
+                    @Override
+                    public void onConnected(String endpointID) {
+                        Endpoint endpoint = new Endpoint(endpointID);
+
+                        plugin.onEndpointConnected(endpoint);
+                    }
+
+                    @Override
+                    public void onDisconnected(String endpointID) {
+                        Endpoint endpoint = new Endpoint(endpointID);
+
+                        plugin.onEndpointDisconnected(endpoint);
+                    }
+
+                    @Override
+                    public void onPayload(@NonNull String endpointID, byte[] payload) {
+                        Endpoint endpoint = new Endpoint(endpointID);
+
+                        plugin.onPayloadReceived(endpoint, payload);
+                    }
                 }
-
-                @Override
-                public void onFailure(Exception exception) {
-                    isAdvertising = false;
-
-                    callback.error(exception);
-                }
-            }
         );
     }
 
@@ -352,6 +365,7 @@ public class Nearby {
         bluetoothGattServer.addService(service);
     }
     */
+
     /**
      * Discovery
      */
@@ -362,76 +376,78 @@ public class Nearby {
         }
 
         nearbyScanner.start(
-            new NearbyScanner.Callback() {
-                @Override
-                public void onFound(@Nullable UUID id, @Nullable UUID info, @Nullable Short channel, Integer rssi, BluetoothDevice device) {
-                    @Nullable
-                    String endpointID = EndpointID.fromUUID(id);
-                    @Nullable
-                    byte[] endpointInfo = makeBytes(info);
+                new NearbyScanner.Callback() {
+                    @Override
+                    public void onFound(@Nullable UUID id, @Nullable String name, @Nullable byte[] info, @Nullable Short channel, Integer rssi, String address) {
+                        @Nullable
+                        String endpointID = EndpointID.fromUUID(id);
+                        @Nullable
+                        String endpointName = name;
+                        @Nullable
+                        byte[] endpointInfo = info;
 
-                    if (endpointID == null) return;
+                        if (endpointID == null) return;
 
-                    NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
-                    if (nearbyEndpoint != null) {
-                        nearbyEndpoint.alive();
-                    } else {
-                        new NearbyEndpoint(endpointID, endpointInfo, channel, rssi, device, () -> {
+                        NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
+                        if (nearbyEndpoint != null) {
+                            nearbyEndpoint.alive();
+                        } else {
+                            new NearbyEndpoint(endpointID, endpointName, endpointInfo, channel, rssi, address, () -> {
+                                if (nearbyScanner.isScanning()) {
+                                    Endpoint endpoint = new Endpoint(endpointID);
+
+                                    plugin.onEndpointLost(endpoint);
+                                }
+
+                                NearbyEndpoint endpoint = endpoints.get(endpointID);
+                                if (endpoint != null) {
+                                    endpoint.kill();
+                                }
+                            });
+                            // endpoints.put(endpointID, nearbyEndpoint);
+
                             if (nearbyScanner.isScanning()) {
-                                Endpoint endpoint = new Endpoint(endpointID);
+                                Endpoint endpoint = new Endpoint(endpointID, endpointName, endpointInfo);
 
-                                plugin.onEndpointLost(endpoint);
+                                plugin.onEndpointFound(endpoint);
                             }
-
-                            NearbyEndpoint endpoint = endpoints.get(endpointID);
-                            if (endpoint != null) {
-                                endpoint.kill();
-                            }
-                        });
-                        // endpoints.put(endpointID, nearbyEndpoint);
-
-                        if (nearbyScanner.isScanning()) {
-                            Endpoint endpoint = new Endpoint(endpointID, endpointInfo);
-
-                            plugin.onEndpointFound(endpoint);
                         }
                     }
-                }
 
-                @Override
-                public void onLost(@Nullable UUID id) {
-                    @Nullable
-                    String endpointID = EndpointID.fromUUID(id);
+                    @Override
+                    public void onLost(@Nullable UUID id) {
+                        @Nullable
+                        String endpointID = EndpointID.fromUUID(id);
 
-                    if (endpointID == null) return;
+                        if (endpointID == null) return;
 
-                    NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
-                    if (nearbyEndpoint != null) {
-                        nearbyEndpoint.kill();
+                        NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
+                        if (nearbyEndpoint != null) {
+                            nearbyEndpoint.kill();
+                        }
+                        // endpoints.remove(endpointID);
+
+                        {
+                            Endpoint endpoint = new Endpoint(endpointID);
+
+                            plugin.onEndpointLost(endpoint);
+                        }
                     }
-                    // endpoints.remove(endpointID);
 
-                    {
-                        Endpoint endpoint = new Endpoint(endpointID);
+                    @Override
+                    public void onSuccess() {
+                        isDiscovering = true;
 
-                        plugin.onEndpointLost(endpoint);
+                        callback.success();
+                    }
+
+                    @Override
+                    public void onFailure(Exception exception) {
+                        isDiscovering = false;
+
+                        callback.error(exception);
                     }
                 }
-
-                @Override
-                public void onSuccess() {
-                    isDiscovering = true;
-
-                    callback.success();
-                }
-
-                @Override
-                public void onFailure(Exception exception) {
-                    isDiscovering = false;
-
-                    callback.error(exception);
-                }
-            }
         );
         //        connectionsClient
         //            .startDiscovery(serviceID, endpointDiscoveryCallback, discoveryOptions.build())
@@ -482,6 +498,22 @@ public class Nearby {
             return;
         }
 
+        String address = endpoint.getAddress();
+
+        BluetoothDevice device;
+
+        if ((device = bluetoothAdapter.getRemoteDevice(address)) != null) {
+            if (
+                    !endpoint.connect(device)
+            ) {
+                Exception exception = new Exception(NOT_CONNECTED);
+
+                callback.error(exception);
+                return;
+            }
+        }
+
+        /*
         final BluetoothDevice device = bluetoothAdapter.getRemoteDevice(endpoint.getAddress());
 
         // Connect to the GATT server
@@ -508,7 +540,7 @@ public class Nearby {
                         plugin.onEndpointDisconnected(new Endpoint(endpoint.endpointID));
                     }
                 }
-                /*
+
                     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
                     @Override
                     public void onServicesDiscovered(BluetoothGatt gatt, int status) {
@@ -570,12 +602,11 @@ public class Nearby {
                         byte[] data = characteristic.getValue();
                         // Log.d(TAG, "onCharacteristicChanged: " + new String(data));
                     }
-                     */
             }
         );
 
         endpoint.setGatt(gatt);
-
+        */
         //        if (endpointInfo == null || endpointInfo.isEmpty()) {
         //            Exception exception = new Exception(MISSING_ENDPOINT_INFO);
         //            callback.error(exception);
@@ -651,6 +682,9 @@ public class Nearby {
             return;
         }
 
+        endpoint.disconnect();
+
+        /*
         final BluetoothGatt gatt = endpoint.getGatt();
 
         if (gatt != null) {
@@ -662,6 +696,7 @@ public class Nearby {
         }
 
         endpoint.state = BluetoothProfile.STATE_DISCONNECTED;
+        */
 
         callback.success();
     }
@@ -686,18 +721,16 @@ public class Nearby {
         }
 
         for (String endpointID : endpointIDs) {
-            NearbyEndpoint endpoint = endpoints.get(endpointID);
-            if (endpoint != null) {
-                BluetoothSocket socket = endpoint.getSocket();
+            NearbyEndpoint endpoint;
 
-                if (socket != null) {
-                    try {
-                        socket.getOutputStream().write(payload);
-                        // var input = socket.getInputStream().read();
-                    } catch (Exception exception) {
-                        callback.error(exception);
-                        return;
-                    }
+            if ((endpoint = endpoints.get(endpointID)) != null) {
+                if (
+                        !endpoint.send(config.endpointID, payload)
+                ) {
+                    Exception exception = new Exception(NOT_CONNECTED);
+
+                    callback.error(exception);
+                    return;
                 }
             }
         }
@@ -715,16 +748,6 @@ public class Nearby {
         //            .sendPayload(endpointIDs, Payload.fromBytes(payload))
         //            .addOnSuccessListener(callback::success)
         //            .addOnFailureListener(callback::error);
-    }
-
-    public void cancelPayload(@NonNull CancelPayloadOptions options, @NonNull Callback callback) {
-        Long payloadID = options.getPayloadID();
-        if (payloadID == null) {
-            Exception exception = new Exception(MISSING_PAYLOAD_ID);
-            callback.error(exception);
-            return;
-        }
-        //        connectionsClient.cancelPayload(payloadID).addOnSuccessListener(callback::success).addOnFailureListener(callback::error);
     }
 
     /**

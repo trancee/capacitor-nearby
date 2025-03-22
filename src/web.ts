@@ -12,11 +12,8 @@ import type {
   ConnectOptions,
   DisconnectOptions,
   SendPayloadOptions,
-  SendPayloadResult,
-  CancelPayloadOptions,
   StatusResult,
 } from './definitions';
-import { PayloadTransferUpdateStatus } from './definitions';
 
 export class NearbyWeb extends WebPlugin implements NearbyPlugin {
   async initialize(options?: InitializeOptions): Promise<InitializeResult> {
@@ -70,17 +67,8 @@ export class NearbyWeb extends WebPlugin implements NearbyPlugin {
     // throw this.unimplemented('Method not implemented.');
   }
 
-  async sendPayload(options: SendPayloadOptions): Promise<SendPayloadResult> {
+  async sendPayload(options: SendPayloadOptions): Promise<void> {
     console.info('sendPayload', options);
-    // throw this.unimplemented('Method not implemented.');
-    return {
-      payloadID: -1,
-
-      status: PayloadTransferUpdateStatus.SUCCESS,
-    };
-  }
-  async cancelPayload(options: CancelPayloadOptions): Promise<void> {
-    console.info('cancelPayload', options);
     // throw this.unimplemented('Method not implemented.');
   }
 

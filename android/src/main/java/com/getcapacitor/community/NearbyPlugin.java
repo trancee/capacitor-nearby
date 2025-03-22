@@ -15,8 +15,6 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import com.getcapacitor.community.classes.Endpoint;
-import com.getcapacitor.community.classes.Payload;
-import com.getcapacitor.community.classes.PayloadTransferUpdate;
 import com.getcapacitor.community.classes.events.EndpointConnectedEvent;
 import com.getcapacitor.community.classes.events.EndpointDisconnectedEvent;
 import com.getcapacitor.community.classes.events.EndpointFailedEvent;
@@ -25,9 +23,7 @@ import com.getcapacitor.community.classes.events.EndpointInitiatedEvent;
 import com.getcapacitor.community.classes.events.EndpointLostEvent;
 import com.getcapacitor.community.classes.events.EndpointRejectedEvent;
 import com.getcapacitor.community.classes.events.PayloadReceivedEvent;
-import com.getcapacitor.community.classes.events.PayloadTransferUpdateEvent;
 import com.getcapacitor.community.classes.options.AcceptConnectionOptions;
-import com.getcapacitor.community.classes.options.CancelPayloadOptions;
 import com.getcapacitor.community.classes.options.ConnectOptions;
 import com.getcapacitor.community.classes.options.DisconnectOptions;
 import com.getcapacitor.community.classes.options.InitializeOptions;
@@ -92,7 +88,6 @@ public class NearbyPlugin extends Plugin {
     static final String ENDPOINT_FAILED_EVENT = "onEndpointFailed";
     static final String ENDPOINT_DISCONNECTED_EVENT = "onEndpointDisconnected";
     static final String PAYLOAD_RECEIVED_EVENT = "onPayloadReceived";
-    static final String PAYLOAD_TRANSFER_UPDATE_EVENT = "onPayloadTransferUpdate";
 
     private Nearby implementation;
 
@@ -278,19 +273,6 @@ public class NearbyPlugin extends Plugin {
             SendPayloadOptions options = new SendPayloadOptions(call);
 
             implementation.sendPayload(options, callback);
-        } catch (Exception exception) {
-            callback.error(exception);
-        }
-    }
-
-    @PluginMethod
-    public void cancelPayload(PluginCall call) {
-        Callback callback = new Callback(call) {};
-
-        try {
-            CancelPayloadOptions options = new CancelPayloadOptions(call);
-
-            implementation.cancelPayload(options, callback);
         } catch (Exception exception) {
             callback.error(exception);
         }
@@ -497,18 +479,9 @@ public class NearbyPlugin extends Plugin {
     /**
      * Called when a Payload is received from a remote endpoint.
      */
-    protected void onPayloadReceived(Endpoint endpoint, Payload payload) {
+    protected void onPayloadReceived(Endpoint endpoint, byte[] payload) {
         PayloadReceivedEvent event = new PayloadReceivedEvent(endpoint, payload);
 
         notifyListeners(PAYLOAD_RECEIVED_EVENT, event.toJSObject());
-    }
-
-    /**
-     * Called with progress information about an active Payload transfer, either incoming or outgoing.
-     */
-    protected void onPayloadTransferUpdate(Endpoint endpoint, PayloadTransferUpdate update) {
-        PayloadTransferUpdateEvent event = new PayloadTransferUpdateEvent(endpoint, update);
-
-        notifyListeners(PAYLOAD_TRANSFER_UPDATE_EVENT, event.toJSObject());
     }
 }
