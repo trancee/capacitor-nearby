@@ -1,7 +1,8 @@
 package com.getcapacitor.community;
 
+import static com.getcapacitor.community.Nearby.MISSING_ENDPOINT_ID;
+import static com.getcapacitor.community.Nearby.MISSING_PAYLOAD_LENGTH;
 import static com.getcapacitor.community.NearbyHelper.ENDPOINT_ID_LENGTH;
-import static java.lang.Thread.sleep;
 
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
@@ -18,8 +19,10 @@ import androidx.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class NearbyAdvertiser {
 
@@ -37,7 +40,7 @@ public class NearbyAdvertiser {
     @NonNull
     private final String endpointName;
 
-    @Nullable
+    @NonNull
     private final UUID endpointUUID;
 
     Integer advertiseMode = AdvertiseSettings.ADVERTISE_MODE_BALANCED;
@@ -49,13 +52,15 @@ public class NearbyAdvertiser {
     private boolean isAdvertising;
 
     public static final int MAXIMUM_DATA_SIZE = 14;
-    public static final int THREAD_SLEEP_TIME = 100; // millis
+
+    @Nullable
+    private Thread thread;
 
     public static synchronized NearbyAdvertiser getInstance(
         @NonNull BluetoothAdapter adapter,
         @NonNull UUID serviceUUID,
         @NonNull String endpointName,
-        @Nullable UUID endpointUUID
+        @NonNull UUID endpointUUID
     ) {
         if (instance == null) {
             instance = new NearbyAdvertiser(adapter, serviceUUID, endpointName, endpointUUID);
@@ -68,7 +73,7 @@ public class NearbyAdvertiser {
         @NonNull BluetoothAdapter adapter,
         @NonNull UUID serviceUUID,
         @NonNull String endpointName,
-        @Nullable UUID endpointUUID
+        @NonNull UUID endpointUUID
     ) {
         this.adapter = adapter;
 
@@ -108,117 +113,110 @@ public class NearbyAdvertiser {
             stop();
         }
 
+        @NonNull
+        final BluetoothServerSocket serverSocket;
+
         @Nullable
         Short channel = null;
 
         try {
-            if (socket != null) {
-                socket.close();
-                socket = null;
-            }
-
+            // Create a new listening server socket
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 // L2CAP (>= Android 10)
-                socket = adapter.listenUsingInsecureL2capChannel();
+                serverSocket = adapter.listenUsingInsecureL2capChannel();
                 // socket = adapter.listenUsingL2capChannel();
-                channel = (short) socket.getPsm();
+
+                channel = (short) serverSocket.getPsm();
             } else {
                 // RFCOMM (< Android 10)
-                socket = adapter.listenUsingInsecureRfcommWithServiceRecord(endpointName, endpointUUID);
+                serverSocket = adapter.listenUsingInsecureRfcommWithServiceRecord(endpointName, endpointUUID);
                 // socket = adapter.listenUsingRfcommWithServiceRecord(endpointName, endpointUUID);
             }
+        } catch (Exception exception) {
+            callback.onFailure(exception);
 
-            Thread acceptThread = new Thread(() -> {
-                if (socket != null) {
-                    BluetoothSocket client;
+            return;
+        }
 
-                    try {
-                        while ((client = socket.accept()) != null) {
-                            int packetSize = client.getMaxReceivePacketSize();
+        if (thread != null) {
+            thread.interrupt();
+            thread = null;
+        }
 
-                            InputStream inputStream;
+        thread = new Thread(() -> {
+            while (true) {
+                @Nullable
+                String endpointID = null;
 
-                            if ((inputStream = client.getInputStream()) != null) {
-                                Thread connectThread = new Thread(() -> {
-                                    byte[] input = new byte[packetSize];
+                try (BluetoothSocket socket = serverSocket.accept()) {
+                    try (InputStream inputStream = socket.getInputStream()) {
+                        int bufferSize = socket.getMaxReceivePacketSize();
+                        byte[] buffer = new byte[bufferSize];
 
-                                    try {
-                                        int read;
+                        ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
-                                        main: while ((read = inputStream.available()) != -1) {
-                                            if (read == 0) {
-                                                sleep(THREAD_SLEEP_TIME);
-                                                continue;
-                                            }
+                        executorService.scheduleWithFixedDelay(
+                            () -> {
+                                try {
+                                    inputStream.close();
+                                } catch (IOException ignored) {}
+                            },
+                            100,
+                            1000,
+                            TimeUnit.MILLISECONDS
+                        );
 
-                                            // wait for data to be available
-                                            while ((read = inputStream.available()) <= 0) {
-                                                if (read == -1) break main;
-                                                sleep(THREAD_SLEEP_TIME);
-                                            }
+                        try {
+                            if (inputStream.read(buffer) == ENDPOINT_ID_LENGTH) {
+                                endpointID = new String(buffer, 0, ENDPOINT_ID_LENGTH);
 
-                                            // 1. EndpointID
-                                            if ((inputStream.read(input)) != ENDPOINT_ID_LENGTH) {
-                                                continue;
-                                            }
+                                callback.onConnected(endpointID);
+                            } else {
+                                throw new IOException(MISSING_ENDPOINT_ID);
+                            }
+                        } catch (IOException ignored) {
+                            continue;
+                        } finally {
+                            executorService.shutdown();
+                        }
 
-                                            @Nullable
-                                            String endpointID = new String(input, 0, ENDPOINT_ID_LENGTH);
+                        while (true) {
+                            if (inputStream.read(buffer) == 3) {
+                                int length = buffer[0] | (buffer[1] << 8) | (buffer[2] << 16);
 
-                                            // wait for data to be available
-                                            while ((read = inputStream.available()) <= 0) {
-                                                if (read == -1) break main;
-                                                sleep(THREAD_SLEEP_TIME);
-                                            }
+                                ByteBuffer payload = ByteBuffer.allocate(length);
 
-                                            // 2. Payload Size
-                                            if ((inputStream.read(input)) != 4) {
-                                                continue;
-                                            }
+                                int read;
+                                while ((read = inputStream.read(buffer)) > 0) {
+                                    payload.put(buffer, 0, read);
 
-                                            int payloadSize = ByteBuffer.wrap(input).order(ByteOrder.LITTLE_ENDIAN).getInt();
-                                            ByteBuffer buffer = ByteBuffer.allocate(payloadSize);
-
-                                            // 3. Payload Data
-                                            while (inputStream.available() > 0) {
-                                                buffer.put(input, 0, inputStream.read(input));
-                                            }
-
-                                            if (callback != null) {
-                                                byte[] payload = buffer.array();
-
-                                                callback.onPayload(endpointID, payload);
-                                            }
-                                        }
-                                    } catch (Exception exception) {
-                                        if (callback != null) callback.onFailure(exception);
+                                    if (length == payload.position()) {
+                                        break;
                                     }
-                                });
-
-                                if (callback != null) {
-                                    String endpointID = client.getRemoteDevice().getAddress();
-
-                                    callback.onConnected(endpointID);
                                 }
 
-                                connectThread.start();
+                                callback.onReceived(endpointID, payload.array());
+                            } else {
+                                throw new IOException(MISSING_PAYLOAD_LENGTH);
                             }
                         }
                     } catch (IOException exception) {
-                        if (callback != null) {
-                            callback.onDisconnected(exception.getMessage());
-                        }
-                    } catch (Exception exception) {
-                        if (callback != null) callback.onFailure(exception);
-                    }
-                }
-            });
+                        socket.close();
 
-            acceptThread.start();
-        } catch (Exception exception) {
-            callback.onFailure(exception);
-            return;
-        }
+                        if (endpointID != null) {
+                            callback.onDisconnected(endpointID);
+                        }
+                    }
+                } catch (IOException ignored) {
+                    if (endpointID != null) {
+                        callback.onDisconnected(endpointID);
+                    }
+
+                    break;
+                }
+            }
+        });
+        thread.start();
 
         advertiser = adapter.getBluetoothLeAdvertiser();
 
@@ -251,14 +249,11 @@ public class NearbyAdvertiser {
         AdvertiseData.Builder builder = new AdvertiseData.Builder()
             // Add a service UUID to advertise data.
             .addServiceUuid(new ParcelUuid(serviceUUID))
+            .addServiceUuid(new ParcelUuid(endpointUUID))
             // Whether the transmission power level should be included in the advertise packet.
             .setIncludeTxPowerLevel(false)
             // Set whether the device name should be included in advertise packet.
             .setIncludeDeviceName(false);
-
-        if (endpointUUID != null) {
-            builder.addServiceUuid(new ParcelUuid(endpointUUID));
-        }
 
         {
             byte size = (byte) ((data != null) ? data.length : 0);
@@ -322,12 +317,6 @@ public class NearbyAdvertiser {
             };
         }
 
-        // AdvertiseData scanResponse = new AdvertiseData.Builder()
-        //         .setIncludeDeviceName(true)
-        //         .build();
-
-        //        totalBytes(advertiseData, true);
-
         // java.lang.IllegalArgumentException: Legacy advertising data too big
         // java.lang.IllegalArgumentException: Advertising data too big
         // advertiser.startAdvertising(advertiseSettings, advertiseData, scanResponse, advertiseCallback);
@@ -383,9 +372,10 @@ public class NearbyAdvertiser {
 
         public void onFailure(Exception exception) {}
 
-        public void onConnected(String endpointID) {}
-        public void onDisconnected(String endpointID) {}
+        public void onConnected(@NonNull String endpointID) {}
 
-        public void onPayload(String endpointID, byte[] payload) {}
+        public void onDisconnected(@NonNull String endpointID) {}
+
+        public void onReceived(@NonNull String endpointID, byte[] payload) {}
     }
 }

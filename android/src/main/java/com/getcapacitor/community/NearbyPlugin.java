@@ -178,6 +178,7 @@ public class NearbyPlugin extends Plugin {
         }
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @PluginMethod
     public void stopDiscovering(PluginCall call) {
         Callback callback = new Callback(call) {};
@@ -410,7 +411,7 @@ public class NearbyPlugin extends Plugin {
         @Nullable
         String serviceID = getConfig().getString("serviceID");
 
-        return new NearbyConfig(endpointName, endpointInfo, serviceID);
+        return new NearbyConfig(getContext(), endpointName, endpointInfo, serviceID);
     }
 
     /**

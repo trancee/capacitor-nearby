@@ -123,10 +123,8 @@ public class NearbyHelper {
             return new String(Arrays.copyOfRange(array, 0, ENDPOINT_ID_LENGTH));
         }
 
-        @Nullable
-        public static UUID toUUID(@Nullable String id) {
-            if (id == null) return null;
-
+        @NonNull
+        public static UUID toUUID(@NonNull String id) {
             byte[] data = id.getBytes();
             assert data.length == ENDPOINT_ID_LENGTH : "name must be 4 characters in length";
 

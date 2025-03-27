@@ -11,11 +11,9 @@ import android.bluetooth.BluetoothGattServer;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.AdvertiseSettings;
 import android.content.Context;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresPermission;
-
 import com.getcapacitor.community.classes.Endpoint;
 import com.getcapacitor.community.classes.options.AcceptConnectionOptions;
 import com.getcapacitor.community.classes.options.ConnectOptions;
@@ -28,7 +26,6 @@ import com.getcapacitor.community.classes.options.StartAdvertisingOptions;
 import com.getcapacitor.community.classes.results.InitializeResult;
 import com.getcapacitor.community.classes.results.StatusResult;
 import com.getcapacitor.community.interfaces.Callback;
-
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
@@ -47,7 +44,7 @@ public class Nearby {
 
     private static final String MISSING_SERVICE_ID = "missing service identifier";
 
-    private static final String MISSING_PAYLOAD_ID = "missing payload identifier";
+    static final String MISSING_PAYLOAD_LENGTH = "missing payload length";
     private static final String MISSING_PAYLOAD = "missing payload";
 
     @NonNull
@@ -71,25 +68,23 @@ public class Nearby {
     protected UUID serviceUUID;
     protected UUID serviceMask = UUID.fromString("ffffffff-0000-0000-0000-000000000000");
 
-    private static final UUID SERVICE_UUID = UUID.fromString("57494e4b-0000-1000-8000-0805f9b34fb");
+    public static final UUID SERVICE_UUID = UUID.fromString("57494e4b-0000-1000-8000-0805f9b34fb");
     private static final UUID CHARACTERISTIC_UUID = UUID.fromString("57494e4b-0000-1000-8000-0805f9b34fb");
     private static final UUID PING_CHARACTERISTIC_UUID = UUID.fromString("50494e47-0000-1000-8000-0805f9b34fb");
     private static final UUID PONG_CHARACTERISTIC_UUID = UUID.fromString("504f4e47-0000-1000-8000-0805f9b34fb");
 
     public static Map<String, NearbyEndpoint> endpoints;
-    public static Map<String, NearbyEndpoint> connections;
 
     public Nearby(@NonNull NearbyConfig config, @NonNull NearbyPlugin plugin) {
         this.config = config;
         this.plugin = plugin;
 
-        this.context = plugin.getContext();
+        context = plugin.getContext();
 
         bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
         bluetoothAdapter = bluetoothManager.getAdapter();
 
         endpoints = new HashMap<>();
-        connections = new HashMap<>();
     }
 
     /**
@@ -157,7 +152,7 @@ public class Nearby {
 
         @NonNull
         String endpointID = config.getEndpointID();
-        @Nullable
+        @NonNull
         UUID endpointUUID = EndpointID.toUUID(endpointID);
 
         @Nullable
@@ -225,46 +220,46 @@ public class Nearby {
         }
 
         nearbyAdvertiser.start(
-                endpointInfo,
-                new NearbyAdvertiser.Callback() {
-                    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-                    @Override
-                    public void onSuccess(AdvertiseSettings settings) {
-                        // startGattServer();
+            endpointInfo,
+            new NearbyAdvertiser.Callback() {
+                @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                @Override
+                public void onSuccess(AdvertiseSettings settings) {
+                    // startGattServer();
 
-                        isAdvertising = true;
+                    isAdvertising = true;
 
-                        callback.success();
-                    }
-
-                    @Override
-                    public void onFailure(Exception exception) {
-                        isAdvertising = false;
-
-                        callback.error(exception);
-                    }
-
-                    @Override
-                    public void onConnected(String endpointID) {
-                        Endpoint endpoint = new Endpoint(endpointID);
-
-                        plugin.onEndpointConnected(endpoint);
-                    }
-
-                    @Override
-                    public void onDisconnected(String endpointID) {
-                        Endpoint endpoint = new Endpoint(endpointID);
-
-                        plugin.onEndpointDisconnected(endpoint);
-                    }
-
-                    @Override
-                    public void onPayload(@NonNull String endpointID, byte[] payload) {
-                        Endpoint endpoint = new Endpoint(endpointID);
-
-                        plugin.onPayloadReceived(endpoint, payload);
-                    }
+                    callback.success();
                 }
+
+                @Override
+                public void onFailure(Exception exception) {
+                    isAdvertising = false;
+
+                    callback.error(exception);
+                }
+
+                @Override
+                public void onConnected(@NonNull String endpointID) {
+                    Endpoint endpoint = new Endpoint(endpointID);
+
+                    plugin.onEndpointConnected(endpoint);
+                }
+
+                @Override
+                public void onDisconnected(@NonNull String endpointID) {
+                    Endpoint endpoint = new Endpoint(endpointID);
+
+                    plugin.onEndpointDisconnected(endpoint);
+                }
+
+                @Override
+                public void onReceived(@NonNull String endpointID, byte[] payload) {
+                    Endpoint endpoint = new Endpoint(endpointID);
+
+                    plugin.onPayloadReceived(endpoint, payload);
+                }
+            }
         );
     }
 
@@ -376,78 +371,87 @@ public class Nearby {
         }
 
         nearbyScanner.start(
-                new NearbyScanner.Callback() {
-                    @Override
-                    public void onFound(@Nullable UUID id, @Nullable String name, @Nullable byte[] info, @Nullable Short channel, Integer rssi, String address) {
-                        @Nullable
-                        String endpointID = EndpointID.fromUUID(id);
-                        @Nullable
-                        String endpointName = name;
-                        @Nullable
-                        byte[] endpointInfo = info;
+            new NearbyScanner.Callback() {
+                @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                @Override
+                public void onFound(
+                    @Nullable UUID id,
+                    @Nullable String name,
+                    @Nullable byte[] info,
+                    @Nullable Short channel,
+                    Integer rssi,
+                    BluetoothDevice device
+                ) {
+                    @Nullable
+                    String endpointID = EndpointID.fromUUID(id);
+                    @Nullable
+                    String endpointName = name;
+                    @Nullable
+                    byte[] endpointInfo = info;
 
-                        if (endpointID == null) return;
+                    if (endpointID == null) return;
 
-                        NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
-                        if (nearbyEndpoint != null) {
-                            nearbyEndpoint.alive();
-                        } else {
-                            new NearbyEndpoint(endpointID, endpointName, endpointInfo, channel, rssi, address, () -> {
-                                if (nearbyScanner.isScanning()) {
-                                    Endpoint endpoint = new Endpoint(endpointID);
-
-                                    plugin.onEndpointLost(endpoint);
-                                }
-
-                                NearbyEndpoint endpoint = endpoints.get(endpointID);
-                                if (endpoint != null) {
-                                    endpoint.kill();
-                                }
-                            });
-                            // endpoints.put(endpointID, nearbyEndpoint);
-
+                    NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
+                    if (nearbyEndpoint != null) {
+                        nearbyEndpoint.alive();
+                    } else {
+                        new NearbyEndpoint(config, endpointID, endpointName, endpointInfo, channel, rssi, device, () -> {
                             if (nearbyScanner.isScanning()) {
-                                Endpoint endpoint = new Endpoint(endpointID, endpointName, endpointInfo);
+                                Endpoint endpoint = new Endpoint(endpointID);
 
-                                plugin.onEndpointFound(endpoint);
+                                plugin.onEndpointLost(endpoint);
                             }
+
+                            NearbyEndpoint endpoint = endpoints.get(endpointID);
+                            if (endpoint != null) {
+                                endpoint.kill();
+                            }
+                        });
+                        // endpoints.put(endpointID, nearbyEndpoint);
+
+                        if (nearbyScanner.isScanning()) {
+                            Endpoint endpoint = new Endpoint(endpointID, endpointName, endpointInfo);
+
+                            plugin.onEndpointFound(endpoint);
                         }
-                    }
-
-                    @Override
-                    public void onLost(@Nullable UUID id) {
-                        @Nullable
-                        String endpointID = EndpointID.fromUUID(id);
-
-                        if (endpointID == null) return;
-
-                        NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
-                        if (nearbyEndpoint != null) {
-                            nearbyEndpoint.kill();
-                        }
-                        // endpoints.remove(endpointID);
-
-                        {
-                            Endpoint endpoint = new Endpoint(endpointID);
-
-                            plugin.onEndpointLost(endpoint);
-                        }
-                    }
-
-                    @Override
-                    public void onSuccess() {
-                        isDiscovering = true;
-
-                        callback.success();
-                    }
-
-                    @Override
-                    public void onFailure(Exception exception) {
-                        isDiscovering = false;
-
-                        callback.error(exception);
                     }
                 }
+
+                @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                @Override
+                public void onLost(@Nullable UUID id) {
+                    @Nullable
+                    String endpointID = EndpointID.fromUUID(id);
+
+                    if (endpointID == null) return;
+
+                    NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
+                    if (nearbyEndpoint != null) {
+                        nearbyEndpoint.kill();
+                    }
+                    // endpoints.remove(endpointID);
+
+                    {
+                        Endpoint endpoint = new Endpoint(endpointID);
+
+                        plugin.onEndpointLost(endpoint);
+                    }
+                }
+
+                @Override
+                public void onSuccess() {
+                    isDiscovering = true;
+
+                    callback.success();
+                }
+
+                @Override
+                public void onFailure(Exception exception) {
+                    isDiscovering = false;
+
+                    callback.error(exception);
+                }
+            }
         );
         //        connectionsClient
         //            .startDiscovery(serviceID, endpointDiscoveryCallback, discoveryOptions.build())
@@ -463,6 +467,7 @@ public class Nearby {
         //            });
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void stopDiscovering(@NonNull Callback callback) {
         stopDiscovering();
 
@@ -498,19 +503,11 @@ public class Nearby {
             return;
         }
 
-        String address = endpoint.getAddress();
+        if (!endpoint.connect()) {
+            Exception exception = new Exception(NOT_CONNECTED);
 
-        BluetoothDevice device;
-
-        if ((device = bluetoothAdapter.getRemoteDevice(address)) != null) {
-            if (
-                    !endpoint.connect(device)
-            ) {
-                Exception exception = new Exception(NOT_CONNECTED);
-
-                callback.error(exception);
-                return;
-            }
+            callback.error(exception);
+            return;
         }
 
         /*
@@ -682,7 +679,12 @@ public class Nearby {
             return;
         }
 
-        endpoint.disconnect();
+        if (!endpoint.disconnect()) {
+            Exception exception = new Exception(NOT_CONNECTED);
+
+            callback.error(exception);
+            return;
+        }
 
         /*
         final BluetoothGatt gatt = endpoint.getGatt();
@@ -724,9 +726,7 @@ public class Nearby {
             NearbyEndpoint endpoint;
 
             if ((endpoint = endpoints.get(endpointID)) != null) {
-                if (
-                        !endpoint.send(config.endpointID, payload)
-                ) {
+                if (!endpoint.send(payload)) {
                     Exception exception = new Exception(NOT_CONNECTED);
 
                     callback.error(exception);
@@ -779,6 +779,7 @@ public class Nearby {
     /**
      * Stops discovery.
      */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     protected void stopDiscovering() {
         isDiscovering = false;
 
@@ -798,10 +799,6 @@ public class Nearby {
         stopDiscovering();
         // connectionsClient.stopAllEndpoints();
     }
-    /**
-     * Callback for discovering endpoints.
-     */
-
     //    private final EndpointDiscoveryCallback endpointDiscoveryCallback = new EndpointDiscoveryCallback() {
     //        @Override
     //        public void onEndpointFound(@NonNull String endpointID, @NonNull DiscoveredEndpointInfo info) {

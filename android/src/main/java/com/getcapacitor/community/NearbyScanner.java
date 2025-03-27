@@ -121,8 +121,6 @@ public class NearbyScanner {
                     BluetoothDevice device = result.getDevice();
                     if (device == null) return;
 
-                    String address = device.getAddress();
-
                     List<ParcelUuid> serviceUuids = record.getServiceUuids();
                     if (serviceUuids != null) {
                         @Nullable
@@ -161,10 +159,8 @@ public class NearbyScanner {
                             break;
                         }
 
-                        // device.setAlias(id);
-
                         if (callback != null) {
-                            callback.onFound(id, name, info, channel, rssi, address);
+                            callback.onFound(id, name, info, channel, rssi, device);
                         }
                     }
                 }
@@ -250,7 +246,14 @@ public class NearbyScanner {
 
     public abstract static class Callback {
 
-        public void onFound(@Nullable UUID id, @Nullable String name, @Nullable byte[] info, @Nullable Short channel, Integer rssi, String address) {}
+        public void onFound(
+            @Nullable UUID id,
+            @Nullable String name,
+            @Nullable byte[] info,
+            @Nullable Short channel,
+            Integer rssi,
+            BluetoothDevice device
+        ) {}
 
         public void onLost(@Nullable UUID id) {}
 

@@ -5,41 +5,41 @@ import static com.getcapacitor.community.Nearby.endpoints;
 import android.Manifest;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothSocket;
 import android.os.Build;
 import android.os.Handler;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresPermission;
-
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.UUID;
 
 public class NearbyEndpoint {
 
     private static final UUID SERVICE_UUID = UUID.fromString("57494e4b-0000-1000-8000-0805f9b34fb");
+    public static final int MAXIMUM_PAYLOAD_SIZE = 0x1000000;
 
     @NonNull
-    String endpointID;
-
-    @Nullable
-    String endpointName;
-    @Nullable
-    byte[] endpointInfo;
-
-    @Nullable
-    Short channel;
-
-    @Nullable
-    Integer rssi;
+    final NearbyConfig config;
 
     @NonNull
-    private final String address;
+    final String endpointID;
+
+    @Nullable
+    final String endpointName;
+
+    @Nullable
+    final byte[] endpointInfo;
+
+    @Nullable
+    final Short channel;
+
+    @Nullable
+    final Integer rssi;
+
+    @NonNull
+    private final BluetoothDevice device;
 
     @Nullable
     private BluetoothGatt gatt;
@@ -47,27 +47,30 @@ public class NearbyEndpoint {
     @Nullable
     private BluetoothSocket socket;
 
-    int state;
-    //private boolean isConnected;
-
     long timestamp;
 
     final Handler handler = new Handler();
     final Runnable runnable;
+
+    @Nullable
+    private Thread thread;
 
     long lastSeen;
 
     public static long ttlSeconds = 10;
 
     public NearbyEndpoint(
-            @NonNull String endpointID,
-            @Nullable String endpointName,
-            @Nullable byte[] endpointInfo,
-            @Nullable Short channel,
-            @Nullable Integer rssi,
-            @NonNull String address,
-            final Runnable runnable
+        @NonNull NearbyConfig config,
+        @NonNull String endpointID,
+        @Nullable String endpointName,
+        @Nullable byte[] endpointInfo,
+        @Nullable Short channel,
+        @Nullable Integer rssi,
+        @NonNull BluetoothDevice device,
+        final Runnable runnable
     ) {
+        this.config = config;
+
         this.endpointID = endpointID;
         this.endpointName = endpointName;
         this.endpointInfo = endpointInfo;
@@ -75,10 +78,7 @@ public class NearbyEndpoint {
         this.channel = channel;
         this.rssi = rssi;
 
-        this.address = address;
-
-        this.state = BluetoothProfile.STATE_DISCONNECTED;
-        //this.isConnected = false;
+        this.device = device;
 
         this.runnable = runnable;
 
@@ -90,7 +90,20 @@ public class NearbyEndpoint {
         endpoints.put(endpointID, this);
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    protected void finalize() {
+        close();
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    public void close() {
+        kill();
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void kill() {
+        disconnect();
+
         handler.removeCallbacks(runnable);
 
         // Kill yourself.
@@ -108,86 +121,102 @@ public class NearbyEndpoint {
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    public void closeGatt() {
-        if (this.gatt != null) {
-            gatt.close();
-        }
+    public boolean connect() {
+        /*
+        BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
+            @Override
+            public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+                super.onConnectionStateChange(gatt, status, newState);
 
-        this.gatt = null;
-    }
-
-    public void setGatt(@Nullable BluetoothGatt gatt) {
-        this.gatt = gatt;
-    }
-
-    @NonNull
-    public String getAddress() {
-        return address;
-    }
-
-    @Nullable
-    public BluetoothGatt getGatt() {
-        return gatt;
-    }
-
-    public boolean isConnected() {
-        return socket != null && socket.isConnected();
-    }
-
-    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    public boolean connect(BluetoothDevice device) {
-        if (socket == null || !socket.isConnected()) {
-            try {
-                if (channel != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    // L2CAP (>= Android 10)
-                    socket = device.createInsecureL2capChannel(channel);
-                    // socket = device.createL2capChannel(channel);
-                } else {
-                    // RFCOMM (< Android 10)
-                    socket = device.createInsecureRfcommSocketToServiceRecord(SERVICE_UUID);
-                    // socket = device.createRfcommSocketToServiceRecord(SERVICE_UUID);
+                switch (newState) {
+                    case BluetoothProfile.STATE_CONNECTED:
+                        if (callback != null) {
+                            callback.onConnected();
+                        }
+                        break;
+                    case BluetoothProfile.STATE_CONNECTING:
+                        // TODO
+                        break;
+                    case BluetoothProfile.STATE_DISCONNECTING:
+                        // TODO
+                        break;
+                    case BluetoothProfile.STATE_DISCONNECTED:
+                        if (callback != null) {
+                            callback.onDisconnected();
+                        }
+                        break;
                 }
-
-                socket.connect();
-            } catch (IOException e) {
-                disconnect();
-
-                return false;
             }
+        };
+
+        gatt = device.connectGatt(config.getContext(), false, gattCallback);
+        */
+
+        try {
+            // Get a BluetoothSocket for a connection with the
+            // given BluetoothDevice
+            if (channel != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // L2CAP (>= Android 10)
+                socket = device.createInsecureL2capChannel(channel);
+                // socket = device.createL2capChannel(channel);
+            } else {
+                // RFCOMM (< Android 10)
+                socket = device.createInsecureRfcommSocketToServiceRecord(SERVICE_UUID);
+                // socket = device.createRfcommSocketToServiceRecord(SERVICE_UUID);
+            }
+
+            // This is a blocking call and will only return on a
+            // successful connection or an exception
+            socket.connect();
+
+            OutputStream outputStream;
+            if ((outputStream = socket.getOutputStream()) != null) {
+                outputStream.write(config.endpointID.getBytes());
+            }
+        } catch (Exception ignored) {
+            return false;
         }
 
         return true;
     }
 
-    public void disconnect() {
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    public boolean disconnect() {
         if (socket != null) {
             try {
                 socket.close();
             } catch (IOException ignored) {
+                return false;
             }
 
             socket = null;
         }
+
+        if (thread != null) {
+            thread.interrupt();
+            thread = null;
+        }
+
+        return true;
     }
 
-    public boolean send(@NonNull String endpointID, @NonNull byte[] payload) {
-        if (socket != null && socket.isConnected()) {
-            try (
-                    OutputStream outputStream = socket.getOutputStream()
-            ) {
-                // 1. EndpointID
-                outputStream.write(endpointID.getBytes());
+    public boolean send(@NonNull byte[] payload) {
+        if (socket != null) {
+            try {
+                OutputStream outputStream;
+                if ((outputStream = socket.getOutputStream()) != null) {
+                    int length = payload.length;
 
-                // 2. Payload Size
-                outputStream.write(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(payload.length).array());
+                    if (length >= MAXIMUM_PAYLOAD_SIZE) {
+                        return false;
+                    }
 
-                // 3. Payload Data
-                outputStream.write(payload);
+                    outputStream.write(new byte[] { (byte) (length), (byte) (length >> 8), (byte) (length >> 16) });
+                    outputStream.write(payload);
 
-                return true;
-            } catch (IOException e) {
-                disconnect();
-            }
+                    return true;
+                }
+            } catch (IOException ignored) {}
         }
 
         return false;
