@@ -15,12 +15,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresPermission;
 import com.getcapacitor.community.classes.Endpoint;
-import com.getcapacitor.community.classes.options.AcceptConnectionOptions;
 import com.getcapacitor.community.classes.options.ConnectOptions;
 import com.getcapacitor.community.classes.options.DisconnectOptions;
 import com.getcapacitor.community.classes.options.InitializeOptions;
-import com.getcapacitor.community.classes.options.RejectConnectionOptions;
-import com.getcapacitor.community.classes.options.RequestConnectionOptions;
 import com.getcapacitor.community.classes.options.SendPayloadOptions;
 import com.getcapacitor.community.classes.options.StartAdvertisingOptions;
 import com.getcapacitor.community.classes.results.InitializeResult;
@@ -417,6 +414,7 @@ public class Nearby {
                     }
                 }
 
+                /*
                 @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
                 @Override
                 public void onLost(@Nullable UUID id) {
@@ -437,7 +435,7 @@ public class Nearby {
                         plugin.onEndpointLost(endpoint);
                     }
                 }
-
+                */
                 @Override
                 public void onSuccess() {
                     isDiscovering = true;
@@ -611,49 +609,6 @@ public class Nearby {
         //        }
 
         callback.success();
-    }
-
-    public void requestConnection(@NonNull RequestConnectionOptions options, @NonNull Callback callback) {
-        String endpointID = options.getEndpointID();
-        if (endpointID == null) {
-            Exception exception = new Exception(MISSING_ENDPOINT_ID);
-            callback.error(exception);
-            return;
-        }
-
-        byte[] endpointInfo = options.getEndpointInfo();
-        //        if (endpointInfo == null || endpointInfo.isEmpty()) {
-        //            Exception exception = new Exception(MISSING_ENDPOINT_INFO);
-        //            callback.error(exception);
-        //            return;
-        //        }
-        //        connectionsClient
-        //            .requestConnection(name, endpointID, connectionLifecycleCallback, connectionOptions.build())
-        //            .addOnSuccessListener(callback::success)
-        //            .addOnFailureListener(callback::error);
-    }
-
-    public void acceptConnection(@NonNull AcceptConnectionOptions options, @NonNull Callback callback) {
-        String endpointID = options.getEndpointID();
-        if (endpointID == null) {
-            Exception exception = new Exception(MISSING_ENDPOINT_ID);
-            callback.error(exception);
-            return;
-        }
-        //        connectionsClient
-        //            .acceptConnection(endpointID, payloadCallback)
-        //            .addOnSuccessListener(callback::success)
-        //            .addOnFailureListener(callback::error);
-    }
-
-    public void rejectConnection(@NonNull RejectConnectionOptions options, @NonNull Callback callback) {
-        String endpointID = options.getEndpointID();
-        if (endpointID == null) {
-            Exception exception = new Exception(MISSING_ENDPOINT_ID);
-            callback.error(exception);
-            return;
-        }
-        //        connectionsClient.rejectConnection(endpointID).addOnSuccessListener(callback::success).addOnFailureListener(callback::error);
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)

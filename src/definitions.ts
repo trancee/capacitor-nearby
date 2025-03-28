@@ -80,29 +80,6 @@ export interface NearbyPlugin {
    */
   stopDiscovering(): Promise<void>;
 
-  /**
-   * Sends a request to connect to a remote endpoint.
-   *
-   * @since 4.1.0
-   */
-  requestConnection(options: RequestConnectionOptions): Promise<void>;
-  /**
-   * Accepts a connection to a remote endpoint.
-   *
-   * @since 4.1.0
-   */
-  acceptConnection(options: AcceptConnectionOptions): Promise<void>;
-  /**
-   * Rejects a connection to a remote endpoint.
-   *
-   * @since 4.1.0
-   */
-  rejectConnection(options: RejectConnectionOptions): Promise<void>;
-  /**
-   * Connects to a remote endpoint.
-   *
-   * @since 4.1.0
-   */
   connect(options: ConnectOptions): Promise<void>;
   /**
    * Disconnects from a remote endpoint.
@@ -172,27 +149,11 @@ export interface NearbyPlugin {
   addListener(eventName: 'onEndpointLost', listenerFunc: EndpointLostCallback): Promise<PluginListenerHandle>;
 
   /**
-   * A basic encrypted channel has been created between you and the endpoint.
-   * Both sides are now asked if they wish to accept or reject the connection before any data can be sent over this channel.
-   *
-   * @since 4.1.0
-   */
-  addListener(eventName: 'onEndpointInitiated', listenerFunc: EndpointInitiatedCallback): Promise<PluginListenerHandle>;
-  /**
-   * Called after both sides have accepted the connection.
-   * Both sides may now send Payloads to each other.
+   * Called when a remote endpoint is connected.
    *
    * @since 4.1.0
    */
   addListener(eventName: 'onEndpointConnected', listenerFunc: EndpointConnectedCallback): Promise<PluginListenerHandle>;
-  /**
-   * Called when either side rejected the connection.
-   * Payloads can not be exchaged.
-   *
-   * @since 4.1.0
-   */
-  addListener(eventName: 'onEndpointRejected', listenerFunc: EndpointRejectedCallback): Promise<PluginListenerHandle>;
-  addListener(eventName: 'onEndpointFailed', listenerFunc: EndpointFailedCallback): Promise<PluginListenerHandle>;
   /**
    * Called when a remote endpoint is disconnected or has become unreachable.
    *
@@ -267,30 +228,13 @@ export type EndpointLostCallback = (_: Endpoint) => void;
 // Connection Lifecycle
 
 /**
- * A basic encrypted channel has been created between you and the endpoint.
- * Both sides are now asked if they wish to accept or reject the connection before any data can be sent over this channel.
- *
- * @since 4.1.0
- */
-export type EndpointInitiatedCallback = (_: Endpoint) => void;
-/**
- * Called after both sides have accepted the connection.
- * Both sides may now send Payloads to each other.
+ * Called when a remote endpoint is connected.
  *
  * @since 4.1.0
  */
 export type EndpointConnectedCallback = (_: Endpoint) => void;
 /**
- * Called when either side rejected the connection.
- * Payloads can not be exchaged.
- *
- * @since 4.1.0
- */
-export type EndpointRejectedCallback = (_: Endpoint) => void;
-export type EndpointFailedCallback = (_: Endpoint) => void;
-/**
  * Called when a remote endpoint is disconnected or has become unreachable.
- * At this point service (re-)discovery may start again.
  *
  * @since 4.1.0
  */
@@ -373,36 +317,18 @@ export interface StartAdvertisingOptions {
   endpointInfo?: string;
 }
 
-export interface RequestConnectionOptions {
+export interface ConnectOptions {
   /**
-   * The identifier for the remote endpoint to which a connection request will be sent.
-   *
-   * @since 4.1.0
-   */
-  endpointID: EndpointID;
-
-  /**
-   * Identifing information about this endpoint.
-   *
-   * ___Note: maximum length is 14 bytes.___
-   *
-   * @since 4.1.0
-   */
-  endpointInfo?: string;
-}
-
-export interface AcceptConnectionOptions {
-  /**
-   * The identifier for the remote endpoint.
+   * The identifier for the remote endpoint to connect to.
    *
    * @since 4.1.0
    */
   endpointID: EndpointID;
 }
 
-export interface RejectConnectionOptions {
+export interface DisconnectOptions {
   /**
-   * The identifier for the remote endpoint.
+   * The identifier for the remote endpoint to disconnect from.
    *
    * @since 4.1.0
    */
@@ -430,24 +356,6 @@ export interface SendPayloadOptions {
    * @type Base64 encoded string
    */
   payload: string;
-}
-
-export interface ConnectOptions {
-  /**
-   * The identifier for the remote endpoint to connect to.
-   *
-   * @since 4.1.0
-   */
-  endpointID: EndpointID;
-}
-
-export interface DisconnectOptions {
-  /**
-   * The identifier for the remote endpoint to disconnect from.
-   *
-   * @since 4.1.0
-   */
-  endpointID: EndpointID;
 }
 
 export interface StatusResult {

@@ -21,7 +21,7 @@ public class SendPayloadOptions {
 
         @Nullable
         String endpointID = call.getString("endpointID");
-        if (endpointID != null) {
+        if (endpointID != null && !endpointID.isEmpty()) {
             endpointIDs.add(endpointID);
         }
 
@@ -29,7 +29,9 @@ public class SendPayloadOptions {
         JSArray endpointArray = call.getArray("endpointIDs");
         if (endpointArray != null) {
             for (var item : endpointArray.toList()) {
-                endpointIDs.add((String) item);
+                if (endpointID != null && !endpointID.isEmpty()) {
+                    endpointIDs.add((String) item);
+                }
             }
         }
 

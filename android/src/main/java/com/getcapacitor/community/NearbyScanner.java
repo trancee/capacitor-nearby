@@ -126,7 +126,7 @@ public class NearbyScanner {
                         @Nullable
                         UUID id = null;
                         @Nullable
-                        String name = null;
+                        String name = device.getName();
                         @Nullable
                         byte[] info = null;
                         @Nullable
@@ -254,8 +254,6 @@ public class NearbyScanner {
             Integer rssi,
             BluetoothDevice device
         ) {}
-
-        public void onLost(@Nullable UUID id) {}
 
         public void onSuccess() {}
 

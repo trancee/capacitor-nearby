@@ -198,28 +198,10 @@ Nearby.addListener('onEndpointLost', (endpoint) => {
     }
 })
 
-Nearby.addListener('onEndpointInitiated', (endpoint) => {
-    console.log('onEndpointInitiated', endpoint)
-
-    logEvent(`onEndpointInitiated(${JSON.stringify(endpoint) || ""})`)
-})
-
 Nearby.addListener('onEndpointConnected', (endpoint) => {
     console.log('onEndpointConnected', endpoint)
 
     logEvent(`onEndpointConnected(${JSON.stringify(endpoint) || ""})`)
-})
-
-Nearby.addListener('onEndpointRejected', (endpoint) => {
-    console.log('onEndpointRejected', endpoint)
-
-    logEvent(`onEndpointRejected(${JSON.stringify(endpoint) || ""})`)
-})
-
-Nearby.addListener('onEndpointFailed', (endpoint) => {
-    console.log('onEndpointFailed', endpoint)
-
-    logEvent(`onEndpointFailed(${JSON.stringify(endpoint) || ""})`)
 })
 
 Nearby.addListener('onEndpointDisconnected', (endpoint) => {
@@ -232,12 +214,6 @@ Nearby.addListener('onPayloadReceived', (endpoint) => {
     console.log('onPayloadReceived', endpoint)
 
     logEvent(`onPayloadReceived(${JSON.stringify(endpoint) || ""})`)
-})
-
-Nearby.addListener('onPayloadTransferUpdate', (endpoint) => {
-    console.log('onPayloadTransferUpdate', endpoint)
-
-    logEvent(`onPayloadTransferUpdate(${JSON.stringify(endpoint) || ""})`)
 })
 
 window.toggle = async (element) => {

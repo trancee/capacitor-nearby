@@ -124,9 +124,6 @@ export default config;
 * [`stopAdvertising()`](#stopadvertising)
 * [`startDiscovering()`](#startdiscovering)
 * [`stopDiscovering()`](#stopdiscovering)
-* [`requestConnection(...)`](#requestconnection)
-* [`acceptConnection(...)`](#acceptconnection)
-* [`rejectConnection(...)`](#rejectconnection)
 * [`connect(...)`](#connect)
 * [`disconnect(...)`](#disconnect)
 * [`sendPayload(...)`](#sendpayload)
@@ -137,10 +134,7 @@ export default config;
 * [`addListener('onBluetoothStateChanged', ...)`](#addlisteneronbluetoothstatechanged-)
 * [`addListener('onEndpointFound', ...)`](#addlisteneronendpointfound-)
 * [`addListener('onEndpointLost', ...)`](#addlisteneronendpointlost-)
-* [`addListener('onEndpointInitiated', ...)`](#addlisteneronendpointinitiated-)
 * [`addListener('onEndpointConnected', ...)`](#addlisteneronendpointconnected-)
-* [`addListener('onEndpointRejected', ...)`](#addlisteneronendpointrejected-)
-* [`addListener('onEndpointFailed', ...)`](#addlisteneronendpointfailed-)
 * [`addListener('onEndpointDisconnected', ...)`](#addlisteneronendpointdisconnected-)
 * [`addListener('onPayloadReceived', ...)`](#addlisteneronpayloadreceived-)
 * [Interfaces](#interfaces)
@@ -240,70 +234,15 @@ Stops discovering remote endpoints.
 --------------------
 
 
-### requestConnection(...)
-
-```typescript
-requestConnection(options: RequestConnectionOptions) => Promise<void>
-```
-
-Sends a request to connect to a remote endpoint.
-
-| Param         | Type                                                                          |
-| ------------- | ----------------------------------------------------------------------------- |
-| **`options`** | <code><a href="#requestconnectionoptions">RequestConnectionOptions</a></code> |
-
-**Since:** 4.1.0
-
---------------------
-
-
-### acceptConnection(...)
-
-```typescript
-acceptConnection(options: AcceptConnectionOptions) => Promise<void>
-```
-
-Accepts a connection to a remote endpoint.
-
-| Param         | Type                                                                        |
-| ------------- | --------------------------------------------------------------------------- |
-| **`options`** | <code><a href="#acceptconnectionoptions">AcceptConnectionOptions</a></code> |
-
-**Since:** 4.1.0
-
---------------------
-
-
-### rejectConnection(...)
-
-```typescript
-rejectConnection(options: RejectConnectionOptions) => Promise<void>
-```
-
-Rejects a connection to a remote endpoint.
-
-| Param         | Type                                                                        |
-| ------------- | --------------------------------------------------------------------------- |
-| **`options`** | <code><a href="#rejectconnectionoptions">RejectConnectionOptions</a></code> |
-
-**Since:** 4.1.0
-
---------------------
-
-
 ### connect(...)
 
 ```typescript
 connect(options: ConnectOptions) => Promise<void>
 ```
 
-Connects to a remote endpoint.
-
 | Param         | Type                                                      |
 | ------------- | --------------------------------------------------------- |
 | **`options`** | <code><a href="#connectoptions">ConnectOptions</a></code> |
-
-**Since:** 4.1.0
 
 --------------------
 
@@ -472,35 +411,13 @@ Called when a remote endpoint is no longer discoverable.
 --------------------
 
 
-### addListener('onEndpointInitiated', ...)
-
-```typescript
-addListener(eventName: 'onEndpointInitiated', listenerFunc: EndpointInitiatedCallback) => Promise<PluginListenerHandle>
-```
-
-A basic encrypted channel has been created between you and the endpoint.
-Both sides are now asked if they wish to accept or reject the connection before any data can be sent over this channel.
-
-| Param              | Type                                                                            |
-| ------------------ | ------------------------------------------------------------------------------- |
-| **`eventName`**    | <code>'onEndpointInitiated'</code>                                              |
-| **`listenerFunc`** | <code><a href="#endpointinitiatedcallback">EndpointInitiatedCallback</a></code> |
-
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
-
-**Since:** 4.1.0
-
---------------------
-
-
 ### addListener('onEndpointConnected', ...)
 
 ```typescript
 addListener(eventName: 'onEndpointConnected', listenerFunc: EndpointConnectedCallback) => Promise<PluginListenerHandle>
 ```
 
-Called after both sides have accepted the connection.
-Both sides may now send Payloads to each other.
+Called when a remote endpoint is connected.
 
 | Param              | Type                                                                            |
 | ------------------ | ------------------------------------------------------------------------------- |
@@ -510,43 +427,6 @@ Both sides may now send Payloads to each other.
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 **Since:** 4.1.0
-
---------------------
-
-
-### addListener('onEndpointRejected', ...)
-
-```typescript
-addListener(eventName: 'onEndpointRejected', listenerFunc: EndpointRejectedCallback) => Promise<PluginListenerHandle>
-```
-
-Called when either side rejected the connection.
-Payloads can not be exchaged.
-
-| Param              | Type                                                                          |
-| ------------------ | ----------------------------------------------------------------------------- |
-| **`eventName`**    | <code>'onEndpointRejected'</code>                                             |
-| **`listenerFunc`** | <code><a href="#endpointrejectedcallback">EndpointRejectedCallback</a></code> |
-
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
-
-**Since:** 4.1.0
-
---------------------
-
-
-### addListener('onEndpointFailed', ...)
-
-```typescript
-addListener(eventName: 'onEndpointFailed', listenerFunc: EndpointFailedCallback) => Promise<PluginListenerHandle>
-```
-
-| Param              | Type                                                                      |
-| ------------------ | ------------------------------------------------------------------------- |
-| **`eventName`**    | <code>'onEndpointFailed'</code>                                           |
-| **`listenerFunc`** | <code><a href="#endpointfailedcallback">EndpointFailedCallback</a></code> |
-
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 --------------------
 
@@ -615,28 +495,6 @@ Called when a <a href="#payload">`Payload`</a> is received from a remote endpoin
 | Prop               | Type                | Description                                                                         | Since |
 | ------------------ | ------------------- | ----------------------------------------------------------------------------------- | ----- |
 | **`endpointInfo`** | <code>string</code> | Identifing information about this endpoint. ___Note: maximum length is 14 bytes.___ | 4.1.0 |
-
-
-#### RequestConnectionOptions
-
-| Prop               | Type                                              | Description                                                                         | Since |
-| ------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------- | ----- |
-| **`endpointID`**   | <code><a href="#endpointid">EndpointID</a></code> | The identifier for the remote endpoint to which a connection request will be sent.  | 4.1.0 |
-| **`endpointInfo`** | <code>string</code>                               | Identifing information about this endpoint. ___Note: maximum length is 14 bytes.___ | 4.1.0 |
-
-
-#### AcceptConnectionOptions
-
-| Prop             | Type                                              | Description                             | Since |
-| ---------------- | ------------------------------------------------- | --------------------------------------- | ----- |
-| **`endpointID`** | <code><a href="#endpointid">EndpointID</a></code> | The identifier for the remote endpoint. | 4.1.0 |
-
-
-#### RejectConnectionOptions
-
-| Prop             | Type                                              | Description                             | Since |
-| ---------------- | ------------------------------------------------- | --------------------------------------- | ----- |
-| **`endpointID`** | <code><a href="#endpointid">EndpointID</a></code> | The identifier for the remote endpoint. | 4.1.0 |
 
 
 #### ConnectOptions
@@ -751,31 +609,9 @@ Called when a remote endpoint is no longer discoverable.
 <code>(_: <a href="#endpoint">Endpoint</a>): void</code>
 
 
-#### EndpointInitiatedCallback
-
-A basic encrypted channel has been created between you and the endpoint.
-Both sides are now asked if they wish to accept or reject the connection before any data can be sent over this channel.
-
-<code>(_: <a href="#endpoint">Endpoint</a>): void</code>
-
-
 #### EndpointConnectedCallback
 
-Called after both sides have accepted the connection.
-Both sides may now send Payloads to each other.
-
-<code>(_: <a href="#endpoint">Endpoint</a>): void</code>
-
-
-#### EndpointRejectedCallback
-
-Called when either side rejected the connection.
-Payloads can not be exchaged.
-
-<code>(_: <a href="#endpoint">Endpoint</a>): void</code>
-
-
-#### EndpointFailedCallback
+Called when a remote endpoint is connected.
 
 <code>(_: <a href="#endpoint">Endpoint</a>): void</code>
 
@@ -783,7 +619,6 @@ Payloads can not be exchaged.
 #### EndpointDisconnectedCallback
 
 Called when a remote endpoint is disconnected or has become unreachable.
-At this point service (re-)discovery may start again.
 
 <code>(_: <a href="#endpoint">Endpoint</a>): void</code>
 

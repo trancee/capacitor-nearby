@@ -147,7 +147,7 @@ public class NearbyHelper {
         @NonNull
         public static String fromBytes(@Nullable byte[] name) {
             StringBuilder endpointID = new StringBuilder(ENDPOINT_ID_LENGTH);
-
+            /*
             byte[] input = new byte[1 + (name != null ? name.length : 0)];
 
             input[0] = (byte) (random.nextInt() & 0xff);
@@ -155,8 +155,8 @@ public class NearbyHelper {
             if (name != null) {
                 System.arraycopy(name, 0, input, 1, name.length);
             }
-
-            byte[] data = hash(input, ENDPOINT_ID_LENGTH);
+            */
+            byte[] data = hash(name, ENDPOINT_ID_LENGTH);
 
             for (byte c : data) {
                 endpointID.append(kEndpointIdChars[(c & 0xff) % kEndpointIdChars.length]);

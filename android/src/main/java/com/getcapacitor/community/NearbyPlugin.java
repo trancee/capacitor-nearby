@@ -17,18 +17,12 @@ import com.getcapacitor.annotation.PermissionCallback;
 import com.getcapacitor.community.classes.Endpoint;
 import com.getcapacitor.community.classes.events.EndpointConnectedEvent;
 import com.getcapacitor.community.classes.events.EndpointDisconnectedEvent;
-import com.getcapacitor.community.classes.events.EndpointFailedEvent;
 import com.getcapacitor.community.classes.events.EndpointFoundEvent;
-import com.getcapacitor.community.classes.events.EndpointInitiatedEvent;
 import com.getcapacitor.community.classes.events.EndpointLostEvent;
-import com.getcapacitor.community.classes.events.EndpointRejectedEvent;
 import com.getcapacitor.community.classes.events.PayloadReceivedEvent;
-import com.getcapacitor.community.classes.options.AcceptConnectionOptions;
 import com.getcapacitor.community.classes.options.ConnectOptions;
 import com.getcapacitor.community.classes.options.DisconnectOptions;
 import com.getcapacitor.community.classes.options.InitializeOptions;
-import com.getcapacitor.community.classes.options.RejectConnectionOptions;
-import com.getcapacitor.community.classes.options.RequestConnectionOptions;
 import com.getcapacitor.community.classes.options.SendPayloadOptions;
 import com.getcapacitor.community.classes.options.StartAdvertisingOptions;
 import com.getcapacitor.community.interfaces.Callback;
@@ -82,10 +76,7 @@ public class NearbyPlugin extends Plugin {
 
     static final String ENDPOINT_FOUND_EVENT = "onEndpointFound";
     static final String ENDPOINT_LOST_EVENT = "onEndpointLost";
-    static final String ENDPOINT_INITIATED_EVENT = "onEndpointInitiated";
     static final String ENDPOINT_CONNECTED_EVENT = "onEndpointConnected";
-    static final String ENDPOINT_REJECTED_EVENT = "onEndpointRejected";
-    static final String ENDPOINT_FAILED_EVENT = "onEndpointFailed";
     static final String ENDPOINT_DISCONNECTED_EVENT = "onEndpointDisconnected";
     static final String PAYLOAD_RECEIVED_EVENT = "onPayloadReceived";
 
@@ -193,45 +184,6 @@ public class NearbyPlugin extends Plugin {
     /**
      * Connection
      */
-
-    @PluginMethod
-    public void requestConnection(PluginCall call) {
-        Callback callback = new Callback(call) {};
-
-        try {
-            RequestConnectionOptions options = new RequestConnectionOptions(call, config);
-
-            implementation.requestConnection(options, callback);
-        } catch (Exception exception) {
-            callback.error(exception);
-        }
-    }
-
-    @PluginMethod
-    public void acceptConnection(PluginCall call) {
-        Callback callback = new Callback(call) {};
-
-        try {
-            AcceptConnectionOptions options = new AcceptConnectionOptions(call);
-
-            implementation.acceptConnection(options, callback);
-        } catch (Exception exception) {
-            callback.error(exception);
-        }
-    }
-
-    @PluginMethod
-    public void rejectConnection(PluginCall call) {
-        Callback callback = new Callback(call) {};
-
-        try {
-            RejectConnectionOptions options = new RejectConnectionOptions(call);
-
-            implementation.rejectConnection(options, callback);
-        } catch (Exception exception) {
-            callback.error(exception);
-        }
-    }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @PluginMethod
@@ -433,39 +385,12 @@ public class NearbyPlugin extends Plugin {
     }
 
     /**
-     * A basic encrypted channel has been created between you and the endpoint.
-     */
-    protected void onEndpointInitiated(Endpoint endpoint) {
-        EndpointInitiatedEvent event = new EndpointInitiatedEvent(endpoint);
-
-        notifyListeners(ENDPOINT_INITIATED_EVENT, event.toJSObject());
-    }
-
-    /**
      * Called after both sides have accepted the connection.
      */
     protected void onEndpointConnected(Endpoint endpoint) {
         EndpointConnectedEvent event = new EndpointConnectedEvent(endpoint);
 
         notifyListeners(ENDPOINT_CONNECTED_EVENT, event.toJSObject());
-    }
-
-    /**
-     * Called after one side has rejected the connection.
-     */
-    protected void onEndpointRejected(Endpoint endpoint) {
-        EndpointRejectedEvent event = new EndpointRejectedEvent(endpoint);
-
-        notifyListeners(ENDPOINT_REJECTED_EVENT, event.toJSObject());
-    }
-
-    /**
-     * Called after the connection has failed.
-     */
-    protected void onEndpointFailed(Endpoint endpoint) {
-        EndpointFailedEvent event = new EndpointFailedEvent(endpoint);
-
-        notifyListeners(ENDPOINT_FAILED_EVENT, event.toJSObject());
     }
 
     /**
