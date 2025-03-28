@@ -22,7 +22,6 @@ public class InitializeOptions {
         if (endpointName != null && !endpointName.isEmpty()) {
             config.setEndpointName(endpointName);
         }
-
         this.setEndpointName(endpointName);
 
         @Nullable
@@ -39,11 +38,10 @@ public class InitializeOptions {
 
             config.setEndpointInfo(endpointInfo);
         }
-
         this.setEndpointInfo(endpointInfo);
 
         String serviceID = call.getString("serviceID");
-        if (serviceID != null) {
+        if (serviceID != null && !serviceID.isEmpty()) {
             config.setServiceID(serviceID);
         }
         this.setServiceID(serviceID);

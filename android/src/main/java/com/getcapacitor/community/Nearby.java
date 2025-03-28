@@ -88,17 +88,17 @@ public class Nearby {
      * Initialize
      */
     public void initialize(@NonNull InitializeOptions options, @NonNull Callback callback) {
-        if (config.getEndpointName() == null) {
-            Exception exception = new Exception(MISSING_ENDPOINT_NAME);
-            callback.error(exception);
-            return;
-        }
+        // if (config.getEndpointName() == null) {
+        //     Exception exception = new Exception(MISSING_ENDPOINT_NAME);
+        //     callback.error(exception);
+        //     return;
+        // }
 
-        if (config.getEndpointInfo() == null) {
-            Exception exception = new Exception(MISSING_ENDPOINT_INFO);
-            callback.error(exception);
-            return;
-        }
+        // if (config.getEndpointInfo() == null) {
+        //     Exception exception = new Exception(MISSING_ENDPOINT_INFO);
+        //     callback.error(exception);
+        //     return;
+        // }
 
         if (config.getServiceID() == null) {
             Exception exception = new Exception(MISSING_SERVICE_ID);
