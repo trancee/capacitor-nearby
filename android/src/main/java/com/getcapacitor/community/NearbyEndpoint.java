@@ -17,6 +17,7 @@ import java.io.OutputStream;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32;
 import java.util.zip.Checksum;
@@ -211,20 +212,22 @@ public class NearbyEndpoint {
         if (socket == null && channel != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+                ScheduledFuture<?> schedule = null;
 
                 try (
                     BluetoothSocket socket = device.createInsecureL2capChannel(channel);
                     InputStream inputStream = socket.getInputStream();
                     OutputStream outputStream = socket.getOutputStream();
                 ) {
-                    executorService.scheduleWithFixedDelay(
+                    schedule = executorService.schedule(
                         () -> {
                             try {
+                                inputStream.close();
+                                outputStream.close();
                                 socket.close();
                             } catch (IOException ignored) {}
                         },
-                        100,
-                        1000,
+                        5000,
                         TimeUnit.MILLISECONDS
                     );
 
@@ -260,9 +263,15 @@ public class NearbyEndpoint {
                     );
 
                     // 5. (N)ACK
-                    if (inputStream.read() > 0) return true;
+                    if (inputStream.read() > 0) {
+                        return true;
+                    }
                 } catch (IOException ignored) {} finally {
                     executorService.shutdown();
+
+                    if (schedule != null) {
+                        schedule.cancel(true);
+                    }
                 }
 
                 return false;

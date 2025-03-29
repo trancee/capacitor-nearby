@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32;
 import java.util.zip.Checksum;
@@ -152,19 +153,20 @@ public class NearbyAdvertiser {
                 String endpointID = null;
 
                 try (BluetoothSocket socket = serverSocket.accept()) {
+                    ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+                    ScheduledFuture<?> schedule = null;
+
                     try (InputStream inputStream = socket.getInputStream(); OutputStream outputStream = socket.getOutputStream()) {
                         int bufferSize = socket.getMaxReceivePacketSize();
                         byte[] buffer = new byte[bufferSize];
 
-                        ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-
-                        executorService.scheduleWithFixedDelay(
+                        schedule = executorService.schedule(
                             () -> {
                                 try {
                                     inputStream.close();
+                                    outputStream.close();
                                 } catch (IOException ignored) {}
                             },
-                            100,
                             1000,
                             TimeUnit.MILLISECONDS
                         );
@@ -182,6 +184,10 @@ public class NearbyAdvertiser {
                             continue;
                         } finally {
                             executorService.shutdown();
+
+                            if (schedule != null) {
+                                schedule.cancel(true);
+                            }
                         }
 
                         while (true) {
