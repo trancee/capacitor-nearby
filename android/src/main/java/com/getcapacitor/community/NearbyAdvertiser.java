@@ -18,11 +18,14 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.CRC32;
+import java.util.zip.Checksum;
 
 public class NearbyAdvertiser {
 
@@ -149,7 +152,7 @@ public class NearbyAdvertiser {
                 String endpointID = null;
 
                 try (BluetoothSocket socket = serverSocket.accept()) {
-                    try (InputStream inputStream = socket.getInputStream()) {
+                    try (InputStream inputStream = socket.getInputStream(); OutputStream outputStream = socket.getOutputStream()) {
                         int bufferSize = socket.getMaxReceivePacketSize();
                         byte[] buffer = new byte[bufferSize];
 
@@ -167,6 +170,7 @@ public class NearbyAdvertiser {
                         );
 
                         try {
+                            // 1. Identifier
                             if (inputStream.read(buffer) == ENDPOINT_ID_LENGTH) {
                                 endpointID = new String(buffer, 0, ENDPOINT_ID_LENGTH);
 
@@ -181,18 +185,36 @@ public class NearbyAdvertiser {
                         }
 
                         while (true) {
+                            // 2. Payload Length
                             if (inputStream.read(buffer) == 3) {
-                                int length = buffer[0] | (buffer[1] << 8) | (buffer[2] << 16);
+                                int length = ((int) buffer[0] & 0xff) | (((int) buffer[1] & 0xff) << 8) | (((int) buffer[2] & 0xff) << 16);
 
                                 ByteBuffer payload = ByteBuffer.allocate(length);
 
                                 int read;
+                                // 3. Payload
                                 while ((read = inputStream.read(buffer)) > 0) {
                                     payload.put(buffer, 0, read);
 
                                     if (length == payload.position()) {
                                         break;
                                     }
+                                }
+
+                                // 4. Checksum
+                                if (inputStream.read(buffer) == 4) {
+                                    long checksum =
+                                        ((long) buffer[0] & 0xff) |
+                                        (((long) buffer[1] & 0xff) << 8) |
+                                        (((long) buffer[2] & 0xff) << 16) |
+                                        (((long) buffer[3] & 0xff) << 24);
+
+                                    Checksum crc32 = new CRC32();
+                                    crc32.update(payload.array(), 0, payload.array().length);
+                                    boolean ok = checksum == crc32.getValue();
+
+                                    // 5. (N)ACK
+                                    outputStream.write(ok ? 1 : 0);
                                 }
 
                                 callback.onReceived(endpointID, payload.array());

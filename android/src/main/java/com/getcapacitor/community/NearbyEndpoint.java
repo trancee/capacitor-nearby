@@ -12,8 +12,14 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresPermission;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.zip.CRC32;
+import java.util.zip.Checksum;
 
 public class NearbyEndpoint {
 
@@ -200,7 +206,69 @@ public class NearbyEndpoint {
         return true;
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public boolean send(@NonNull byte[] payload) {
+        if (socket == null && channel != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+                try (
+                    BluetoothSocket socket = device.createInsecureL2capChannel(channel);
+                    InputStream inputStream = socket.getInputStream();
+                    OutputStream outputStream = socket.getOutputStream();
+                ) {
+                    executorService.scheduleWithFixedDelay(
+                        () -> {
+                            try {
+                                socket.close();
+                            } catch (IOException ignored) {}
+                        },
+                        100,
+                        1000,
+                        TimeUnit.MILLISECONDS
+                    );
+
+                    socket.connect();
+
+                    int length = payload.length;
+
+                    if (length >= MAXIMUM_PAYLOAD_SIZE) {
+                        return false;
+                    }
+
+                    // https://raw.githubusercontent.com/krzyzanowskim/CryptoSwift/416a57ee940e0bdf29ef1dae042722d1b147b790/Sources/CryptoSwift/Checksum.swift
+                    Checksum crc32 = new CRC32();
+                    crc32.update(payload, 0, length);
+                    long checksum = crc32.getValue();
+
+                    // 1. Identify
+                    outputStream.write(config.endpointID.getBytes());
+                    // 2. Payload Length
+                    outputStream.write(
+                        new byte[] { (byte) ((length) & 0xff), (byte) ((length >> 8) & 0xff), (byte) ((length >> 16) & 0xff) }
+                    );
+                    // 3. Payload
+                    outputStream.write(payload);
+                    // 4. Checksum
+                    outputStream.write(
+                        new byte[] {
+                            (byte) ((checksum) & 0xff),
+                            (byte) ((checksum >> 8) & 0xff),
+                            (byte) ((checksum >> 16) & 0xff),
+                            (byte) ((checksum >> 24) & 0xff)
+                        }
+                    );
+
+                    // 5. (N)ACK
+                    if (inputStream.read() > 0) return true;
+                } catch (IOException ignored) {} finally {
+                    executorService.shutdown();
+                }
+
+                return false;
+            }
+        }
+        /*
         if (socket != null) {
             try {
                 OutputStream outputStream;
@@ -211,13 +279,15 @@ public class NearbyEndpoint {
                         return false;
                     }
 
-                    outputStream.write(new byte[] { (byte) (length), (byte) (length >> 8), (byte) (length >> 16) });
+                    outputStream.write(new byte[]{(byte) (length), (byte) (length >> 8), (byte) (length >> 16)});
                     outputStream.write(payload);
 
                     return true;
                 }
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
         }
+        */
 
         return false;
     }
