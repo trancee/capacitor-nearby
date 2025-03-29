@@ -172,9 +172,17 @@ public class NearbyEndpoint {
                 // socket = device.createRfcommSocketToServiceRecord(SERVICE_UUID);
             }
 
-            // This is a blocking call and will only return on a
-            // successful connection or an exception
-            socket.connect();
+            for (int retries = 3; (retries > 0 && !socket.isConnected()); retries--) {
+                try {
+                    // This is a blocking call and will only return on a
+                    // successful connection or an exception
+                    socket.connect();
+                } catch (IOException ignored) {}
+            }
+
+            if (!socket.isConnected()) {
+                return false;
+            }
 
             OutputStream outputStream;
             if ((outputStream = socket.getOutputStream()) != null) {
@@ -189,6 +197,11 @@ public class NearbyEndpoint {
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public boolean disconnect() {
+        if (thread != null) {
+            thread.interrupt();
+            thread = null;
+        }
+
         if (socket != null) {
             try {
                 socket.close();
@@ -197,11 +210,6 @@ public class NearbyEndpoint {
             }
 
             socket = null;
-        }
-
-        if (thread != null) {
-            thread.interrupt();
-            thread = null;
         }
 
         return true;
@@ -231,7 +239,15 @@ public class NearbyEndpoint {
                         TimeUnit.MILLISECONDS
                     );
 
-                    socket.connect();
+                    for (int retries = 3; (retries > 0 && !socket.isConnected()); retries--) {
+                        try {
+                            socket.connect();
+                        } catch (IOException ignored) {}
+                    }
+
+                    if (!socket.isConnected()) {
+                        return false;
+                    }
 
                     int length = payload.length;
 
@@ -276,27 +292,56 @@ public class NearbyEndpoint {
 
                 return false;
             }
-        }
-        /*
-        if (socket != null) {
+        } else if (socket != null) {
             try {
-                OutputStream outputStream;
-                if ((outputStream = socket.getOutputStream()) != null) {
-                    int length = payload.length;
+                InputStream inputStream = socket.getInputStream();
+                OutputStream outputStream = socket.getOutputStream();
 
-                    if (length >= MAXIMUM_PAYLOAD_SIZE) {
-                        return false;
+                int length = payload.length;
+
+                if (length >= MAXIMUM_PAYLOAD_SIZE) {
+                    return false;
+                }
+
+                // https://raw.githubusercontent.com/krzyzanowskim/CryptoSwift/416a57ee940e0bdf29ef1dae042722d1b147b790/Sources/CryptoSwift/Checksum.swift
+                Checksum crc32 = new CRC32();
+                crc32.update(payload, 0, length);
+                long checksum = crc32.getValue();
+
+                // 1. Identify
+                // outputStream.write(config.endpointID.getBytes());
+                // 2. Payload Length
+                outputStream.write(new byte[] { (byte) ((length) & 0xff), (byte) ((length >> 8) & 0xff), (byte) ((length >> 16) & 0xff) });
+                // 3. Payload
+                outputStream.write(payload);
+                // 4. Checksum
+                outputStream.write(
+                    new byte[] {
+                        (byte) ((checksum) & 0xff),
+                        (byte) ((checksum >> 8) & 0xff),
+                        (byte) ((checksum >> 16) & 0xff),
+                        (byte) ((checksum >> 24) & 0xff)
                     }
+                );
 
-                    outputStream.write(new byte[]{(byte) (length), (byte) (length >> 8), (byte) (length >> 16)});
-                    outputStream.write(payload);
-
+                // 5. (N)ACK
+                if (inputStream.read() > 0) {
                     return true;
                 }
-            } catch (IOException ignored) {
-            }
+                /*
+                int length = payload.length;
+
+                if (length >= MAXIMUM_PAYLOAD_SIZE) {
+                    return false;
+                }
+
+                outputStream.write(new byte[]{(byte) (length), (byte) (length >> 8), (byte) (length >> 16)});
+                outputStream.write(payload);
+
+                return true;
+                */
+            } catch (IOException ignored) {}
         }
-        */
 
         return false;
     }
