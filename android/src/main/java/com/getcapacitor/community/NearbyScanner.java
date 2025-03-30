@@ -3,6 +3,7 @@ package com.getcapacitor.community;
 import static com.getcapacitor.community.NearbyHelper.BLUETOOTH_BASE_UUID_LSB;
 import static com.getcapacitor.community.NearbyHelper.makeBuffer;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -12,14 +13,16 @@ import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
-import android.os.Handler;
 import android.os.ParcelUuid;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresPermission;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class NearbyScanner {
 
@@ -35,6 +38,7 @@ public class NearbyScanner {
     private final UUID serviceMask;
 
     private Integer scanMode = ScanSettings.SCAN_MODE_BALANCED;
+    private Integer reportDelay = 0;
 
     private BluetoothLeScanner scanner;
     private ScanCallback scanCallback;
@@ -60,12 +64,20 @@ public class NearbyScanner {
         this.serviceMask = serviceMask;
     }
 
+    public void setScanMode(Integer scanMode) {
+        this.scanMode = scanMode;
+    }
+
     public Integer getScanMode() {
         return scanMode;
     }
 
-    public void setScanMode(Integer scanMode) {
-        this.scanMode = scanMode;
+    public void setReportDelay(Integer reportDelay) {
+        this.reportDelay = reportDelay;
+    }
+
+    public Integer getReportDelay() {
+        return reportDelay;
     }
 
     public void start() {
@@ -73,7 +85,7 @@ public class NearbyScanner {
     }
 
     @SuppressLint("MissingPermission")
-    public void start(@Nullable Callback callback) {
+    public void start(Callback callback) {
         if (isScanning) {
             stop();
         }
@@ -83,11 +95,8 @@ public class NearbyScanner {
         if (scanner == null || !isBluetoothAvailable()) {
             int errorCode = ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED;
 
-            if (callback != null) {
-                Exception exception = new Exception(scanFailed(errorCode));
-
-                callback.onFailure(exception);
-            }
+            Exception exception = new Exception(scanFailed(errorCode));
+            callback.onFailure(exception);
 
             return;
         }
@@ -101,6 +110,7 @@ public class NearbyScanner {
         ScanSettings settings = new ScanSettings.Builder()
             // Set scan mode for Bluetooth LE scan.
             .setScanMode(scanMode)
+            .setReportDelay(reportDelay)
             .build();
 
         if (scanCallback == null) {
@@ -112,62 +122,16 @@ public class NearbyScanner {
                 public void onScanResult(int callbackType, ScanResult result) {
                     super.onScanResult(callbackType, result);
 
-                    // Represents a scan record from Bluetooth LE scan.
-                    ScanRecord record = result.getScanRecord();
-                    if (record == null) return;
-
-                    int rssi = result.getRssi();
-
-                    BluetoothDevice device = result.getDevice();
-                    if (device == null) return;
-
-                    List<ParcelUuid> serviceUuids = record.getServiceUuids();
-                    if (serviceUuids != null) {
-                        @Nullable
-                        UUID id = null;
-                        @Nullable
-                        String name = device.getName();
-                        @Nullable
-                        byte[] info = null;
-                        @Nullable
-                        Short channel = null;
-
-                        for (ParcelUuid serviceUuid : serviceUuids) {
-                            UUID uuid = serviceUuid.getUuid();
-
-                            if (uuid.compareTo(serviceUUID) == 0) {
-                                continue;
-                            }
-
-                            if (id == null && uuid.getLeastSignificantBits() == BLUETOOTH_BASE_UUID_LSB) {
-                                id = uuid;
-                                continue;
-                            }
-
-                            ByteBuffer buffer = makeBuffer(uuid);
-                            buffer.rewind();
-
-                            byte size = buffer.get();
-
-                            info = new byte[size & 0x7f];
-                            buffer.get(info);
-
-                            if ((size & 0x80) != 0) {
-                                channel = (short) (buffer.get() & 0xff);
-                            }
-
-                            break;
-                        }
-
-                        if (callback != null) {
-                            callback.onFound(id, name, info, channel, rssi, device);
-                        }
-                    }
+                    parseScanResult(result, callback);
                 }
 
                 @Override
                 public void onBatchScanResults(List<ScanResult> results) {
                     super.onBatchScanResults(results);
+
+                    for (ScanResult result : results) {
+                        parseScanResult(result, callback);
+                    }
                 }
 
                 @Override
@@ -179,11 +143,8 @@ public class NearbyScanner {
 
                     stop();
 
-                    if (callback != null) {
-                        Exception exception = new Exception(scanFailed(errorCode));
-
-                        callback.onFailure(exception);
-                    }
+                    Exception exception = new Exception(scanFailed(errorCode));
+                    callback.onFailure(exception);
                 }
             };
         }
@@ -194,17 +155,69 @@ public class NearbyScanner {
 
         isScanning = true;
 
-        Handler handler = new Handler();
-        handler.postDelayed(
-            () -> {
-                if (isScanning) {
-                    if (callback != null) {
+        Executors.newSingleThreadScheduledExecutor()
+            .schedule(
+                () -> {
+                    if (isScanning) {
                         callback.onSuccess();
                     }
+                },
+                100,
+                TimeUnit.MILLISECONDS
+            );
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private void parseScanResult(ScanResult result, Callback callback) {
+        // Represents a scan record from Bluetooth LE scan.
+        ScanRecord record = result.getScanRecord();
+        if (record == null) return;
+
+        int rssi = result.getRssi();
+
+        BluetoothDevice device = result.getDevice();
+        if (device == null) return;
+
+        List<ParcelUuid> serviceUuids = record.getServiceUuids();
+        if (serviceUuids != null) {
+            @Nullable
+            UUID id = null;
+            @Nullable
+            String name = device.getName();
+            @Nullable
+            byte[] info = null;
+            @Nullable
+            Short channel = null;
+
+            for (ParcelUuid serviceUuid : serviceUuids) {
+                UUID uuid = serviceUuid.getUuid();
+
+                if (uuid.compareTo(serviceUUID) == 0) {
+                    continue;
                 }
-            },
-            100
-        );
+
+                if (id == null && uuid.getLeastSignificantBits() == BLUETOOTH_BASE_UUID_LSB) {
+                    id = uuid;
+                    continue;
+                }
+
+                ByteBuffer buffer = makeBuffer(uuid);
+                buffer.rewind();
+
+                byte size = buffer.get();
+
+                info = new byte[size & 0x7f];
+                buffer.get(info);
+
+                if ((size & 0x80) != 0) {
+                    channel = (short) (buffer.get() & 0xff);
+                }
+
+                break;
+            }
+
+            callback.onFound(id, name, info, channel, rssi, device);
+        }
     }
 
     @SuppressLint("MissingPermission")

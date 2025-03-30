@@ -22,7 +22,6 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32;
@@ -41,7 +40,7 @@ public class NearbyAdvertiser {
     @NonNull
     private final UUID serviceUUID;
 
-    @NonNull
+    @Nullable
     private final String endpointName;
 
     @NonNull
@@ -63,7 +62,7 @@ public class NearbyAdvertiser {
     public static synchronized NearbyAdvertiser getInstance(
         @NonNull BluetoothAdapter adapter,
         @NonNull UUID serviceUUID,
-        @NonNull String endpointName,
+        @Nullable String endpointName,
         @NonNull UUID endpointUUID
     ) {
         if (instance == null) {
@@ -76,7 +75,7 @@ public class NearbyAdvertiser {
     NearbyAdvertiser(
         @NonNull BluetoothAdapter adapter,
         @NonNull UUID serviceUUID,
-        @NonNull String endpointName,
+        @Nullable String endpointName,
         @NonNull UUID endpointUUID
     ) {
         this.adapter = adapter;
@@ -148,101 +147,103 @@ public class NearbyAdvertiser {
         }
 
         thread = new Thread(() -> {
-            while (true) {
-                @Nullable
-                String endpointID = null;
+            BluetoothSocket socket;
 
-                try (BluetoothSocket socket = serverSocket.accept()) {
-                    ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-                    ScheduledFuture<?> schedule = null;
+            try {
+                while ((socket = serverSocket.accept()) != null) {
+                    BluetoothSocket finalSocket = socket;
 
-                    try (InputStream inputStream = socket.getInputStream(); OutputStream outputStream = socket.getOutputStream()) {
-                        int bufferSize = socket.getMaxReceivePacketSize();
-                        byte[] buffer = new byte[bufferSize];
+                    new Thread(() -> {
+                        @Nullable
+                        String endpointID = null;
 
-                        schedule = executorService.schedule(
-                            () -> {
-                                try {
-                                    inputStream.close();
-                                    outputStream.close();
-                                } catch (IOException ignored) {}
-                            },
-                            1000,
-                            TimeUnit.MILLISECONDS
-                        );
+                        ScheduledFuture<?> schedule;
 
-                        try {
-                            // 1. Identifier
-                            if (inputStream.read(buffer) == ENDPOINT_ID_LENGTH) {
-                                endpointID = new String(buffer, 0, ENDPOINT_ID_LENGTH);
+                        try (
+                            InputStream inputStream = finalSocket.getInputStream();
+                            OutputStream outputStream = finalSocket.getOutputStream()
+                        ) {
+                            int bufferSize = finalSocket.getMaxReceivePacketSize();
+                            byte[] buffer = new byte[bufferSize];
 
-                                callback.onConnected(endpointID);
-                            } else {
-                                throw new IOException(MISSING_ENDPOINT_ID);
+                            schedule = Executors.newSingleThreadScheduledExecutor()
+                                .schedule(
+                                    () -> {
+                                        try {
+                                            inputStream.close();
+                                            outputStream.close();
+                                        } catch (IOException ignored) {}
+                                    },
+                                    1000,
+                                    TimeUnit.MILLISECONDS
+                                );
+
+                            try {
+                                // 1. Identifier
+                                if (inputStream.read(buffer) == ENDPOINT_ID_LENGTH) {
+                                    endpointID = new String(buffer, 0, ENDPOINT_ID_LENGTH);
+
+                                    callback.onConnected(endpointID);
+                                } else {
+                                    throw new IOException(MISSING_ENDPOINT_ID);
+                                }
+                            } finally {
+                                if (schedule != null) {
+                                    schedule.cancel(true);
+                                }
                             }
-                        } catch (IOException ignored) {
-                            continue;
-                        } finally {
-                            executorService.shutdown();
 
-                            if (schedule != null) {
-                                schedule.cancel(true);
-                            }
-                        }
+                            while (true) {
+                                // 2. Payload Length
+                                if (inputStream.read(buffer) == 3) {
+                                    int length =
+                                        ((int) buffer[0] & 0xff) | (((int) buffer[1] & 0xff) << 8) | (((int) buffer[2] & 0xff) << 16);
 
-                        while (true) {
-                            // 2. Payload Length
-                            if (inputStream.read(buffer) == 3) {
-                                int length = ((int) buffer[0] & 0xff) | (((int) buffer[1] & 0xff) << 8) | (((int) buffer[2] & 0xff) << 16);
+                                    ByteBuffer payload = ByteBuffer.allocate(length);
 
-                                ByteBuffer payload = ByteBuffer.allocate(length);
+                                    int read;
+                                    // 3. Payload
+                                    while ((read = inputStream.read(buffer)) > 0) {
+                                        payload.put(buffer, 0, read);
 
-                                int read;
-                                // 3. Payload
-                                while ((read = inputStream.read(buffer)) > 0) {
-                                    payload.put(buffer, 0, read);
-
-                                    if (length == payload.position()) {
-                                        break;
+                                        if (length == payload.position()) {
+                                            break;
+                                        }
                                     }
+
+                                    // 4. Checksum
+                                    if (inputStream.read(buffer) == 4) {
+                                        long checksum =
+                                            ((long) buffer[0] & 0xff) |
+                                            (((long) buffer[1] & 0xff) << 8) |
+                                            (((long) buffer[2] & 0xff) << 16) |
+                                            (((long) buffer[3] & 0xff) << 24);
+
+                                        Checksum crc32 = new CRC32();
+                                        crc32.update(payload.array(), 0, payload.array().length);
+                                        boolean ok = checksum == crc32.getValue();
+
+                                        // 5. (N)ACK
+                                        outputStream.write(ok ? 1 : 0);
+                                    }
+
+                                    callback.onReceived(endpointID, payload.array());
+                                } else {
+                                    throw new IOException(MISSING_PAYLOAD_LENGTH);
                                 }
+                            }
+                        } catch (IOException exception) {
+                            try {
+                                finalSocket.close();
+                            } catch (IOException ignored) {}
 
-                                // 4. Checksum
-                                if (inputStream.read(buffer) == 4) {
-                                    long checksum =
-                                        ((long) buffer[0] & 0xff) |
-                                        (((long) buffer[1] & 0xff) << 8) |
-                                        (((long) buffer[2] & 0xff) << 16) |
-                                        (((long) buffer[3] & 0xff) << 24);
-
-                                    Checksum crc32 = new CRC32();
-                                    crc32.update(payload.array(), 0, payload.array().length);
-                                    boolean ok = checksum == crc32.getValue();
-
-                                    // 5. (N)ACK
-                                    outputStream.write(ok ? 1 : 0);
-                                }
-
-                                callback.onReceived(endpointID, payload.array());
-                            } else {
-                                throw new IOException(MISSING_PAYLOAD_LENGTH);
+                            if (endpointID != null) {
+                                callback.onDisconnected(endpointID);
                             }
                         }
-                    } catch (IOException exception) {
-                        socket.close();
-
-                        if (endpointID != null) {
-                            callback.onDisconnected(endpointID);
-                        }
-                    }
-                } catch (IOException ignored) {
-                    if (endpointID != null) {
-                        callback.onDisconnected(endpointID);
-                    }
-
-                    break;
+                    }).start();
                 }
-            }
+            } catch (IOException ignored) {}
         });
         thread.start();
 
@@ -251,11 +252,8 @@ public class NearbyAdvertiser {
         if (advertiser == null || !isBluetoothAvailable()) {
             int errorCode = AdvertiseCallback.ADVERTISE_FAILED_FEATURE_UNSUPPORTED;
 
-            if (callback != null) {
-                Exception exception = new Exception(advertiseFailed(errorCode));
-
-                callback.onFailure(exception);
-            }
+            Exception exception = new Exception(advertiseFailed(errorCode));
+            callback.onFailure(exception);
 
             return;
         }
@@ -288,8 +286,8 @@ public class NearbyAdvertiser {
 
             if (size > MAXIMUM_DATA_SIZE) {
                 Exception exception = new Exception("data too large");
-
                 callback.onFailure(exception);
+
                 return;
             }
 
@@ -322,9 +320,7 @@ public class NearbyAdvertiser {
 
                     isAdvertising = true;
 
-                    if (callback != null) {
-                        callback.onSuccess(settingsInEffect);
-                    }
+                    callback.onSuccess(settingsInEffect);
                 }
 
                 @Override
@@ -336,11 +332,8 @@ public class NearbyAdvertiser {
 
                     stop();
 
-                    if (callback != null) {
-                        Exception exception = new Exception(advertiseFailed(errorCode));
-
-                        callback.onFailure(exception);
-                    }
+                    Exception exception = new Exception(advertiseFailed(errorCode));
+                    callback.onFailure(exception);
                 }
             };
         }

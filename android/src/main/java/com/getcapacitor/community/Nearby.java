@@ -70,7 +70,7 @@ public class Nearby {
     private static final UUID PING_CHARACTERISTIC_UUID = UUID.fromString("50494e47-0000-1000-8000-0805f9b34fb");
     private static final UUID PONG_CHARACTERISTIC_UUID = UUID.fromString("504f4e47-0000-1000-8000-0805f9b34fb");
 
-    public static Map<String, NearbyEndpoint> endpoints;
+    public final Map<String, NearbyEndpoint> endpoints;
 
     public Nearby(@NonNull NearbyConfig config, @NonNull NearbyPlugin plugin) {
         this.config = config;
@@ -176,7 +176,9 @@ public class Nearby {
         //     nearbyAdvertiser.setTxPowerLevel(txPowerLevel);
         // }
 
-        endpoints.clear();
+        synchronized (endpoints) {
+            endpoints.clear();
+        }
 
         InitializeResult result = new InitializeResult(endpointID);
         callback.success(result);
@@ -388,23 +390,27 @@ public class Nearby {
 
                     if (endpointID == null) return;
 
-                    NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
-                    if (nearbyEndpoint != null) {
+                    NearbyEndpoint nearbyEndpoint;
+                    if ((nearbyEndpoint = endpoints.get(endpointID)) != null) {
                         nearbyEndpoint.alive();
                     } else {
-                        new NearbyEndpoint(config, endpointID, endpointName, endpointInfo, channel, rssi, device, () -> {
-                            if (nearbyScanner.isScanning()) {
-                                Endpoint endpoint = new Endpoint(endpointID);
+                        nearbyEndpoint = new NearbyEndpoint(config, endpointID, endpointName, endpointInfo, channel, rssi, device).onLost(
+                            () -> {
+                                if (nearbyScanner.isScanning()) {
+                                    Endpoint endpoint = new Endpoint(endpointID);
 
-                                plugin.onEndpointLost(endpoint);
-                            }
+                                    plugin.onEndpointLost(endpoint);
+                                }
 
-                            NearbyEndpoint endpoint = endpoints.get(endpointID);
-                            if (endpoint != null) {
-                                endpoint.kill();
+                                synchronized (endpoints) {
+                                    endpoints.remove(endpointID);
+                                }
                             }
-                        });
-                        // endpoints.put(endpointID, nearbyEndpoint);
+                        );
+
+                        synchronized (endpoints) {
+                            endpoints.put(endpointID, nearbyEndpoint);
+                        }
 
                         if (nearbyScanner.isScanning()) {
                             Endpoint endpoint = new Endpoint(endpointID, endpointName, endpointInfo);
@@ -415,27 +421,27 @@ public class Nearby {
                 }
 
                 /*
-                @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-                @Override
-                public void onLost(@Nullable UUID id) {
-                    @Nullable
-                    String endpointID = EndpointID.fromUUID(id);
+                    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                    @Override
+                    public void onLost(@Nullable UUID id) {
+                        @Nullable
+                        String endpointID = EndpointID.fromUUID(id);
 
-                    if (endpointID == null) return;
+                        if (endpointID == null) return;
 
-                    NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
-                    if (nearbyEndpoint != null) {
-                        nearbyEndpoint.kill();
+                        NearbyEndpoint nearbyEndpoint = endpoints.get(endpointID);
+                        if (nearbyEndpoint != null) {
+                            nearbyEndpoint.kill();
+                        }
+                        // endpoints.remove(endpointID);
+
+                        {
+                            Endpoint endpoint = new Endpoint(endpointID);
+
+                            plugin.onEndpointLost(endpoint);
+                        }
                     }
-                    // endpoints.remove(endpointID);
-
-                    {
-                        Endpoint endpoint = new Endpoint(endpointID);
-
-                        plugin.onEndpointLost(endpoint);
-                    }
-                }
-                */
+                    */
                 @Override
                 public void onSuccess() {
                     isDiscovering = true;
@@ -741,11 +747,14 @@ public class Nearby {
         nearbyScanner.stop();
         // connectionsClient.stopDiscovery();
 
-        // Make sure to clear all found beacons.
-        for (NearbyEndpoint endpoint : endpoints.values()) {
-            endpoint.kill();
+        synchronized (endpoints) {
+            // Make sure to clear all found beacons.
+            for (NearbyEndpoint endpoint : endpoints.values()) {
+                endpoint.kill();
+            }
+
+            endpoints.clear();
         }
-        endpoints.clear();
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)

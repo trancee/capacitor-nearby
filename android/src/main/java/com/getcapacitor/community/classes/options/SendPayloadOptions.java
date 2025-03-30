@@ -29,8 +29,10 @@ public class SendPayloadOptions {
         JSArray endpointArray = call.getArray("endpointIDs");
         if (endpointArray != null) {
             for (var item : endpointArray.toList()) {
+                endpointID = (String) item;
+
                 if (endpointID != null && !endpointID.isEmpty()) {
-                    endpointIDs.add((String) item);
+                    endpointIDs.add(endpointID);
                 }
             }
         }

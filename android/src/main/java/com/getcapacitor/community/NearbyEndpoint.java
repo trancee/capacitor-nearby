@@ -1,13 +1,10 @@
 package com.getcapacitor.community;
 
-import static com.getcapacitor.community.Nearby.endpoints;
-
 import android.Manifest;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothSocket;
 import android.os.Build;
-import android.os.Handler;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresPermission;
@@ -16,7 +13,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.UUID;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32;
@@ -56,16 +52,16 @@ public class NearbyEndpoint {
 
     long timestamp;
 
-    final Handler handler = new Handler();
-    final Runnable runnable;
-
     @Nullable
-    private Thread thread;
+    private ScheduledFuture<?> schedule;
+
+    private Runnable command;
 
     long lastSeen;
 
     public static long ttlSeconds = 10;
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public NearbyEndpoint(
         @NonNull NearbyConfig config,
         @NonNull String endpointID,
@@ -73,8 +69,7 @@ public class NearbyEndpoint {
         @Nullable byte[] endpointInfo,
         @Nullable Short channel,
         @Nullable Integer rssi,
-        @NonNull BluetoothDevice device,
-        final Runnable runnable
+        @NonNull BluetoothDevice device
     ) {
         this.config = config;
 
@@ -87,23 +82,13 @@ public class NearbyEndpoint {
 
         this.device = device;
 
-        this.runnable = runnable;
-
         this.timestamp = System.currentTimeMillis();
 
-        lastSeen = System.currentTimeMillis();
-        handler.postDelayed(runnable, ttlSeconds * 1000);
-
-        endpoints.put(endpointID, this);
+        alive();
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     protected void finalize() {
-        close();
-    }
-
-    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    public void close() {
         kill();
     }
 
@@ -111,20 +96,34 @@ public class NearbyEndpoint {
     public void kill() {
         disconnect();
 
-        handler.removeCallbacks(runnable);
-
-        // Kill yourself.
-        endpoints.remove(endpointID);
+        if (schedule != null) {
+            schedule.cancel(true);
+            schedule = null;
+        }
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void alive() {
-        handler.removeCallbacks(runnable);
+        lastSeen = System.currentTimeMillis();
 
-        // Check if we are still alive.
-        if (endpoints.containsKey(endpointID)) {
-            lastSeen = System.currentTimeMillis();
-            handler.postDelayed(runnable, ttlSeconds * 1000);
+        if (schedule != null) {
+            schedule.cancel(true);
+            schedule = null;
         }
+
+        schedule = Executors.newSingleThreadScheduledExecutor()
+            .scheduleWithFixedDelay(
+                () -> {
+                    kill();
+
+                    if (command != null) {
+                        command.run();
+                    }
+                },
+                ttlSeconds,
+                ttlSeconds,
+                TimeUnit.SECONDS
+            );
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
@@ -197,11 +196,6 @@ public class NearbyEndpoint {
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public boolean disconnect() {
-        if (thread != null) {
-            thread.interrupt();
-            thread = null;
-        }
-
         if (socket != null) {
             try {
                 socket.close();
@@ -219,7 +213,6 @@ public class NearbyEndpoint {
     public boolean send(@NonNull byte[] payload) {
         if (socket == null && channel != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
                 ScheduledFuture<?> schedule = null;
 
                 try (
@@ -227,17 +220,18 @@ public class NearbyEndpoint {
                     InputStream inputStream = socket.getInputStream();
                     OutputStream outputStream = socket.getOutputStream();
                 ) {
-                    schedule = executorService.schedule(
-                        () -> {
-                            try {
-                                inputStream.close();
-                                outputStream.close();
-                                socket.close();
-                            } catch (IOException ignored) {}
-                        },
-                        5000,
-                        TimeUnit.MILLISECONDS
-                    );
+                    schedule = Executors.newSingleThreadScheduledExecutor()
+                        .schedule(
+                            () -> {
+                                try {
+                                    inputStream.close();
+                                    outputStream.close();
+                                    socket.close();
+                                } catch (IOException ignored) {}
+                            },
+                            5000,
+                            TimeUnit.MILLISECONDS
+                        );
 
                     for (int retries = 3; (retries > 0 && !socket.isConnected()); retries--) {
                         try {
@@ -283,8 +277,6 @@ public class NearbyEndpoint {
                         return true;
                     }
                 } catch (IOException ignored) {} finally {
-                    executorService.shutdown();
-
                     if (schedule != null) {
                         schedule.cancel(true);
                     }
@@ -344,5 +336,11 @@ public class NearbyEndpoint {
         }
 
         return false;
+    }
+
+    public NearbyEndpoint onLost(final Runnable command) {
+        this.command = command;
+
+        return this;
     }
 }
