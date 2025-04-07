@@ -106,12 +106,12 @@ public class NearbyAdvertiser {
         start(null, null);
     }
 
-    public void start(@Nullable byte[] data) {
-        start(data, null);
+    public void start(@Nullable byte[] endpointInfo) {
+        start(endpointInfo, null);
     }
 
     @SuppressLint("MissingPermission")
-    public void start(@Nullable byte[] data, Callback callback) {
+    public void start(@Nullable byte[] endpointInfo, Callback callback) {
         if (isAdvertising) {
             stop();
         }
@@ -282,7 +282,7 @@ public class NearbyAdvertiser {
             .setIncludeDeviceName(false);
 
         {
-            byte size = (byte) ((data != null) ? data.length : 0);
+            byte size = (byte) ((endpointInfo != null) ? endpointInfo.length : 0);
 
             if (size > MAXIMUM_DATA_SIZE) {
                 Exception exception = new Exception("data too large");
@@ -299,7 +299,7 @@ public class NearbyAdvertiser {
 
             buffer.put(size);
 
-            if (data != null) buffer.put(data);
+            if (endpointInfo != null) buffer.put(endpointInfo);
             if (channel != null) buffer.put(channel.byteValue());
 
             UUID dataUUID = NearbyHelper.makeUUID(buffer.array());

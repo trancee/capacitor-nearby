@@ -3,13 +3,11 @@ import Foundation
 public enum CustomError: Error {
     case endpointIDMissing
     case endpointIDUnknown
+    case endpointMissing
     case endpointNameMissing
 
     case serviceIDMissing
-    case strategyMissing
-    case strategyUnknown
 
-    case payloadIDMissing
     case payloadMissing
 
     case initializationError
@@ -24,18 +22,14 @@ extension CustomError: LocalizedError {
             return NSLocalizedString("missing endpoint identifier", comment: "endpointIDMissing")
         case .endpointIDUnknown:
             return NSLocalizedString("unknown endpoint identifier", comment: "endpointIDUnknown")
+        case .endpointMissing:
+            return NSLocalizedString("missing endpoint", comment: "endpointMissing")
         case .endpointNameMissing:
             return NSLocalizedString("missing endpoint name", comment: "endpointNameMissing")
 
         case .serviceIDMissing:
             return NSLocalizedString("missing service identifier", comment: "serviceIDMissing")
-        case .strategyMissing:
-            return NSLocalizedString("missing strategy", comment: "strategyMissing")
-        case .strategyUnknown:
-            return NSLocalizedString("unknown strategy", comment: "strategyUnknown")
 
-        case .payloadIDMissing:
-            return NSLocalizedString("missing payload identifier", comment: "payloadIDMissing")
         case .payloadMissing:
             return NSLocalizedString("missing payload", comment: "payloadMissing")
 

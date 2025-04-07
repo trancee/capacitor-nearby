@@ -1,5 +1,5 @@
 //
-//  Advertiser.swift
+//  NearbyAdvertiser.swift
 //  Plugin
 //
 //  Created by Philipp Grosswiler on 5/7/21.
@@ -16,7 +16,7 @@ public enum AdvertiseResult {
     case expired
 }
 
-public final class Advertiser: NSObject {
+public final class NearbyAdvertiser: NSObject {
     // An object that manages and advertises peripheral services exposed by this app.
     private var peripheralManager: CBPeripheralManager?
     private var callback: AdvertiseCallback?
@@ -25,15 +25,23 @@ public final class Advertiser: NSObject {
 
     private static var serviceUUID: CBUUID?
 
+    private static var endpointName: String?
+    private static var endpointUUID: CBUUID?
+
     private static var stateCallback: StateCallback?
 
-    init(_ serviceUUID: CBUUID,
+    init(_ serviceUUID: UUID,
+         _ endpointName: String?,
+         _ endpointUUID: UUID,
          stateCallback: @escaping StateCallback) {
         super.init()
 
-        Advertiser.serviceUUID = serviceUUID
+        NearbyAdvertiser.serviceUUID = CBUUID(nsuuid: serviceUUID)
 
-        Advertiser.stateCallback = stateCallback
+        NearbyAdvertiser.endpointName = endpointName
+        NearbyAdvertiser.endpointUUID = CBUUID(nsuuid: endpointUUID)
+
+        NearbyAdvertiser.stateCallback = stateCallback
 
         // Keys used to specify options when creating a peripheral manager.
         let options: [String: Any] = [
@@ -51,11 +59,11 @@ public final class Advertiser: NSObject {
     }
 }
 
-extension Advertiser {
+extension NearbyAdvertiser {
     // Start advertising this device as a peripheral
     public func start(
-        _ beaconUUID: CBUUID,
-        _ ttlSeconds: Int?,
+        _ endpointInfo: Data?,
+        // _ ttlSeconds: Int?,
         callback: @escaping AdvertiseCallback) {
         self.callback = callback
 
@@ -73,17 +81,17 @@ extension Advertiser {
         let advertisementData: [String: Any] = [
             // An array of service UUIDs.
             CBAdvertisementDataServiceUUIDsKey: [
-                Advertiser.serviceUUID,
-                beaconUUID
+                NearbyAdvertiser.serviceUUID
             ]
         ]
 
         // Advertises peripheral manager data.
         peripheralManager.startAdvertising(advertisementData)
-
-        if let ttlSeconds = ttlSeconds {
-            startTimer(TimeInterval(ttlSeconds))
-        }
+        /*
+         if let ttlSeconds = ttlSeconds {
+         startTimer(TimeInterval(ttlSeconds))
+         }
+         */
     }
 
     public func stop(_ error: Error? = nil) {
@@ -135,10 +143,10 @@ extension Advertiser {
 }
 
 // A protocol that provides updates for local peripheral state and interactions with remote central devices.
-extension Advertiser: CBPeripheralManagerDelegate {
+extension NearbyAdvertiser: CBPeripheralManagerDelegate {
     // Tells the delegate the peripheral manager’s state updated.
     public func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
-        if let callback = Advertiser.stateCallback {
+        if let callback = NearbyAdvertiser.stateCallback {
             switch peripheral.state {
             case .unknown:
                 callback(.unknown)

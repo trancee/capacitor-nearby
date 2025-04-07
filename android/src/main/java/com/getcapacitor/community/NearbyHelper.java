@@ -126,7 +126,7 @@ public class NearbyHelper {
         @NonNull
         public static UUID toUUID(@NonNull String id) {
             byte[] data = id.getBytes();
-            assert data.length == ENDPOINT_ID_LENGTH : "name must be 4 characters in length";
+            assert data.length == ENDPOINT_ID_LENGTH : "invalid endpoint identifier length";
 
             ByteBuffer byteBuffer = ByteBuffer.allocate(16).putLong(BLUETOOTH_BASE_UUID_MSB).putLong(BLUETOOTH_BASE_UUID_LSB);
 
@@ -145,7 +145,7 @@ public class NearbyHelper {
         }
 
         @NonNull
-        public static String fromBytes(@Nullable byte[] name) {
+        public static String fromBytes(@Nullable byte[] bytes) {
             StringBuilder endpointID = new StringBuilder(ENDPOINT_ID_LENGTH);
             /*
             byte[] input = new byte[1 + (name != null ? name.length : 0)];
@@ -156,7 +156,7 @@ public class NearbyHelper {
                 System.arraycopy(name, 0, input, 1, name.length);
             }
             */
-            byte[] data = hash(name, ENDPOINT_ID_LENGTH);
+            byte[] data = hash(bytes, ENDPOINT_ID_LENGTH);
 
             for (byte c : data) {
                 endpointID.append(kEndpointIdChars[(c & 0xff) % kEndpointIdChars.length]);

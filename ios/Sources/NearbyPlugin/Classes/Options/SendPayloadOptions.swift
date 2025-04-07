@@ -1,8 +1,6 @@
 import Foundation
 import Capacitor
 
-import NearbyConnections
-
 @objc public class SendPayloadOptions: NSObject {
     private var endpointIDs: [EndpointID]?
 

@@ -1,7 +1,7 @@
 {
   "name": "@capacitor-trancee/nearby",
   "version": "4.1.0",
-  "description": "Uses Nearby Connections peer-to-peer networking API that allows apps to easily discover, connect to, and exchange data with nearby devices in real-time, regardless of network connectivity",
+  "description": "Uses Bluetooth Low Energy peer-to-peer networking API that allows apps to easily discover, connect to, and exchange data with nearby devices in real-time, regardless of network connectivity",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
@@ -44,14 +44,14 @@
     "clean": "rimraf ./dist",
     "watch": "tsc --watch",
     "prepublishOnly": "npm run build",
-    "upgrade": "npm install --upgrade @capacitor/cli @capacitor/core @capacitor/docgen @capacitor/android @capacitor/ios @ionic/eslint-config @ionic/prettier-config @ionic/swiftlint-config eslint prettier prettier-plugin-java rimraf rollup swiftlint typescript"
+    "upgrade": "npm install --upgrade @capacitor/core @capacitor/cli @capacitor/docgen @capacitor/android @capacitor/ios @ionic/eslint-config @ionic/prettier-config @ionic/swiftlint-config eslint prettier prettier-plugin-java rimraf rollup swiftlint typescript"
   },
   "devDependencies": {
-    "@capacitor/android": "^6.2.0",
-    "@capacitor/cli": "^6.2.0",
-    "@capacitor/core": "^6.2.0",
-    "@capacitor/docgen": "^0.2.2",
-    "@capacitor/ios": "^6.2.0",
+    "@capacitor/android": "^7.2.0",
+    "@capacitor/cli": "^7.2.0",
+    "@capacitor/core": "^7.2.0",
+    "@capacitor/docgen": "^0.3.0",
+    "@capacitor/ios": "^7.2.0",
     "@ionic/eslint-config": "^0.4.0",
     "@ionic/prettier-config": "^4.0.0",
     "@ionic/swiftlint-config": "^2.0.0",
@@ -59,12 +59,12 @@
     "prettier": "^3.5.3",
     "prettier-plugin-java": "^2.6.7",
     "rimraf": "^6.0.1",
-    "rollup": "^4.38.0",
+    "rollup": "^4.39.0",
     "swiftlint": "^2.0.0",
     "typescript": "~4.1.5"
   },
   "peerDependencies": {
-    "@capacitor/core": "^6.0.0"
+    "@capacitor/core": ">=7.0.0"
   },
   "prettier": "@ionic/prettier-config",
   "swiftlint": "@ionic/swiftlint-config",
@@ -78,8 +78,5 @@
     "android": {
       "src": "android"
     }
-  },
-  "publishConfig": {
-    "access": "public"
   }
 }

@@ -1,9 +1,8 @@
 //
-//  Scanner.swift
+//  NearbyScanner.swift
 //  Plugin
 //
-//  Created by Philipp Grosswiler on 5/8/21.
-//  Copyright © 2021 Max Lynch. All rights reserved.
+//  Created by Philipp Grosswiler on 02.04.2025.
 //
 
 import CoreBluetooth
@@ -23,9 +22,12 @@ public enum BeaconResult {
     case lost(_ uuid: CBUUID, data: Data? = nil, rssi: NSNumber? = nil)
 }
 
-public final class Scanner: NSObject {
+public final class NearbyScanner: NSObject {
     // An object that scans for, discovers, connects to, and manages peripherals.
-    private var centralManager: CBCentralManager?
+    private var centralManager: CBCentralManager!
+    private var peripheral: CBPeripheral!
+    private var l2capChannel: CBL2CAPChannel?
+
     private var callback: ScanCallback?
 
     private var timer: Timer?
@@ -37,15 +39,15 @@ public final class Scanner: NSObject {
     private static var beaconCallback: BeaconCallback?
     private static var beacons: [CBUUID: Beacon] = [:]
 
-    init(_ serviceUUID: CBUUID,
-         stateCallback: @escaping StateCallback,
-         beaconCallback: @escaping BeaconCallback) {
+    init(_ serviceUUID: UUID,
+         stateCallback: @escaping StateCallback/*,
+         beaconCallback: @escaping BeaconCallback*/) {
         super.init()
 
-        Scanner.serviceUUID = serviceUUID
+        NearbyScanner.serviceUUID = CBUUID(nsuuid: serviceUUID)
 
-        Scanner.stateCallback = stateCallback
-        Scanner.beaconCallback = beaconCallback
+        NearbyScanner.stateCallback = stateCallback
+        // NearbyScanner.beaconCallback = beaconCallback
 
         // Keys used to pass options when initializing a central manager.
         let options: [String: Any] = [
@@ -60,15 +62,16 @@ public final class Scanner: NSObject {
 
         clearBeacons()
     }
+
     deinit {
         stop()
     }
 }
 
-extension Scanner {
+extension NearbyScanner {
     // Start scanning for peripherals
     public func start(
-        _ ttlSeconds: Int?,
+        // _ ttlSeconds: Int?,
         callback: @escaping ScanCallback) {
         self.callback = callback
 
@@ -91,7 +94,7 @@ extension Scanner {
         // Scans for peripherals that are advertising services.
         centralManager.scanForPeripherals(
             withServices: [
-                Scanner.serviceUUID!
+                NearbyScanner.serviceUUID!
             ],
 
             options: options
@@ -100,10 +103,11 @@ extension Scanner {
         if let callback = self.callback {
             callback(.started)
         }
-
-        if let ttlSeconds = ttlSeconds {
-            startTimer(TimeInterval(ttlSeconds))
-        }
+        /*
+         if let ttlSeconds = ttlSeconds {
+         startTimer(TimeInterval(ttlSeconds))
+         }
+         */
     }
 
     public func stop(_ error: Error? = nil) {
@@ -157,10 +161,10 @@ extension Scanner {
 }
 
 // A protocol that provides updates for the discovery and management of peripheral devices.
-extension Scanner: CBCentralManagerDelegate {
+extension NearbyScanner: CBCentralManagerDelegate {
     // Tells the delegate the central manager’s state updated.
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        if let callback = Scanner.stateCallback {
+        if let callback = NearbyScanner.stateCallback {
             switch central.state {
             case .unknown:
                 callback(.unknown)
@@ -187,18 +191,20 @@ extension Scanner: CBCentralManagerDelegate {
                                rssi RSSI: NSNumber) {
         let rssi = RSSI.intValue != Int8.max ? RSSI : nil
 
+        peripheral.delegate = self
+
         if let advertisementDataServiceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] {
             for uuid in advertisementDataServiceUUIDs {
-                if uuid == Scanner.serviceUUID {
+                if uuid == NearbyScanner.serviceUUID {
                     continue
                 }
 
-                if let beacon = Scanner.beacons[uuid] {
+                if let beacon = NearbyScanner.beacons[uuid] {
                     beacon.alive()
                 } else {
-                    Scanner.beacons[uuid] = Beacon(uuid, rssi: rssi)
+                    NearbyScanner.beacons[uuid] = Beacon(uuid, rssi: rssi)
 
-                    if let beaconCallback = Scanner.beaconCallback {
+                    if let beaconCallback = NearbyScanner.beaconCallback {
                         beaconCallback(.found(uuid, rssi: rssi))
                     }
                 }
@@ -207,16 +213,16 @@ extension Scanner: CBCentralManagerDelegate {
 
         if let advertisementDataServiceData = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data] {
             for (uuid, _) in advertisementDataServiceData {
-                if uuid == Scanner.serviceUUID {
+                if uuid == NearbyScanner.serviceUUID {
                     continue
                 }
 
-                if let beacon = Scanner.beacons[uuid] {
+                if let beacon = NearbyScanner.beacons[uuid] {
                     beacon.alive()
                 } else {
-                    Scanner.beacons[uuid] = Beacon(uuid, rssi: rssi)
+                    NearbyScanner.beacons[uuid] = Beacon(uuid, rssi: rssi)
 
-                    if let beaconCallback = Scanner.beaconCallback {
+                    if let beaconCallback = NearbyScanner.beaconCallback {
                         beaconCallback(.found(uuid, rssi: rssi))
                     }
                 }
@@ -225,17 +231,17 @@ extension Scanner: CBCentralManagerDelegate {
     }
 }
 
-extension Scanner {
+extension NearbyScanner: CBPeripheralDelegate {
     private static let ttlSeconds: TimeInterval = 10
 
     public func clearBeacons() {
-        Scanner.beacons = [:]
+        NearbyScanner.beacons = [:]
     }
 
     public func getBeacons() -> [String] {
         var result: [String] = []
 
-        for key in Scanner.beacons.keys {
+        for key in NearbyScanner.beacons.keys {
             result.append(key.uuidString.lowercased())
         }
 
@@ -260,9 +266,9 @@ extension Scanner {
 
             self.lastSeen = Date()
 
-            startTimer(Scanner.ttlSeconds)
+            startTimer(NearbyScanner.ttlSeconds)
 
-            Scanner.beacons[self.uuid] = self
+            NearbyScanner.beacons[self.uuid] = self
         }
         deinit {
             kill()
@@ -271,7 +277,7 @@ extension Scanner {
         public func kill() {
             stopTimer()
 
-            Scanner.beacons[self.uuid] = nil
+            NearbyScanner.beacons[self.uuid] = nil
         }
 
         public func alive() {
@@ -279,8 +285,8 @@ extension Scanner {
 
             stopTimer()
 
-            if Scanner.beacons[self.uuid] != nil {
-                startTimer(Scanner.ttlSeconds)
+            if NearbyScanner.beacons[self.uuid] != nil {
+                startTimer(NearbyScanner.ttlSeconds)
             }
         }
 
@@ -306,9 +312,16 @@ extension Scanner {
         @objc fileprivate func onTimer(_ timer: Timer) {
             kill()
 
-            if let beaconCallback = Scanner.beaconCallback {
+            if let beaconCallback = NearbyScanner.beaconCallback {
                 beaconCallback(.lost(self.uuid, rssi: self.rssi))
             }
+        }
+    }
+
+    func setupL2CAPChannel(_ psm: UInt16) {
+        if let peripheral = self.peripheral {
+            // Attempt to open an L2CAP channel to the peripheral using the supplied PSM.
+            peripheral.openL2CAPChannel(psm)
         }
     }
 }

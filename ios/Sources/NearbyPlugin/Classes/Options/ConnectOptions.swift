@@ -1,7 +1,7 @@
 import Foundation
 import Capacitor
 
-@objc public class AcceptConnectionOptions: NSObject {
+@objc public class ConnectOptions: NSObject {
     private var endpointID: String?
 
     init(_ call: CAPPluginCall) {

@@ -65,6 +65,13 @@ BLUETOOTH CORE SPECIFICATION Version 5.1 | Vol 3, Part A
         android:required="true" />
 ```
 
+### iOS
+
+```xml
+<key>NSBluetoothAlwaysUsageDescription</key>
+<string>This app requires Bluetooth access to communicate with other devices.</string>
+```
+
 <docgen-config>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
 

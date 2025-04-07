@@ -1,292 +1,252 @@
 import Foundation
 import Capacitor
-import CoreBluetooth
 
 /**
  * Please read the Capacitor iOS Plugin Development Guide
  * here: https://capacitorjs.com/docs/plugins/ios
  */
-struct Constants {
-    static let BLUETOOTH_NOT_SUPPORTED = "Bluetooth not supported"
-    static let BLE_NOT_SUPPORTED = "Bluetooth Low Energy not supported"
-    static let NOT_INITIALIZED = "not initialized"
-    static let PERMISSION_DENIED = "permission denied"
-
-    static let UUID_NOT_FOUND = "UUID not found"
-}
-
-public typealias StateCallback = (StateResult) -> Void
-
-public enum StateResult {
-    case unknown
-    case resetting
-    case unsupported
-    case unauthorized
-    case poweredOff
-    case poweredOn
-}
-
 @objc(NearbyPlugin)
-public class NearbyPlugin: CAPPlugin {
-    private var scanner: Scanner!
-    private var advertiser: Advertiser!
+public class NearbyPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "NearbyPlugin"
+    public let jsName = "Nearby"
 
-    private var serviceUUID: CBUUID?
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "initialize", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "reset", returnType: CAPPluginReturnPromise),
 
-    private var uuid: CBUUID?
-    private var data: Data?
+        CAPPluginMethod(name: "startAdvertising", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopAdvertising", returnType: CAPPluginReturnPromise),
+
+        CAPPluginMethod(name: "startDiscovering", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopDiscovering", returnType: CAPPluginReturnPromise),
+
+        CAPPluginMethod(name: "connect", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "disconnect", returnType: CAPPluginReturnPromise),
+
+        CAPPluginMethod(name: "sendPayload", returnType: CAPPluginReturnPromise),
+
+        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise)
+    ]
+
+    public let tag = "NearbyPlugin"
+
+    let ENDPOINT_FOUND_EVENT = "onEndpointFound"
+    let ENDPOINT_LOST_EVENT = "onEndpointLost"
+    let ENDPOINT_CONNECTED_EVENT = "onEndpointConnected"
+    let ENDPOINT_DISCONNECTED_EVENT = "onEndpointDisconnected"
+    let PAYLOAD_RECEIVED_EVENT = "onPayloadReceived"
+
+    private var implementation: Nearby!
+    private var config: NearbyConfig!
+
+    override public func load() {
+        super.load()
+
+        self.config = NearbyConfig(config: getConfig())
+        self.implementation = Nearby(plugin: self, config: self.config)
+    }
 
     /**
      * Initialize
      */
+
     @objc func initialize(_ call: CAPPluginCall) {
-        guard let serviceUUID = call.getString("serviceUUID") else {
-            call.reject(Constants.UUID_NOT_FOUND)
-            return
+        let options = InitializeOptions(call, config)
+
+        if let endpointName = call.getString("endpointName") {
+            config.setEndpointName(endpointName)
         }
 
-        if serviceUUID.count > 0 {
-            self.serviceUUID = CBUUID(string: serviceUUID)
-        } else {
-            call.reject(Constants.UUID_NOT_FOUND)
-            return
+        if let serviceID = call.getString("serviceID") {
+            config.setServiceID(serviceID)
         }
 
-        self.scanner = Scanner(self.serviceUUID!) { [self] result in
-            notifyListeners("onBluetoothStateChanged", data: [
-                "state": fromBluetoothState(result)
-            ])
-
-            switch result {
-            case .poweredOn:
-                call.resolve()
-            default:
-                call.reject("Bluetooth is not powered on.")
+        implementation.initialize(options, completion: { result, error in
+            if let error = error {
+                self.rejectCall(call, error)
+            } else if let result = result?.toJSObject() as? JSObject {
+                self.resolveCall(call, result)
             }
-        } beaconCallback: { [self] result in
-            guard let scanner = self.scanner else {
-                return
-            }
-
-            switch result {
-            case .found(let uuid, let data, let rssi):
-                if scanner.isScanning() {
-                    var jsData: [String: Any] = [
-                        "uuid": uuid.uuidString.lowercased()
-                    ]
-
-                    if let data = data {
-                        jsData["content"] = Data(base64Encoded: data)
-                    }
-                    if let rssi = rssi {
-                        jsData["rssi"] = rssi.stringValue
-                    }
-
-                    notifyListeners("onFound", data: jsData)
-                }
-            case .lost(let uuid, let data, let rssi):
-                if scanner.isScanning() {
-                    var jsData: [String: Any] = [
-                        "uuid": uuid.uuidString.lowercased()
-                    ]
-
-                    if let data = data {
-                        jsData["content"] = Data(base64Encoded: data)
-                    }
-                    if let rssi = rssi {
-                        jsData["rssi"] = rssi.stringValue
-                    }
-
-                    notifyListeners("onLost", data: jsData)
-                }
-            }
-        }
-
-        self.advertiser = Advertiser(self.serviceUUID!) { [self] result in
-            notifyListeners("onBluetoothStateChanged", data: [
-                "state": fromBluetoothState(result)
-            ])
-
-            switch result {
-            case .poweredOn:
-                call.resolve()
-            default:
-                call.reject("Bluetooth is not powered on.")
-            }
-        }
-
-        self.uuid = nil
-        self.data = nil
-
-        // call.success()
+        })
     }
 
     /**
      * Reset
      */
+
     @objc func reset(_ call: CAPPluginCall) {
-        stop()
-
-        self.uuid = nil
-        self.data = nil
-
-        call.resolve()
+        implementation.reset(completion: { error in
+            if let error = error {
+                self.rejectCall(call, error)
+            } else {
+                self.resolveCall(call, nil)
+            }
+        })
     }
 
     /**
-     * Publish
+     * Advertising
      */
-    @objc func publish(_ call: CAPPluginCall) {
-        guard let advertiser = self.advertiser else {
-            call.reject(Constants.NOT_INITIALIZED)
-            return
-        }
 
-        guard let beaconUUID = call.getString("uuid") else {
-            call.reject(Constants.UUID_NOT_FOUND)
-            return
-        }
+    @objc func startAdvertising(_ call: CAPPluginCall) {
+        let options = StartAdvertisingOptions(call)
 
-        if beaconUUID.count > 0 {
-            self.uuid = CBUUID(string: beaconUUID)
-        } else {
-            call.reject(Constants.UUID_NOT_FOUND)
-            return
-        }
-
-        if !advertiser.isAdvertising() {
-            advertiser.start(uuid!, call.getInt("ttlSeconds")) { result in
-                switch result {
-                case .started:
-                    call.resolve()
-                case .stopped(let e):
-                    if let e = e {
-                        call.reject(e.localizedDescription, String((e as NSError).code))
-                    }
-                case .expired:
-                    self.publishExpired()
-                }
+        implementation.startAdvertising(options, completion: { error in
+            if let error = error {
+                self.rejectCall(call, error)
+            } else {
+                self.resolveCall(call, nil)
             }
-        } else {
-            call.resolve()
-        }
+        })
     }
 
-    @objc func unpublish(_ call: CAPPluginCall) {
-        guard let advertiser = self.advertiser else {
-            call.reject(Constants.NOT_INITIALIZED)
-            return
-        }
-
-        advertiser.stop()
-
-        self.uuid = nil
-        self.data = nil
-
-        call.resolve()
-    }
-
-    private func publishExpired() {
-        guard let advertiser = self.advertiser else { return }
-
-        if advertiser.isAdvertising() {
-            notifyListeners("onPublishExpired", data: nil)
-        }
-
-        advertiser.stop()
+    @objc func stopAdvertising(_ call: CAPPluginCall) {
+        implementation.stopAdvertising(completion: { error in
+            if let error = error {
+                self.rejectCall(call, error)
+            } else {
+                self.resolveCall(call, nil)
+            }
+        })
     }
 
     /**
-     * Subscribe
+     * Discovering
      */
-    @objc func subscribe(_ call: CAPPluginCall) {
-        guard let scanner = self.scanner else {
-            call.reject(Constants.NOT_INITIALIZED)
-            return
-        }
 
-        if !scanner.isScanning() {
-            scanner.start(call.getInt("ttlSeconds")) { result in
-                switch result {
-                case .started:
-                    call.resolve()
-                case .stopped(let e):
-                    if let e = e {
-                        call.reject(e.localizedDescription, String((e as NSError).code))
-                    }
-                case .expired:
-                    self.subscribeExpired()
-                }
+    @objc func startDiscovering(_ call: CAPPluginCall) {
+        implementation.startDiscovering(completion: { error in
+            if let error = error {
+                self.rejectCall(call, error)
+            } else {
+                self.resolveCall(call, nil)
             }
-        } else {
-            call.resolve()
-        }
+        })
     }
 
-    @objc func unsubscribe(_ call: CAPPluginCall) {
-        guard let scanner = self.scanner else {
-            call.reject(Constants.NOT_INITIALIZED)
-            return
-        }
-
-        scanner.stop()
-
-        call.resolve()
+    @objc func stopDiscovering(_ call: CAPPluginCall) {
+        implementation.stopDiscovering(completion: { error in
+            if let error = error {
+                self.rejectCall(call, error)
+            } else {
+                self.resolveCall(call, nil)
+            }
+        })
     }
 
-    private func subscribeExpired() {
-        guard let scanner = self.scanner else { return }
+    /**
+     * Connection
+     */
 
-        if scanner.isScanning() {
-            notifyListeners("onSubscribeExpired", data: nil)
-        }
+    @objc func connect(_ call: CAPPluginCall) {
+        let options = ConnectOptions(call)
 
-        scanner.stop()
+        implementation.connect(options, completion: { error in
+            if let error = error {
+                self.rejectCall(call, error)
+            } else {
+                self.resolveCall(call, nil)
+            }
+        })
+    }
+
+    @objc func disconnect(_ call: CAPPluginCall) {
+        let options = DisconnectOptions(call)
+
+        implementation.disconnect(options, completion: { error in
+            if let error = error {
+                self.rejectCall(call, error)
+            } else {
+                self.resolveCall(call, nil)
+            }
+        })
+    }
+
+    /**
+     * Payload
+     */
+
+    @objc func sendPayload(_ call: CAPPluginCall) {
+        let options = SendPayloadOptions(call)
+
+        implementation.sendPayload(options, completion: { error in
+            if let error = error {
+                self.rejectCall(call, error)
+            } else {
+                self.resolveCall(call, nil)
+            }
+        })
     }
 
     /**
      * Status
      */
+
     @objc func status(_ call: CAPPluginCall) {
-        let isPublishing = (self.advertiser != nil) ? self.advertiser.isAdvertising() : false
-        let isSubscribing = (self.scanner != nil) ? self.scanner.isScanning() : false
-
-        let uuids = (self.scanner != nil) ? scanner.getBeacons() : []
-
-        call.resolve([
-            "isPublishing": isPublishing,
-            "isSubscribing": isSubscribing,
-            "uuids": uuids
-        ])
+        implementation.status(completion: { result, error in
+            if let error = error {
+                self.rejectCall(call, error)
+            } else if let result = result?.toJSObject() as? JSObject {
+                self.resolveCall(call, result)
+            }
+        })
     }
 
     /**
-     * Helper
+     * Permissions
      */
-    private func stop() {
-        if let scanner = self.scanner {
-            scanner.stop()
-        }
 
-        if let advertiser = self.advertiser {
-            advertiser.stop()
-        }
+    /**
+     * Events
+     */
+
+    /**
+     * Called when a remote endpoint is discovered.
+     */
+    func onEndpointFound(_ event: EndpointFoundEvent) {
+        notifyListeners(self.ENDPOINT_FOUND_EVENT, data: event.toJSObject())
+    }
+    /**
+     * Called when a remote endpoint is no longer discoverable.
+     */
+    func onEndpointLost(_ event: EndpointLostEvent) {
+        notifyListeners(self.ENDPOINT_LOST_EVENT, data: event.toJSObject())
     }
 
-    private func fromBluetoothState(_ state: StateResult) -> String {
-        switch state {
-        case .poweredOn:
-            return "poweredOn"
-        case .poweredOff:
-            return "poweredOff"
-        case .resetting:
-            return "resetting"
-        case .unsupported:
-            return "unsupported"
-        case .unauthorized:
-            return "unauthorized"
-        default:
-            return "unknown"
+    /**
+     * Called after both sides have accepted the connection.
+     */
+    func onEndpointConnected(_ event: EndpointConnectedEvent) {
+        notifyListeners(self.ENDPOINT_CONNECTED_EVENT, data: event.toJSObject())
+    }
+    /**
+     * Called when a remote endpoint is disconnected or has become unreachable.
+     */
+    func onEndpointDisconnected(_ event: EndpointDisconnectedEvent) {
+        notifyListeners(self.ENDPOINT_DISCONNECTED_EVENT, data: event.toJSObject())
+    }
+
+    /**
+     * Called when a Payload is received from a remote endpoint.
+     */
+    func onPayloadReceived(_ event: PayloadReceivedEvent) {
+        notifyListeners(self.PAYLOAD_RECEIVED_EVENT, data: event.toJSObject())
+    }
+
+    /**
+     * Calls
+     */
+
+    private func rejectCall(_ call: CAPPluginCall, _ error: Error) {
+        CAPLog.print("[", self.tag, "] ", error)
+        call.reject(error.localizedDescription)
+    }
+
+    private func resolveCall(_ call: CAPPluginCall, _ result: JSObject?) {
+        if let result {
+            call.resolve(result)
+        } else {
+            call.resolve()
         }
     }
 }

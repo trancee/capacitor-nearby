@@ -3,14 +3,14 @@ import PackageDescription
 
 let package = Package(
     name: "CapacitorTranceeNearby",
-    platforms: [.iOS(.v13)],
+    platforms: [.iOS(.v14)],
     products: [
         .library(
             name: "CapacitorTranceeNearby",
             targets: ["NearbyPlugin"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", branch: "7.0.1")
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "7.2.0")
     ],
     targets: [
         .target(

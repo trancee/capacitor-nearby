@@ -497,9 +497,6 @@ public class Nearby {
         }
 
         @Nullable
-        byte[] endpointInfo = options.getEndpointInfo();
-
-        @Nullable
         NearbyEndpoint endpoint = endpoints.get(endpointID);
         if (endpoint == null) {
             Exception exception = new Exception(MISSING_ENDPOINT);

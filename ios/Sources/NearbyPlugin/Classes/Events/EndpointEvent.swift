@@ -1,8 +1,6 @@
 import Foundation
 import Capacitor
 
-import NearbyConnections
-
 @objc public class EndpointEvent: NSObject {
     let endpointID: EndpointID
     let endpointName: String?
