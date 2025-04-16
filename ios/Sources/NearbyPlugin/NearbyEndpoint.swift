@@ -165,12 +165,12 @@ class NearbyEndpoint: NSObject {
         self.socket = nil
     }
 
-    func sendPayload(_ payload: Data) -> Bool {
+    func sendPayload(_ payload: Data) {
         if let socket {
             let length = payload.count
 
             if length >= MAXIMUM_PAYLOAD_SIZE {
-                return false
+                throw CustomError.payloadTooLarge
             }
 
             let checksum = payload.crc32()
@@ -198,12 +198,10 @@ class NearbyEndpoint: NSObject {
             )
 
             // 5. (N)ACK
-            if socket.inputStream.read() > 0 {
-                return true
+            if !(socket.inputStream.read() > 0) {
+                throw CustomError.notAcknowledged
             }
         }
-
-        return false
     }
 
     private func stopTimer() {

@@ -223,7 +223,12 @@ public enum StateResult {
             return
         }
 
-        endpoint.connect()
+        try {
+            endpoint.connect()
+        } catch {
+            completion(error)
+            return
+        }
 
         completion(nil)
     }
@@ -243,7 +248,12 @@ public enum StateResult {
             return
         }
 
-        endpoint.disconnect()
+        try {
+            endpoint.disconnect()
+        } catch {
+            completion(error)
+            return
+        }
 
         completion(nil)
     }
@@ -273,7 +283,12 @@ public enum StateResult {
                 return
             }
 
-            endpoint.sendPayload(payload)
+            try {
+                endpoint.sendPayload(payload)
+            } catch {
+                completion(error)
+                return
+            }   
         }
 
         completion(nil)

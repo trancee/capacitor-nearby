@@ -19,6 +19,10 @@ This guide provides instructions for contributing to this Capacitor plugin.
     brew install swiftlint
     ```
 
+1. Install Swift
+
+    https://www.swift.org/install/linux/
+
 ### Scripts
 
 #### `npm run build`

@@ -23,6 +23,7 @@ import com.getcapacitor.community.classes.options.StartAdvertisingOptions;
 import com.getcapacitor.community.classes.results.InitializeResult;
 import com.getcapacitor.community.classes.results.StatusResult;
 import com.getcapacitor.community.interfaces.Callback;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
@@ -504,13 +505,13 @@ public class Nearby {
             return;
         }
 
-        if (!endpoint.connect()) {
-            Exception exception = new Exception(NOT_CONNECTED);
+        try {
+            endpoint.connect();
 
+            callback.success();
+        } catch (IOException exception) {
             callback.error(exception);
-            return;
         }
-
         /*
         final BluetoothDevice device = bluetoothAdapter.getRemoteDevice(endpoint.getAddress());
 
@@ -610,8 +611,6 @@ public class Nearby {
         //            callback.error(exception);
         //            return;
         //        }
-
-        callback.success();
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
@@ -637,13 +636,13 @@ public class Nearby {
             return;
         }
 
-        if (!endpoint.disconnect()) {
-            Exception exception = new Exception(NOT_CONNECTED);
+        try {
+            endpoint.disconnect();
 
+            callback.success();
+        } catch (IOException exception) {
             callback.error(exception);
-            return;
         }
-
         /*
         final BluetoothGatt gatt = endpoint.getGatt();
 
@@ -657,8 +656,6 @@ public class Nearby {
 
         endpoint.state = BluetoothProfile.STATE_DISCONNECTED;
         */
-
-        callback.success();
     }
 
     /**
@@ -684,9 +681,9 @@ public class Nearby {
             NearbyEndpoint endpoint;
 
             if ((endpoint = endpoints.get(endpointID)) != null) {
-                if (!endpoint.send(payload)) {
-                    Exception exception = new Exception(NOT_CONNECTED);
-
+                try {
+                    endpoint.sendPayload(payload);
+                } catch (IOException exception) {
                     callback.error(exception);
                     return;
                 }

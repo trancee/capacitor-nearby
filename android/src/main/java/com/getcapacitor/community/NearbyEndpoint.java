@@ -94,7 +94,9 @@ public class NearbyEndpoint {
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void kill() {
-        disconnect();
+        try {
+            disconnect();
+        } catch (IOException ignored) {}
 
         if (schedule != null) {
             schedule.cancel(true);
@@ -127,7 +129,7 @@ public class NearbyEndpoint {
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    public boolean connect() {
+    public void connect() throws IOException {
         /*
         BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
             @Override
@@ -158,59 +160,55 @@ public class NearbyEndpoint {
         gatt = device.connectGatt(config.getContext(), false, gattCallback);
         */
 
-        try {
-            // Get a BluetoothSocket for a connection with the
-            // given BluetoothDevice
-            if (channel != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // L2CAP (>= Android 10)
-                socket = device.createInsecureL2capChannel(channel);
-                // socket = device.createL2capChannel(channel);
-            } else {
-                // RFCOMM (< Android 10)
-                socket = device.createInsecureRfcommSocketToServiceRecord(SERVICE_UUID);
-                // socket = device.createRfcommSocketToServiceRecord(SERVICE_UUID);
-            }
-
-            for (int retries = 3; (retries > 0 && !socket.isConnected()); retries--) {
-                try {
-                    // This is a blocking call and will only return on a
-                    // successful connection or an exception
-                    socket.connect();
-                } catch (IOException ignored) {}
-            }
-
-            if (!socket.isConnected()) {
-                return false;
-            }
-
-            OutputStream outputStream;
-            if ((outputStream = socket.getOutputStream()) != null) {
-                outputStream.write(config.endpointID.getBytes());
-            }
-        } catch (Exception ignored) {
-            return false;
+        // Get a BluetoothSocket for a connection with the
+        // given BluetoothDevice
+        if (channel != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // L2CAP (>= Android 10)
+            socket = device.createInsecureL2capChannel(channel);
+            // socket = device.createL2capChannel(channel);
+        } else {
+            // RFCOMM (< Android 10)
+            socket = device.createInsecureRfcommSocketToServiceRecord(SERVICE_UUID);
+            // socket = device.createRfcommSocketToServiceRecord(SERVICE_UUID);
         }
 
-        return true;
-    }
+        @Nullable
+        IOException exception = null;
 
-    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    public boolean disconnect() {
-        if (socket != null) {
+        for (int retries = 10; retries > 0; retries--) {
             try {
-                socket.close();
-            } catch (IOException ignored) {
-                return false;
-            }
+                // This is a blocking call and will only return on a
+                // successful connection or an exception
+                socket.connect();
 
-            socket = null;
+                exception = null;
+                break;
+            } catch (IOException e) {
+                exception = e;
+            }
         }
 
-        return true;
+        if (exception != null) {
+            throw exception;
+        }
+
+        OutputStream outputStream;
+        if ((outputStream = socket.getOutputStream()) != null) {
+            outputStream.write(config.endpointID.getBytes());
+        }
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    public boolean send(@NonNull byte[] payload) {
+    public void disconnect() throws IOException {
+        if (socket != null) {
+            socket.close();
+        }
+
+        socket = null;
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    public void sendPayload(@NonNull byte[] payload) throws IOException {
         if (socket == null && channel != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 ScheduledFuture<?> schedule = null;
@@ -233,20 +231,26 @@ public class NearbyEndpoint {
                             TimeUnit.MILLISECONDS
                         );
 
-                    for (int retries = 3; (retries > 0 && !socket.isConnected()); retries--) {
+                    IOException exception = null;
+                    for (int retries = 10; retries > 0; retries--) {
                         try {
                             socket.connect();
-                        } catch (IOException ignored) {}
+
+                            exception = null;
+                            break;
+                        } catch (IOException e) {
+                            exception = e;
+                        }
                     }
 
-                    if (!socket.isConnected()) {
-                        return false;
+                    if (exception != null) {
+                        throw exception;
                     }
 
                     int length = payload.length;
 
                     if (length >= MAXIMUM_PAYLOAD_SIZE) {
-                        return false;
+                        throw new IOException("payload too large");
                     }
 
                     // https://raw.githubusercontent.com/krzyzanowskim/CryptoSwift/416a57ee940e0bdf29ef1dae042722d1b147b790/Sources/CryptoSwift/Checksum.swift
@@ -273,54 +277,51 @@ public class NearbyEndpoint {
                     );
 
                     // 5. (N)ACK
-                    if (inputStream.read() > 0) {
-                        return true;
+                    if (!(inputStream.read() > 0)) {
+                        throw new IOException("not acknowledged");
                     }
-                } catch (IOException ignored) {} finally {
+                } finally {
                     if (schedule != null) {
                         schedule.cancel(true);
                     }
                 }
-
-                return false;
             }
         } else if (socket != null) {
-            try {
-                InputStream inputStream = socket.getInputStream();
-                OutputStream outputStream = socket.getOutputStream();
+            InputStream inputStream = socket.getInputStream();
+            OutputStream outputStream = socket.getOutputStream();
 
-                int length = payload.length;
+            int length = payload.length;
 
-                if (length >= MAXIMUM_PAYLOAD_SIZE) {
-                    return false;
+            if (length >= MAXIMUM_PAYLOAD_SIZE) {
+                throw new IOException("payload too large");
+            }
+
+            // https://raw.githubusercontent.com/krzyzanowskim/CryptoSwift/416a57ee940e0bdf29ef1dae042722d1b147b790/Sources/CryptoSwift/Checksum.swift
+            Checksum crc32 = new CRC32();
+            crc32.update(payload, 0, length);
+            long checksum = crc32.getValue();
+
+            // 1. Identify
+            // outputStream.write(config.endpointID.getBytes());
+            // 2. Payload Length
+            outputStream.write(new byte[] { (byte) ((length) & 0xff), (byte) ((length >> 8) & 0xff), (byte) ((length >> 16) & 0xff) });
+            // 3. Payload
+            outputStream.write(payload);
+            // 4. Checksum
+            outputStream.write(
+                new byte[] {
+                    (byte) ((checksum) & 0xff),
+                    (byte) ((checksum >> 8) & 0xff),
+                    (byte) ((checksum >> 16) & 0xff),
+                    (byte) ((checksum >> 24) & 0xff)
                 }
+            );
 
-                // https://raw.githubusercontent.com/krzyzanowskim/CryptoSwift/416a57ee940e0bdf29ef1dae042722d1b147b790/Sources/CryptoSwift/Checksum.swift
-                Checksum crc32 = new CRC32();
-                crc32.update(payload, 0, length);
-                long checksum = crc32.getValue();
-
-                // 1. Identify
-                // outputStream.write(config.endpointID.getBytes());
-                // 2. Payload Length
-                outputStream.write(new byte[] { (byte) ((length) & 0xff), (byte) ((length >> 8) & 0xff), (byte) ((length >> 16) & 0xff) });
-                // 3. Payload
-                outputStream.write(payload);
-                // 4. Checksum
-                outputStream.write(
-                    new byte[] {
-                        (byte) ((checksum) & 0xff),
-                        (byte) ((checksum >> 8) & 0xff),
-                        (byte) ((checksum >> 16) & 0xff),
-                        (byte) ((checksum >> 24) & 0xff)
-                    }
-                );
-
-                // 5. (N)ACK
-                if (inputStream.read() > 0) {
-                    return true;
-                }
-                /*
+            // 5. (N)ACK
+            if (!(inputStream.read() > 0)) {
+                throw new IOException("not acknowledged");
+            }
+            /*
                 int length = payload.length;
 
                 if (length >= MAXIMUM_PAYLOAD_SIZE) {
@@ -332,10 +333,7 @@ public class NearbyEndpoint {
 
                 return true;
                 */
-            } catch (IOException ignored) {}
         }
-
-        return false;
     }
 
     public NearbyEndpoint onLost(final Runnable command) {

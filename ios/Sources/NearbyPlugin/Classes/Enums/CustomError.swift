@@ -9,6 +9,9 @@ public enum CustomError: Error {
     case serviceIDMissing
 
     case payloadMissing
+    case payloadTooLarge
+
+    case notAcknowledged
 
     case initializationError
     case advertiserError
@@ -32,7 +35,12 @@ extension CustomError: LocalizedError {
 
         case .payloadMissing:
             return NSLocalizedString("missing payload", comment: "payloadMissing")
+        case .payloadTooLarge:
+            return NSLocalizedString("payload too large", comment: "payloadTooLarge")
 
+        case .notAcknowledged:
+            return NSLocalizedString("not acknowledged", comment: "notAcknowledged")
+            
         case .initializationError:
             return NSLocalizedString("initialization error", comment: "initializationError")
         case .advertiserError:
