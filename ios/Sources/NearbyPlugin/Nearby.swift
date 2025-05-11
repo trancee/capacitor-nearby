@@ -50,7 +50,21 @@ public enum StateResult {
             return
         }
 
-        let serviceUUID = serviceID.uuid
+        let serviceUUID = {
+            let data = serviceID.data.hash(4)
+
+            //          0000-1000-8000-00805f9b34fb
+            // ffffffff-0000-0000-0000-000000000000
+
+            var bytes = BLUETOOTH_BASE_UUID
+
+            bytes[0] = data[0]
+            bytes[1] = data[1]
+            bytes[2] = data[2]
+            bytes[3] = data[3]
+
+            return NSUUID(uuidBytes: bytes) as UUID
+        }()
 
         guard let endpointID = config.getEndpointID() else {
             completion(nil, CustomError.endpointIDMissing)
@@ -223,8 +237,8 @@ public enum StateResult {
             return
         }
 
-        try {
-            endpoint.connect()
+        do {
+            try endpoint.connect()
         } catch {
             completion(error)
             return
@@ -248,8 +262,8 @@ public enum StateResult {
             return
         }
 
-        try {
-            endpoint.disconnect()
+        do {
+            try endpoint.disconnect()
         } catch {
             completion(error)
             return
@@ -283,12 +297,12 @@ public enum StateResult {
                 return
             }
 
-            try {
-                endpoint.sendPayload(payload)
+            do {
+                try endpoint.sendPayload(payload)
             } catch {
                 completion(error)
                 return
-            }   
+            }
         }
 
         completion(nil)

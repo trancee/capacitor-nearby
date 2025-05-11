@@ -40,7 +40,7 @@ extension CustomError: LocalizedError {
 
         case .notAcknowledged:
             return NSLocalizedString("not acknowledged", comment: "notAcknowledged")
-            
+
         case .initializationError:
             return NSLocalizedString("initialization error", comment: "initializationError")
         case .advertiserError:

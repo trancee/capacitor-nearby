@@ -12,7 +12,11 @@ let MAXIMUM_PAYLOAD_SIZE = 0x1000000
 
 public typealias Short = UInt16
 
-class NearbyEndpoint: NSObject {
+class NearbyEndpoint: NSObject, CBCentralManagerDelegate {
+    func centralManagerDidUpdateState(_ central: CBCentralManager) {
+
+    }
+
     /*
      func centralManagerDidUpdateState(_ central: CBCentralManager) {
      // Tells the delegate the central manager’s state updated.
@@ -75,7 +79,7 @@ class NearbyEndpoint: NSObject {
 
     // private var managerQueue = DispatchQueue.global(qos: .utility)
     // private var peripheralManager: CBPeripheralManager?
-    // private var centralManager:CBCentralManager?
+    private var centralManager: CBCentralManager?
     private var peripheral: CBPeripheral?
     private var socket: CBL2CAPChannel?
 
@@ -92,14 +96,14 @@ class NearbyEndpoint: NSObject {
 
         self.lastSeen = Date()
 
-        // self.centralManager = CBCentralManager(delegate: self, queue: nil)
-
-        // self.peripheralManager = CBPeripheralManager(delegate: nil, queue: managerQueue)
-        // self.peripheralManager?.delegate = self
-
         self.peripheral = peripheral
 
         super.init()
+
+        self.centralManager = CBCentralManager(delegate: self, queue: nil)
+
+        // self.peripheralManager = CBPeripheralManager(delegate: nil, queue: managerQueue)
+        // self.peripheralManager?.delegate = self
 
         peripheral.delegate = self
 
@@ -110,7 +114,11 @@ class NearbyEndpoint: NSObject {
     }
 
     func kill() {
-        disconnect()
+        do {
+            try disconnect()
+        } catch {
+            // ignore
+        }
 
         stopTimer()
     }
@@ -128,13 +136,11 @@ class NearbyEndpoint: NSObject {
             repeats: false)
     }
 
-    func connect() {
+    func connect() throws {
         if let peripheral {
-            /*
-             if let centralManager {
-             centralManager.connect(peripheral)
-             }
-             */
+            if let centralManager {
+                centralManager.connect(peripheral)
+            }
 
             // The PSM of the channel to open
             if let channel {
@@ -144,13 +150,12 @@ class NearbyEndpoint: NSObject {
         }
     }
 
-    func disconnect() {
+    func disconnect() throws {
         if let peripheral {
-            /*
-             if let centralManager {
-             centralManager.cancelPeripheralConnection(peripheral)
-             }
-             */
+            if let centralManager {
+                centralManager.cancelPeripheralConnection(peripheral)
+            }
+
             if let socket {
                 socket.inputStream.close()
                 socket.inputStream.remove(from: .main, forMode: .default)
@@ -165,7 +170,7 @@ class NearbyEndpoint: NSObject {
         self.socket = nil
     }
 
-    func sendPayload(_ payload: Data) {
+    func sendPayload(_ payload: Data) throws {
         if let socket {
             let length = payload.count
 
