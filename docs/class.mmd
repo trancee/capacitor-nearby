@@ -1,0 +1,46 @@
+classDiagram
+    Endpoint : Config config
+    Endpoint : String endpointID
+    Endpoint : String endpointName
+    Endpoint : Bytes endpointInfo
+    Endpoint : Short channel
+    Endpoint : Integer rssi
+    Endpoint : Device device
+    Endpoint : kill()
+    Endpoint : alive()
+    Endpoint : connect()
+    Endpoint : disconnect()
+    Endpoint : send(Bytes payload)
+
+    Advertiser : Adapter adapter
+    Advertiser : UUID serviceUUID
+    Advertiser : UUID endpointUUID
+    Advertiser : String endpointName
+    Advertiser : start(Bytes endpointInfo)
+    Advertiser : stop()
+    Advertiser : isAdvertising() Boolean
+    Advertiser <-- AdvertiserCallback : Callback
+
+    AdvertiserCallback : onSuccess()
+    AdvertiserCallback : onFailure(Exception exception)
+    AdvertiserCallback : onConnected(String endpointID)
+    AdvertiserCallback : onDisconnected(String endpointID)
+    AdvertiserCallback : onReceived(String endpointID, Bytes payload)
+    
+    Scanner : Adapter adapter
+    Scanner : UUID serviceUUID
+    Scanner : UUID serviceMask
+    Scanner : start()
+    Scanner : stop()
+    Scanner : isScanning() Boolean
+    Scanner <-- ScannerCallback : Callback
+
+    ScannerCallback : UUID endpointID
+    ScannerCallback : String endpointName
+    ScannerCallback : Bytes endpointInfo
+    ScannerCallback : Short channel
+    ScannerCallback : Integer rssi
+    ScannerCallback : Device device
+    ScannerCallback : onSuccess()
+    ScannerCallback : onFailure(Exception exception)
+    ScannerCallback : onFound(...)
