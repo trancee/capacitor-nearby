@@ -25,7 +25,10 @@ public class NearbyPlugin: CAPPlugin, CAPBridgedPlugin {
 
         CAPPluginMethod(name: "sendPayload", returnType: CAPPluginReturnPromise),
 
-        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+
+        CAPPluginMethod(name: "checkPermissions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise)
     ]
 
     public let tag = "NearbyPlugin"
@@ -196,6 +199,28 @@ public class NearbyPlugin: CAPPlugin, CAPBridgedPlugin {
      * Permissions
      */
 
+    @objc override public func checkPermissions(_ call: CAPPluginCall) {
+        implementation.checkPermissions(completion: { result, error in
+            if let error = error {
+                self.rejectCall(call, error)
+            } else if let result = result?.toJSObject() as? JSObject {
+                self.resolveCall(call, result)
+            }
+        })
+    }
+
+    @objc override public func requestPermissions(_ call: CAPPluginCall) {
+        let options = RequestPermissionsOptions(call)
+
+        implementation.requestPermissions(options, completion: { error in
+            if let error = error {
+                self.rejectCall(call, error)
+            } else {
+                self.resolveCall(call, nil)
+            }
+        })
+    }
+
     /**
      * Events
      */
@@ -203,33 +228,43 @@ public class NearbyPlugin: CAPPlugin, CAPBridgedPlugin {
     /**
      * Called when a remote endpoint is discovered.
      */
-    func onEndpointFound(_ event: EndpointFoundEvent) {
+    func onEndpointFound(_ endpoint: Endpoint) {
+        let event: EndpointFoundEvent = .init(endpoint)
+
         notifyListeners(self.ENDPOINT_FOUND_EVENT, data: event.toJSObject())
     }
     /**
      * Called when a remote endpoint is no longer discoverable.
      */
-    func onEndpointLost(_ event: EndpointLostEvent) {
+    func onEndpointLost(_ endpoint: Endpoint) {
+        let event: EndpointLostEvent = .init(endpoint)
+
         notifyListeners(self.ENDPOINT_LOST_EVENT, data: event.toJSObject())
     }
 
     /**
      * Called after both sides have accepted the connection.
      */
-    func onEndpointConnected(_ event: EndpointConnectedEvent) {
+    func onEndpointConnected(_ endpoint: Endpoint) {
+        let event: EndpointConnectedEvent = .init(endpoint)
+
         notifyListeners(self.ENDPOINT_CONNECTED_EVENT, data: event.toJSObject())
     }
     /**
      * Called when a remote endpoint is disconnected or has become unreachable.
      */
-    func onEndpointDisconnected(_ event: EndpointDisconnectedEvent) {
+    func onEndpointDisconnected(_ endpoint: Endpoint) {
+        let event: EndpointDisconnectedEvent = .init(endpoint)
+
         notifyListeners(self.ENDPOINT_DISCONNECTED_EVENT, data: event.toJSObject())
     }
 
     /**
      * Called when a Payload is received from a remote endpoint.
      */
-    func onPayloadReceived(_ event: PayloadReceivedEvent) {
+    func onPayloadReceived(_ endpoint: Endpoint, _ payload: Data) {
+        let event: PayloadReceivedEvent = .init(endpoint, payload)
+
         notifyListeners(self.PAYLOAD_RECEIVED_EVENT, data: event.toJSObject())
     }
 

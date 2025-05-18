@@ -2,21 +2,27 @@ import Foundation
 import Capacitor
 
 @objc public class EndpointEvent: NSObject {
-    let endpointID: EndpointID
-    let endpointName: String?
+    let endpoint: Endpoint
 
-    init(_ endpointID: EndpointID, endpointName: String? = nil) {
-        self.endpointID = endpointID
-        self.endpointName = endpointName
+    init(_ endpoint: Endpoint) {
+        self.endpoint = endpoint
     }
 
     public func toJSObject() -> JSObject {
         var result = JSObject()
 
-        result["endpointID"] = endpointID
+        result["endpointID"] = endpoint.endpointID
 
-        if let endpointName = self.endpointName {
-            result["endpointName"] = endpointName
+        if let endpointName = endpoint.endpointName {
+            if !endpointName.isEmpty {
+                result["endpointName"] = endpointName
+            }
+        }
+
+        if let endpointInfo = endpoint.endpointInfo {
+            if !endpointInfo.isEmpty {
+                result["endpointInfo"] = endpointInfo.base64EncodedString()
+            }
         }
 
         return result

@@ -16,6 +16,10 @@ public enum CustomError: Error {
     case initializationError
     case advertiserError
     case discovererError
+
+    case dataTooLarge
+
+    case openSettingsError
 }
 
 extension CustomError: LocalizedError {
@@ -47,6 +51,12 @@ extension CustomError: LocalizedError {
             return NSLocalizedString("advertiser error", comment: "advertiserError")
         case .discovererError:
             return NSLocalizedString("discoverer error", comment: "discovererError")
+
+        case .dataTooLarge:
+            return NSLocalizedString("data too large", comment: "dataTooLarge")
+
+        case .openSettingsError:
+            return NSLocalizedString("open settings error", comment: "openSettingsError")
         }
     }
 }

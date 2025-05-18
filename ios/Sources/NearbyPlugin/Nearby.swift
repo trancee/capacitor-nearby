@@ -180,11 +180,27 @@ public enum StateResult {
         advertiser.start(endpointInfo) { result in
             switch result {
             case .started:
-                print("started")
+                completion(nil)
+                return
+
             case .stopped(let error):
-                print("stopped")
-            case .expired:
-                print("expired")
+                completion(error)
+                return
+
+            case .connected(let endpointID):
+                let endpoint = Endpoint(endpointID)
+
+                self.plugin.onEndpointConnected(endpoint)
+
+            case .disconnected(let endpointID):
+                let endpoint = Endpoint(endpointID)
+
+                self.plugin.onEndpointDisconnected(endpoint)
+
+            case .received(let endpointID, let payload):
+                let endpoint = Endpoint(endpointID)
+
+                self.plugin.onPayloadReceived(endpoint, payload)
             }
         }
     }
@@ -202,16 +218,50 @@ public enum StateResult {
             return
         }
 
-        scanner.start { result in
+        scanner.start(callback: { result in
             switch result {
             case .started:
-                print("started")
+                self.isDiscovering = true
+
+                completion(nil)
+
             case .stopped(let error):
-                print("stopped")
-            case .expired:
-                print("expired")
+                self.isDiscovering = false
+
+                completion(error)
+
+            case .found(let id, let name, let info, let channel, let rssi, let peripheral):
+                let endpointID = String(bytes: id.data.prefix(ENDPOINT_ID_LENGTH), encoding: .utf8)!
+                let endpointName = name
+                let endpointInfo = info
+
+                if let endpoint = self.endpoints[endpointID] {
+                    endpoint.alive()
+                } else {
+                    let endpoint = NearbyEndpoint(endpointID, endpointName: endpointName, endpointInfo: endpointInfo, channel: channel, rssi: rssi, peripheral, callback: {
+                        result in
+                        switch result {
+                        case .lost(let endpointID):
+                            if self.scanner.isScanning() {
+                                let endpoint = Endpoint(endpointID)
+
+                                self.plugin.onEndpointLost(endpoint)
+                            }
+
+                            self.endpoints[endpointID] = nil
+                        }
+                    })
+
+                    self.endpoints[endpointID] = endpoint
+
+                    if self.scanner.isScanning() {
+                        let endpoint = Endpoint(endpointID, endpointName: endpointName, endpointInfo: endpointInfo)
+
+                        self.plugin.onEndpointFound(endpoint)
+                    }
+                }
             }
-        }
+        })
     }
 
     @objc public func stopDiscovering(completion: @escaping (Error?) -> Void) {
@@ -316,6 +366,68 @@ public enum StateResult {
         let result = StatusResult(isAdvertising: isAdvertising, isDiscovering: isDiscovering)
 
         completion(result, nil)
+    }
+
+    /**
+     * Permissions
+     */
+
+    @objc public func checkPermissions(completion: @escaping (Result?, Error?) -> Void) {
+        let bluetoothState = switch self.scanner.bluetoothState() {
+        case .unknown:
+            "denied"
+        case .resetting:
+            "prompt"
+        case .unsupported:
+            "denied"
+        case .unauthorized:
+            "denied"
+        case .poweredOff:
+            "prompt"
+        case .poweredOn:
+            "granted"
+        }
+        let locationState = "granted"
+
+        let result = PermissionsResult(bluetooth: bluetoothState, location: locationState)
+
+        completion(result, nil)
+    }
+
+    @objc public func requestPermissions(_ options: RequestPermissionsOptions, completion: @escaping (Error?) -> Void) {
+        guard let permissions = options.getPermissions() else {
+            return
+        }
+
+        for permission in permissions {
+            switch permission {
+            case "bluetooth":
+                guard let settingsUrl = URL(string: UIApplication.openSettingsURLString) else {
+                    completion(CustomError.openSettingsError)
+                    return
+                }
+
+                DispatchQueue.main.async {
+                    if UIApplication.shared.canOpenURL(settingsUrl) {
+                        UIApplication.shared.open(settingsUrl, completionHandler: { (success) in
+                            if !success {
+                                completion(CustomError.openSettingsError)
+                                return
+                            }
+                        })
+                    } else {
+                        completion(CustomError.openSettingsError)
+                        return
+                    }
+                }
+            case "location":
+                break
+            default:
+                break
+            }
+        }
+
+        completion(nil)
     }
 
     /**

@@ -12,10 +12,14 @@ let MAXIMUM_PAYLOAD_SIZE = 0x1000000
 
 public typealias Short = UInt16
 
-class NearbyEndpoint: NSObject, CBCentralManagerDelegate {
-    func centralManagerDidUpdateState(_ central: CBCentralManager) {
+public typealias EndpointCallback = (EndpointResult) -> Void
 
-    }
+public enum EndpointResult {
+    case lost(_ endpointID: EndpointID)
+}
+
+class NearbyEndpoint: NSObject {
+    // func centralManagerDidUpdateState(_ central: CBCentralManager) {}
 
     /*
      func centralManagerDidUpdateState(_ central: CBCentralManager) {
@@ -67,7 +71,7 @@ class NearbyEndpoint: NSObject, CBCentralManagerDelegate {
     let endpointInfo: Data?
 
     let channel: Short?
-    let rssi: Int?
+    let rssi: NSNumber?
 
     let timestamp: Date
 
@@ -79,11 +83,13 @@ class NearbyEndpoint: NSObject, CBCentralManagerDelegate {
 
     // private var managerQueue = DispatchQueue.global(qos: .utility)
     // private var peripheralManager: CBPeripheralManager?
-    private var centralManager: CBCentralManager?
+    // private var centralManager: CBCentralManager?
     private var peripheral: CBPeripheral?
     private var socket: CBL2CAPChannel?
 
-    init(_ endpointID: EndpointID, endpointName: String?, endpointInfo: Data?, channel: Short?, rssi: Int? = nil, peripheral: CBPeripheral) {
+    private var callback: EndpointCallback?
+
+    init(_ endpointID: EndpointID, endpointName: String?, endpointInfo: Data?, channel: Short?, rssi: NSNumber? = nil, _ peripheral: CBPeripheral, callback: @escaping EndpointCallback) {
         self.endpointID = endpointID
 
         self.endpointName = endpointName
@@ -98,9 +104,11 @@ class NearbyEndpoint: NSObject, CBCentralManagerDelegate {
 
         self.peripheral = peripheral
 
+        self.callback = callback
+
         super.init()
 
-        self.centralManager = CBCentralManager(delegate: self, queue: nil)
+        // self.centralManager = CBCentralManager(delegate: self, queue: nil)
 
         // self.peripheralManager = CBPeripheralManager(delegate: nil, queue: managerQueue)
         // self.peripheralManager?.delegate = self
@@ -138,9 +146,9 @@ class NearbyEndpoint: NSObject, CBCentralManagerDelegate {
 
     func connect() throws {
         if let peripheral {
-            if let centralManager {
-                centralManager.connect(peripheral)
-            }
+            // if let centralManager {
+            //    centralManager.connect(peripheral)
+            // }
 
             // The PSM of the channel to open
             if let channel {
@@ -152,9 +160,9 @@ class NearbyEndpoint: NSObject, CBCentralManagerDelegate {
 
     func disconnect() throws {
         if let peripheral {
-            if let centralManager {
-                centralManager.cancelPeripheralConnection(peripheral)
-            }
+            // if let centralManager {
+            //    centralManager.cancelPeripheralConnection(peripheral)
+            // }
 
             if let socket {
                 socket.inputStream.close()
@@ -210,7 +218,7 @@ class NearbyEndpoint: NSObject, CBCentralManagerDelegate {
     }
 
     private func stopTimer() {
-        if let timer = self.timer {
+        if let timer {
             if timer.isValid { timer.invalidate() }
 
             self.timer = nil
@@ -220,9 +228,9 @@ class NearbyEndpoint: NSObject, CBCentralManagerDelegate {
     @objc fileprivate func onTimer(_ timer: Timer) {
         kill()
 
-        // if let beaconCallback = Scanner.beaconCallback {
-        //     beaconCallback(.lost(self.uuid, rssi: self.rssi))
-        // }
+        if let callback {
+            callback(.lost(self.endpointID))
+        }
     }
 }
 

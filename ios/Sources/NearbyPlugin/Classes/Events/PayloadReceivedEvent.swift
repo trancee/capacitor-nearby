@@ -4,10 +4,10 @@ import Capacitor
 @objc public class PayloadReceivedEvent: EndpointEvent {
     let payload: Data
 
-    init(_ endpointID: EndpointID, payload: Data) {
+    init(_ endpoint: Endpoint, _ payload: Data) {
         self.payload = payload
 
-        super.init(endpointID)
+        super.init(endpoint)
     }
 
     override public func toJSObject() -> JSObject {

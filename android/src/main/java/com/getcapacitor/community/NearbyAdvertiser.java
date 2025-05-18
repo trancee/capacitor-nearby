@@ -116,6 +116,17 @@ public class NearbyAdvertiser {
             stop();
         }
 
+        advertiser = adapter.getBluetoothLeAdvertiser();
+
+        if (advertiser == null || !isBluetoothAvailable()) {
+            int errorCode = AdvertiseCallback.ADVERTISE_FAILED_FEATURE_UNSUPPORTED;
+
+            Exception exception = new Exception(advertiseFailed(errorCode));
+            callback.onFailure(exception);
+
+            return;
+        }
+
         @NonNull
         final BluetoothServerSocket serverSocket;
 
@@ -246,17 +257,6 @@ public class NearbyAdvertiser {
             } catch (IOException ignored) {}
         });
         thread.start();
-
-        advertiser = adapter.getBluetoothLeAdvertiser();
-
-        if (advertiser == null || !isBluetoothAvailable()) {
-            int errorCode = AdvertiseCallback.ADVERTISE_FAILED_FEATURE_UNSUPPORTED;
-
-            Exception exception = new Exception(advertiseFailed(errorCode));
-            callback.onFailure(exception);
-
-            return;
-        }
 
         // The AdvertiseSettings provide a way to adjust advertising preferences for each Bluetooth LE advertisement instance.
         AdvertiseSettings advertiseSettings = new AdvertiseSettings.Builder()
