@@ -25,6 +25,16 @@ import Capacitor
             }
         }
 
+        if let rssi = endpoint.rssi {
+            result["rssi"] = rssi
+        }
+        if let power = endpoint.power {
+            result["power"] = power
+        }
+        if let distance = endpoint.distance {
+            result["distance"] = distance
+        }
+
         return result
     }
 }

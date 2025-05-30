@@ -35,18 +35,20 @@ public final class NearbyAdvertiser: NSObject {
 
     private static var stateCallback: StateCallback?
 
+    private let queue = DispatchQueue(label: "NearbyAdvertiser")
+
     private var psm: CBL2CAPPSM?
 
-    init(_ serviceUUID: UUID,
+    init(_ serviceUUID: CBUUID,
          _ endpointName: String?,
-         _ endpointUUID: UUID,
+         _ endpointUUID: CBUUID,
          stateCallback: @escaping StateCallback) {
         super.init()
 
-        NearbyAdvertiser.serviceUUID = CBUUID(nsuuid: serviceUUID)
+        NearbyAdvertiser.serviceUUID = serviceUUID
 
         NearbyAdvertiser.endpointName = endpointName
-        NearbyAdvertiser.endpointUUID = CBUUID(nsuuid: endpointUUID)
+        NearbyAdvertiser.endpointUUID = endpointUUID
 
         NearbyAdvertiser.stateCallback = stateCallback
 
@@ -63,6 +65,10 @@ public final class NearbyAdvertiser: NSObject {
     }
 
     deinit {
+        if let psm {
+            peripheralManager?.unpublishL2CAPChannel(psm)
+        }
+
         stop()
     }
 }
@@ -85,7 +91,7 @@ extension NearbyAdvertiser {
             return
         }
 
-        let channel: Short? = psm
+        let channel: Short? = self.psm
 
         func makeUUID() -> CBUUID? {
             var size = endpointInfo?.count ?? 0
@@ -209,6 +215,7 @@ extension NearbyAdvertiser: CBPeripheralManagerDelegate {
 
     // Tells the delegate the peripheral manager’s state updated.
     public func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
+        print("NearbyAdvertiser::peripheralManagerDidUpdateState", peripheral.state)
         if let callback = NearbyAdvertiser.stateCallback {
             switch peripheral.state {
             case .unknown:
@@ -257,12 +264,12 @@ extension NearbyAdvertiser: CBPeripheralDelegate {
         // The error that occurred, or nil if no error occurred.
         error: (any Error)?
     ) {
-        print("didUnpublishL2CAPChannel")
+        print("NearbyAdvertiser::didUnpublishL2CAPChannel", PSM)
 
         self.psm = PSM
 
         if let error {
-            stop(error)
+            return stop(error)
         }
     }
 
@@ -275,12 +282,12 @@ extension NearbyAdvertiser: CBPeripheralDelegate {
         // The error that prevented publishing, or nil if no error occurred.
         error: (any Error)?
     ) {
-        print("didPublishL2CAPChannel")
+        print("NearbyAdvertiser::didPublishL2CAPChannel", PSM)
 
         self.psm = PSM
 
         if let error {
-            stop(error)
+            return stop(error)
         }
     }
 
@@ -293,10 +300,116 @@ extension NearbyAdvertiser: CBPeripheralDelegate {
         // The error that occurred, or nil if no error occurred.
         error: (any Error)?
     ) {
-        print("didOpen")
+        print("NearbyAdvertiser::didOpen", channel)
 
         if let error {
-            stop(error)
+            return stop(error)
+        }
+
+        if let channel {
+            queue.async {
+                var endpointID: String?
+
+                channel.inputStream.delegate = self
+                channel.inputStream.schedule(in: .main, forMode: .default)
+                channel.inputStream.open()
+
+                channel.outputStream.delegate = self
+                channel.outputStream.schedule(in: .main, forMode: .default)
+                channel.outputStream.open()
+
+                let bufferSize = 8192
+                let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+                defer {
+                    buffer.deallocate()
+                }
+
+                // 1. Identity
+                if channel.inputStream.read(buffer, maxLength: ENDPOINT_ID_LENGTH) == ENDPOINT_ID_LENGTH {
+                    endpointID = String(cString: buffer)
+                    print("receive::endpointID", endpointID)
+
+                    if let endpointID {
+                        if let callback = self.callback {
+                            callback(.connected(endpointID))
+                        }
+                    }
+
+                    // 2. Payload Length
+                    if channel.inputStream.read(buffer, maxLength: 3) == 3 {
+                        var length = Int(buffer[0]) | Int(buffer[1]) << 8 | Int(buffer[2]) << 16
+                        print("receive::length", length)
+
+                        // 3. Payload
+                        var payload = Data(capacity: length)
+                        while length > 0 {
+                            let read = channel.inputStream.read(buffer, maxLength: min(length, bufferSize))
+                            print("receive::payload \(read) bytes of total: \(payload.count), remaining: \(length)")
+                            if read == 0 { break }
+
+                            payload.append(buffer, count: read)
+
+                            length -= read
+                        }
+
+                        // 4. Checksum
+                        if channel.inputStream.read(buffer, maxLength: 4) == 4 {
+                            let checksum = UInt32(buffer[0]) | UInt32(buffer[1]) << 8 | UInt32(buffer[2]) << 16 | UInt32(buffer[3]) << 24
+                            print("receive::checksum", checksum)
+
+                            let ok = (checksum == payload.crc32())
+                            print("receive::checksum ok", ok)
+
+                            // 5. (N)ACK
+                            channel.outputStream.write(ok ? 0x01 : 0x00)
+                            print("receive::checksum ok", ok)
+                        } else {
+                            // 5. NAK
+                            channel.outputStream.write(0x00)
+                            print("receive::checksum NOK")
+                        }
+
+                        if let endpointID {
+                            if let callback = self.callback {
+                                callback(.received(endpointID, payload: payload))
+                            }
+                        }
+                    }
+                }
+
+                channel.inputStream.close()
+                channel.inputStream.remove(from: .main, forMode: .default)
+
+                channel.outputStream.close()
+                channel.outputStream.remove(from: .main, forMode: .default)
+
+                if let endpointID {
+                    if let callback = self.callback {
+                        callback(.disconnected(endpointID))
+                    }
+                }
+            }
         }
     }
+}
+
+extension NearbyAdvertiser: StreamDelegate {
+    //    public func stream(_ stream: Stream, handle eventCode: Stream.Event) {
+    //        switch eventCode {
+    //        case Stream.Event.openCompleted:
+    //            print("Stream is open")
+    //        case Stream.Event.endEncountered:
+    //            print("Stream encountered end")
+    //        case Stream.Event.hasBytesAvailable:
+    //            print("Stream has bytes available")
+    //        // receive
+    //        case Stream.Event.hasSpaceAvailable:
+    //            print("Stream has space available")
+    //        // send
+    //        case Stream.Event.errorOccurred:
+    //            print("Stream error occurred")
+    //        default:
+    //            print("Unknown stream event")
+    //        }
+    //    }
 }

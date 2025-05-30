@@ -22,7 +22,7 @@ import Capacitor
         }
 
         if let payload = call.getString("payload") {
-            self.payload = payload.data(using: .utf8)
+            self.payload = Data(base64Encoded: payload, options: .ignoreUnknownCharacters)
         }
     }
 

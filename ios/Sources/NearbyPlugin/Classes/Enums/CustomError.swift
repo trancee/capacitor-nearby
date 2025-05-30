@@ -20,6 +20,8 @@ public enum CustomError: Error {
     case dataTooLarge
 
     case openSettingsError
+
+    case spaceNotAvailable
 }
 
 extension CustomError: LocalizedError {
@@ -57,6 +59,9 @@ extension CustomError: LocalizedError {
 
         case .openSettingsError:
             return NSLocalizedString("open settings error", comment: "openSettingsError")
+
+        case .spaceNotAvailable:
+            return NSLocalizedString("space not available", comment: "spaceNotAvailable")
         }
     }
 }

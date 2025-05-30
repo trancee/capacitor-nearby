@@ -9,7 +9,7 @@ import Capacitor
         self.endpointName = call.getString("endpointName")
 
         if let endpointInfo = call.getString("endpointInfo") {
-            self.endpointInfo = endpointInfo.data(using: .utf8)
+            self.endpointInfo = Data(base64Encoded: endpointInfo, options: .ignoreUnknownCharacters)
         }
     }
 

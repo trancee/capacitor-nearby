@@ -15,7 +15,7 @@ public class NearbyConfig {
 
         self.endpointName = config.getString("endpointName")
         if let endpointInfo = config.getString("endpointInfo") {
-            self.endpointInfo = endpointInfo.data(using: .utf8)
+            self.endpointInfo = Data(base64Encoded: endpointInfo, options: .ignoreUnknownCharacters)
         }
 
         self.serviceID = config.getString("serviceID")

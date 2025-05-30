@@ -7,13 +7,13 @@
 
 import Foundation
 import CryptoKit
+import CoreBluetooth
 
 // The most significant bits and the least significant bits or Bluetooth Base UUID.
 // See Bluetooth Core Specification 6.0 Vol.3, Part B, Section 2.5.1
-let BLUETOOTH_BASE_UUID_MSB: UInt64 = 0x0000000000001000
-let BLUETOOTH_BASE_UUID_LSB: UInt64 = 0x800000805f9b34fb
-
-let BLUETOOTH_BASE_UUID: [UInt8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b, 0x34, 0xfb]
+let BLUETOOTH_BASE_UUID_MSB: [UInt8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00]
+let BLUETOOTH_BASE_UUID_LSB: [UInt8] = [0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b, 0x34, 0xfb]
+let BLUETOOTH_BASE_UUID: [UInt8] = BLUETOOTH_BASE_UUID_MSB + BLUETOOTH_BASE_UUID_LSB
 
 let ENDPOINT_ID_LENGTH: Int = 4
 
@@ -100,44 +100,53 @@ extension Array where Element == UInt8 {
 
 extension InputStream {
     func read() -> UInt8 {
-        let READ_BUFFER_SIZE = 1024
-
-        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: READ_BUFFER_SIZE)
-        defer {
-            buffer.deallocate()
-        }
-
-        let read = self.read(buffer, maxLength: READ_BUFFER_SIZE)
-
-        // var data = Data()
-        // data.append(buffer, count:read)
-
-        // return data
-        return buffer[0]
+        var byte: UInt8 = 0x00
+        let read = self.read(&byte, maxLength: 1)
+        return byte
     }
 }
 
 extension OutputStream {
-    func write(_ data: Data) -> UInt8 {
-        return data.withUnsafeBytes({ (rawBufferPointer: UnsafeRawBufferPointer) -> UInt8 in
-            let bufferPointer = rawBufferPointer.bindMemory(to: UInt8.self)
-            return UInt8(self.write(bufferPointer.baseAddress!, maxLength: data.count))
+    func write(_ byte: UInt8) -> Int {
+        var byte = byte
+        return self.write(UnsafePointer<UInt8>(&byte), maxLength: 1)
+    }
+    func write(_ bytes: [UInt8]) -> Int {
+        return bytes.withUnsafeBytes({ (buffer: UnsafeRawBufferPointer) -> Int in
+            let pointer = buffer.bindMemory(to: UInt8.self)
+            return self.write(pointer.baseAddress!, maxLength: bytes.count)
         })
+    }
+    func write(_ data: Data) {
+        return data.withUnsafeBytes({ (buffer: UnsafeRawBufferPointer) in
+            guard let pointer = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                print("Central: Error getting buffer pointer.")
+                return
+            }
+            var length = data.count
+            var offset = 0
+            while length > 0 {
+                let bytesWritten = self.write(pointer+offset, maxLength: min(length, 8192))
+                length -= bytesWritten
+                offset += bytesWritten
+                if bytesWritten > 0 {
+                    print("Central: Successfully wrote \(bytesWritten) bytes of total: \(data.count), remaining: \(length)")
+                } else if bytesWritten == -1 {
+                    print("Central: Error writing to stream: \(self.streamError?.localizedDescription ?? "Unknown error")")
+                } else {
+                    print("Central: Wrote 0 bytes.")
+                }
+            }
+        })
+        // return self.write(data.bytes)
     }
 }
 
 extension EndpointID {
-    var uuid: UUID {
+    var uuid: CBUUID {
         assert(self.count == ENDPOINT_ID_LENGTH, "invalid endpoint identifier length")
 
-        var bytes = BLUETOOTH_BASE_UUID
-
-        bytes[0] = self.bytes[0]
-        bytes[1] = self.bytes[1]
-        bytes[2] = self.bytes[2]
-        bytes[3] = self.bytes[3]
-
-        return NSUUID(uuidBytes: bytes) as UUID
+        return CBUUID(data: self.data)
     }
 
     static let kEndpointIdChars: [Character] = ["A",

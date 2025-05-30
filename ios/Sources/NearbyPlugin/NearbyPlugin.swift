@@ -230,6 +230,7 @@ public class NearbyPlugin: CAPPlugin, CAPBridgedPlugin {
      */
     func onEndpointFound(_ endpoint: Endpoint) {
         let event: EndpointFoundEvent = .init(endpoint)
+        print(self.ENDPOINT_FOUND_EVENT, event.toJSObject())
 
         notifyListeners(self.ENDPOINT_FOUND_EVENT, data: event.toJSObject())
     }
@@ -238,6 +239,7 @@ public class NearbyPlugin: CAPPlugin, CAPBridgedPlugin {
      */
     func onEndpointLost(_ endpoint: Endpoint) {
         let event: EndpointLostEvent = .init(endpoint)
+        print(self.ENDPOINT_FOUND_EVENT, event.toJSObject())
 
         notifyListeners(self.ENDPOINT_LOST_EVENT, data: event.toJSObject())
     }
@@ -247,6 +249,7 @@ public class NearbyPlugin: CAPPlugin, CAPBridgedPlugin {
      */
     func onEndpointConnected(_ endpoint: Endpoint) {
         let event: EndpointConnectedEvent = .init(endpoint)
+        print(self.ENDPOINT_FOUND_EVENT, event.toJSObject())
 
         notifyListeners(self.ENDPOINT_CONNECTED_EVENT, data: event.toJSObject())
     }
@@ -255,6 +258,7 @@ public class NearbyPlugin: CAPPlugin, CAPBridgedPlugin {
      */
     func onEndpointDisconnected(_ endpoint: Endpoint) {
         let event: EndpointDisconnectedEvent = .init(endpoint)
+        print(self.ENDPOINT_FOUND_EVENT, event.toJSObject())
 
         notifyListeners(self.ENDPOINT_DISCONNECTED_EVENT, data: event.toJSObject())
     }
@@ -264,6 +268,7 @@ public class NearbyPlugin: CAPPlugin, CAPBridgedPlugin {
      */
     func onPayloadReceived(_ endpoint: Endpoint, _ payload: Data) {
         let event: PayloadReceivedEvent = .init(endpoint, payload)
+        print(self.ENDPOINT_FOUND_EVENT, event.toJSObject())
 
         notifyListeners(self.PAYLOAD_RECEIVED_EVENT, data: event.toJSObject())
     }

@@ -1,5 +1,6 @@
 import Foundation
 import Capacitor
+import CoreBluetooth
 
 public typealias StateCallback = (StateResult) -> Void
 
@@ -53,17 +54,7 @@ public enum StateResult {
         let serviceUUID = {
             let data = serviceID.data.hash(4)
 
-            //          0000-1000-8000-00805f9b34fb
-            // ffffffff-0000-0000-0000-000000000000
-
-            var bytes = BLUETOOTH_BASE_UUID
-
-            bytes[0] = data[0]
-            bytes[1] = data[1]
-            bytes[2] = data[2]
-            bytes[3] = data[3]
-
-            return NSUUID(uuidBytes: bytes) as UUID
+            return CBUUID(data: data)
         }()
 
         guard let endpointID = config.getEndpointID() else {
@@ -230,17 +221,30 @@ public enum StateResult {
 
                 completion(error)
 
-            case .found(let id, let name, let info, let channel, let rssi, let peripheral):
+            case .found(let id, let name, let info, let psm, let rssi, let power, let distance, let peripheral):
                 let endpointID = String(bytes: id.data.prefix(ENDPOINT_ID_LENGTH), encoding: .utf8)!
                 let endpointName = name
                 let endpointInfo = info
 
                 if let endpoint = self.endpoints[endpointID] {
                     endpoint.alive()
+
+                    if self.scanner.isScanning() {
+                        let endpoint = Endpoint(endpointID, endpointName: endpointName, endpointInfo: endpointInfo, rssi: rssi, power: power, distance: distance)
+
+                        self.plugin.onEndpointFound(endpoint)
+                    }
                 } else {
-                    let endpoint = NearbyEndpoint(endpointID, endpointName: endpointName, endpointInfo: endpointInfo, channel: channel, rssi: rssi, peripheral, callback: {
+                    let endpoint = NearbyEndpoint(endpointID, endpointName: endpointName, endpointInfo: endpointInfo, psm: psm, rssi: rssi, peripheral, callback: {
                         result in
                         switch result {
+                        case .found(let endpointID, let endpointName, let endpointInfo):
+                            if self.scanner.isScanning() {
+                                let endpoint = Endpoint(endpointID, endpointName: endpointName, endpointInfo: endpointInfo, rssi: rssi, power: power, distance: distance)
+
+                                self.plugin.onEndpointFound(endpoint)
+                            }
+
                         case .lost(let endpointID):
                             if self.scanner.isScanning() {
                                 let endpoint = Endpoint(endpointID)
@@ -253,12 +257,13 @@ public enum StateResult {
                     })
 
                     self.endpoints[endpointID] = endpoint
+                }
 
-                    if self.scanner.isScanning() {
-                        let endpoint = Endpoint(endpointID, endpointName: endpointName, endpointInfo: endpointInfo)
+            case .lost(let id):
+                let endpointID = String(bytes: id.data.prefix(ENDPOINT_ID_LENGTH), encoding: .utf8)!
 
-                        self.plugin.onEndpointFound(endpoint)
-                    }
+                if let endpoint = self.endpoints[endpointID] {
+                    endpoint.lost()
                 }
             }
         })

@@ -13,14 +13,13 @@ public enum ScanResult {
     case started
     case stopped(_ error: Error? = nil)
 
-    case found(_ uuid: CBUUID, name: String? = nil, info: Data? = nil, channel: Short? = nil, rssi: NSNumber? = nil, _ device: CBPeripheral)
+    case found(_ uuid: CBUUID, name: String? = nil, info: Data? = nil, psm: Short? = nil, rssi: NSNumber? = nil, power: NSNumber? = nil, distance: Double?, _ device: CBPeripheral)
+    case lost(_ uuid: CBUUID)
 }
 
 public final class NearbyScanner: NSObject {
     // An object that scans for, discovers, connects to, and manages peripherals.
     private var centralManager: CBCentralManager!
-    private var peripheral: CBPeripheral!
-    private var l2capChannel: CBL2CAPChannel?
 
     private var callback: ScanCallback?
 
@@ -30,14 +29,24 @@ public final class NearbyScanner: NSObject {
 
     private static var stateCallback: StateCallback?
 
-    // private static var beaconCallback: BeaconCallback?
-    // private static var beacons: [CBUUID: Beacon] = [:]
+    // private let queue = DispatchQueue(label: "NearbyScanner")
+    private var endpoints: [UUID: Endpoint] = [:]
 
-    init(_ serviceUUID: UUID,
+    class Endpoint {
+        let id: CBUUID
+        let psm: CBL2CAPPSM
+
+        init(_ id: CBUUID, _ psm: CBL2CAPPSM) {
+            self.id = id
+            self.psm = psm
+        }
+    }
+
+    init(_ serviceUUID: CBUUID,
          stateCallback: @escaping StateCallback) {
         super.init()
 
-        NearbyScanner.serviceUUID = CBUUID(nsuuid: serviceUUID)
+        NearbyScanner.serviceUUID = serviceUUID
 
         NearbyScanner.stateCallback = stateCallback
 
@@ -50,9 +59,9 @@ public final class NearbyScanner: NSObject {
         self.centralManager = CBCentralManager(delegate: self, queue: nil, options: options)
         self.callback = nil
 
-        self.timer = nil
+        self.endpoints = [:]
 
-        // clearBeacons()
+        self.timer = nil
     }
 
     deinit {
@@ -94,10 +103,6 @@ extension NearbyScanner {
         if let callback = self.callback {
             callback(.started)
         }
-
-        //        if let ttlSeconds = ttlSeconds {
-        //            startTimer(TimeInterval(ttlSeconds))
-        //        }
     }
 
     public func stop(_ error: Error? = nil) {
@@ -107,8 +112,6 @@ extension NearbyScanner {
             // Asks the central manager to stop scanning for peripherals.
             centralManager.stopScan()
         }
-
-        // clearBeacons()
 
         if let callback = self.callback {
             callback(.stopped(error))
@@ -173,6 +176,7 @@ extension NearbyScanner: CBCentralManagerDelegate {
 
     // Tells the delegate the central manager’s state updated.
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        print("NearbyScanner::centralManagerDidUpdateState", central.state)
         if let callback = NearbyScanner.stateCallback {
             switch central.state {
             case .unknown:
@@ -195,56 +199,68 @@ extension NearbyScanner: CBCentralManagerDelegate {
         }
     }
 
+    // https://heraldprox.io/bluetooth/distance
+    // Distance = 10 ^ ((Measured Power – RSSI)/(10 * N))
+    // Note: The values 0.89976, 7.7095 and 0.111 are the three constants calculated when solving for a best fit curve to our measured data points. YMMV
+    func calculateDistance(power: NSNumber?, rssi: NSNumber?) -> Double? {
+        guard let rssi = rssi else { return nil }
+
+        let power = 1 // The default calibrated transmit (TX) power on iOS devices is +8 dBm.
+        let ratio = Double(exactly:rssi)!/Double(power)
+
+        if ratio < 1.0 {
+            return pow(10.0, ratio)
+        } else {
+            return 0.89976 * pow(ratio, 7.7095) + 0.111
+        }
+    }
+    
     // Tells the delegate the central manager discovered a peripheral while scanning for devices.
     public func centralManager(_ central: CBCentralManager,
                                didDiscover peripheral: CBPeripheral,
                                advertisementData: [String: Any],
                                rssi RSSI: NSNumber) {
-        let rssi = RSSI.intValue != Int8.max ? RSSI : nil
-
-        peripheral.delegate = self
-
+        let power = advertisementData[CBAdvertisementDataTxPowerLevelKey] as? NSNumber // containing the transmit power of a peripheral.
+        let rssi = RSSI.intValue != Int8.max ? RSSI : nil // current RSSI of peripheral, in dBm.
+        let distance = calculateDistance(power: power, rssi: rssi)
+        
         if let advertisementDataServiceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] {
             var id: CBUUID?
             var name: String? = peripheral.name
             var info: Data?
-            var channel: Short?
+            var psm: Short?
 
             for uuid in advertisementDataServiceUUIDs {
                 if uuid == NearbyScanner.serviceUUID {
                     continue
                 }
 
-                if id == nil {
+                if id == nil && uuid.data.count == ENDPOINT_ID_LENGTH {
                     id = uuid
                     continue
                 }
 
                 if info == nil {
-                    let size = uuid.data[0]
+                    let size = uuid.data[0] & 0x7f
 
-                    info = Data(uuid.data[1..<(size & 0x7F)+1])
+                    info = (uuid.data[1..<(size)+1])
 
-                    if size & 0x80 != 0 {
-                        channel = Short(uuid.data[Int(size & 0x7F)+1])
+                    if uuid.data[0] & 0x80 != 0 {
+                        psm = Short(uuid.data[Int(size)+1])
                     }
-
-                    break
                 }
+            }
 
-                //                if let beacon = NearbyScanner.beacons[uuid] {
-                //                    beacon.alive()
-                //                } else {
-                //                    NearbyScanner.beacons[uuid] = Beacon(uuid, rssi: rssi)
-                //
-                //                    if let beaconCallback = NearbyScanner.beaconCallback {
-                //                        beaconCallback(.found(uuid, rssi: rssi))
-                //                    }
-                //                }
+            if let endpoint = self.endpoints[peripheral.identifier] {
+            } else {
+                self.endpoints[peripheral.identifier] = Endpoint(id!, psm!)
+
+                print("connecting to new endpoint", psm)
+                centralManager.connect(peripheral, options: nil)
             }
 
             if let callback = self.callback {
-                callback(.found(id!, name: name, info: info, channel: channel, rssi: rssi, peripheral))
+                callback(.found(id!, name: name, info: info, psm: psm, rssi: rssi, power: power, distance: distance, peripheral))
             }
         }
 
@@ -266,99 +282,32 @@ extension NearbyScanner: CBCentralManagerDelegate {
         //            }
         //        }
     }
-}
 
-extension NearbyScanner: CBPeripheralDelegate {
-    //    private static let ttlSeconds: TimeInterval = 10
-    //
-    //    public func clearBeacons() {
-    //        NearbyScanner.beacons = [:]
-    //    }
-    //
-    //    public func getBeacons() -> [String] {
-    //        var result: [String] = []
-    //
-    //        for key in NearbyScanner.beacons.keys {
-    //            result.append(key.uuidString.lowercased())
-    //        }
-    //
-    //        return result
-    //    }
-    //
-    //    public final class Beacon {
-    //        let uuid: CBUUID
-    //        let rssi: NSNumber?
-    //
-    //        let timestamp: Date
-    //
-    //        private var timer: Timer?
-    //
-    //        private var lastSeen: Date
-    //
-    //        init(_ uuid: CBUUID, rssi: NSNumber? = nil) {
-    //            self.uuid = uuid
-    //            self.rssi = rssi
-    //
-    //            self.timestamp = Date()
-    //
-    //            self.lastSeen = Date()
-    //
-    //            startTimer(NearbyScanner.ttlSeconds)
-    //
-    //            NearbyScanner.beacons[self.uuid] = self
-    //        }
-    //        deinit {
-    //            kill()
-    //        }
-    //
-    //        public func kill() {
-    //            stopTimer()
-    //
-    //            NearbyScanner.beacons[self.uuid] = nil
-    //        }
-    //
-    //        public func alive() {
-    //            self.lastSeen = Date()
-    //
-    //            stopTimer()
-    //
-    //            if NearbyScanner.beacons[self.uuid] != nil {
-    //                startTimer(NearbyScanner.ttlSeconds)
-    //            }
-    //        }
-    //
-    //        private func startTimer(_ timeout: TimeInterval) {
-    //            stopTimer()
-    //
-    //            self.timer = Timer.scheduledTimer(
-    //                timeInterval: timeout,
-    //                target: self,
-    //                selector: #selector(self.onTimer),
-    //                userInfo: nil,
-    //                repeats: false)
-    //        }
-    //
-    //        private func stopTimer() {
-    //            if let timer = self.timer {
-    //                if timer.isValid { timer.invalidate() }
-    //
-    //                self.timer = nil
-    //            }
-    //        }
-    //
-    //        @objc fileprivate func onTimer(_ timer: Timer) {
-    //            kill()
-    //
-    //            if let beaconCallback = NearbyScanner.beaconCallback {
-    //                beaconCallback(.lost(self.uuid, rssi: self.rssi))
-    //            }
-    //        }
-    //    }
+    public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        print("NearbyScanner::didConnect", peripheral)
 
-    func setupL2CAPChannel(_ psm: UInt16) {
-        if let peripheral {
+        if let endpoint = self.endpoints[peripheral.identifier] {
+            print("opening channel \(endpoint.psm) to endpoint", endpoint)
             // Attempt to open an L2CAP channel to the peripheral using the supplied PSM.
-            peripheral.openL2CAPChannel(psm)
+            peripheral.openL2CAPChannel(endpoint.psm)
         }
+    }
+
+    public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        print("NearbyScanner::didFailToConnect", peripheral, error)
+
+        self.endpoints[peripheral.identifier] = nil
+    }
+
+    public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        print("NearbyScanner::didDisconnectPeripheral", peripheral, error)
+
+        if let endpoint = self.endpoints[peripheral.identifier] {
+            if let callback = self.callback {
+                callback(.lost(endpoint.id))
+            }
+        }
+
+        self.endpoints[peripheral.identifier] = nil
     }
 }

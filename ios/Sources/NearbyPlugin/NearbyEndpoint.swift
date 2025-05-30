@@ -15,62 +15,17 @@ public typealias Short = UInt16
 public typealias EndpointCallback = (EndpointResult) -> Void
 
 public enum EndpointResult {
+    case found(_ endpointID: EndpointID, endpointName: String?, endpointInfo: Data?)
     case lost(_ endpointID: EndpointID)
 }
 
 class NearbyEndpoint: NSObject {
-    // func centralManagerDidUpdateState(_ central: CBCentralManager) {}
-
-    /*
-     func centralManagerDidUpdateState(_ central: CBCentralManager) {
-     // Tells the delegate the central manager’s state updated.
-     switch central.state {
-     case .unknown:
-     callback(.unknown)
-     case .resetting:
-     callback(.resetting)
-     case .unsupported:
-     callback(.unsupported)
-     case .unauthorized:
-     callback(.unauthorized)
-     case .poweredOff:
-     callback(.poweredOff)
-     case .poweredOn:
-     callback(.poweredOn)
-     @unknown default:
-     callback(.unknown)
-     }
-     }
-     */
-
-    /*
-     func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
-     // Tells the delegate the peripheral manager’s state updated.
-     switch peripheral.state {
-     case .unknown:
-     callback(.unknown)
-     case .resetting:
-     callback(.resetting)
-     case .unsupported:
-     callback(.unsupported)
-     case .unauthorized:
-     callback(.unauthorized)
-     case .poweredOff:
-     callback(.poweredOff)
-     case .poweredOn:
-     callback(.poweredOn)
-     @unknown default:
-     callback(.unknown)
-     }
-     }
-     */
-
     let endpointID: EndpointID
 
     let endpointName: String?
     let endpointInfo: Data?
 
-    let channel: Short?
+    let psm: Short?
     let rssi: NSNumber?
 
     let timestamp: Date
@@ -83,19 +38,24 @@ class NearbyEndpoint: NSObject {
 
     // private var managerQueue = DispatchQueue.global(qos: .utility)
     // private var peripheralManager: CBPeripheralManager?
-    // private var centralManager: CBCentralManager?
+    private var centralManager: CBCentralManager?
     private var peripheral: CBPeripheral?
-    private var socket: CBL2CAPChannel?
+
+    private var channel: CBL2CAPChannel?
+    private var inputStream: InputStream?
+    private var outputStream: OutputStream?
 
     private var callback: EndpointCallback?
 
-    init(_ endpointID: EndpointID, endpointName: String?, endpointInfo: Data?, channel: Short?, rssi: NSNumber? = nil, _ peripheral: CBPeripheral, callback: @escaping EndpointCallback) {
+    private let queue = DispatchQueue(label: "NearbyEndpoint")
+
+    init(_ endpointID: EndpointID, endpointName: String?, endpointInfo: Data?, psm: Short?, rssi: NSNumber? = nil, _ peripheral: CBPeripheral, callback: @escaping EndpointCallback) {
         self.endpointID = endpointID
 
         self.endpointName = endpointName
         self.endpointInfo = endpointInfo
 
-        self.channel = channel
+        self.psm = psm
         self.rssi = rssi
 
         self.timestamp = Date()
@@ -108,10 +68,10 @@ class NearbyEndpoint: NSObject {
 
         super.init()
 
-        // self.centralManager = CBCentralManager(delegate: self, queue: nil)
+        self.centralManager = CBCentralManager()
 
-        // self.peripheralManager = CBPeripheralManager(delegate: nil, queue: managerQueue)
-        // self.peripheralManager?.delegate = self
+        //        self.peripheralManager = CBPeripheralManager(delegate: nil, queue: managerQueue)
+        //        self.peripheralManager?.delegate = self
 
         peripheral.delegate = self
 
@@ -131,6 +91,14 @@ class NearbyEndpoint: NSObject {
         stopTimer()
     }
 
+    func lost() {
+        kill()
+
+        if let callback {
+            callback(.lost(self.endpointID))
+        }
+    }
+
     func alive() {
         self.lastSeen = Date()
 
@@ -146,40 +114,44 @@ class NearbyEndpoint: NSObject {
 
     func connect() throws {
         if let peripheral {
-            // if let centralManager {
-            //    centralManager.connect(peripheral)
-            // }
-
             // The PSM of the channel to open
-            if let channel {
+            if let psm {
                 // Attempt to open an L2CAP channel to the peripheral using the supplied PSM.
-                peripheral.openL2CAPChannel(channel)
+                peripheral.openL2CAPChannel(psm)
             }
         }
     }
 
     func disconnect() throws {
         if let peripheral {
-            // if let centralManager {
-            //    centralManager.cancelPeripheralConnection(peripheral)
-            // }
-
-            if let socket {
-                socket.inputStream.close()
-                socket.inputStream.remove(from: .main, forMode: .default)
-                socket.inputStream.delegate = nil
-
-                socket.outputStream.close()
-                socket.outputStream.remove(from: .main, forMode: .default)
-                socket.outputStream.delegate = nil
+            if let centralManager {
+                centralManager.cancelPeripheralConnection(peripheral)
             }
         }
 
-        self.socket = nil
+        if let inputStream {
+            inputStream.close()
+            inputStream.remove(from: .main, forMode: .default)
+            inputStream.delegate = nil
+        }
+
+        if let outputStream {
+            outputStream.close()
+            outputStream.remove(from: .main, forMode: .default)
+            outputStream.delegate = nil
+        }
+
+        self.channel = nil
+        self.inputStream = nil
+        self.outputStream = nil
     }
 
     func sendPayload(_ payload: Data) throws {
-        if let socket {
+        if let inputStream, let outputStream {
+            guard outputStream.hasSpaceAvailable else {
+                throw CustomError.spaceNotAvailable
+            }
+
             let length = payload.count
 
             if length >= MAXIMUM_PAYLOAD_SIZE {
@@ -189,19 +161,26 @@ class NearbyEndpoint: NSObject {
             let checksum = payload.crc32()
 
             // 1. Identity
-            _ = socket.outputStream.write(endpointID.data)
+            print("sendPayload::endpointID", endpointID)
+            outputStream.write(endpointID.data)
+
             // 2. Payload Length
-            _ = socket.outputStream.write(
+            print("sendPayload::length", length)
+            outputStream.write(
                 Data([
                     (UInt8) ((length) & 0xff),
                     (UInt8) ((length >> 8) & 0xff),
                     (UInt8) ((length >> 16) & 0xff)
                 ])
             )
+
             // 3. Payload
-            _ = socket.outputStream.write(payload)
+            print("sendPayload::payload", payload)
+            outputStream.write(payload)
+
             // 4. Checksum
-            _ = socket.outputStream.write(
+            print("sendPayload::checksum", checksum)
+            outputStream.write(
                 Data([
                     (UInt8) ((checksum) & 0xff),
                     (UInt8) ((checksum >> 8) & 0xff),
@@ -210,8 +189,21 @@ class NearbyEndpoint: NSObject {
                 ])
             )
 
+            // A Boolean value that indicates whether the receiver has bytes available to read.
+            for i in 1...10 {
+                print("sendPayload::hasBytesAvailable", i)
+
+                if inputStream.hasBytesAvailable {
+                    break
+                }
+
+                sleep(1)
+            }
+
             // 5. (N)ACK
-            if !(socket.inputStream.read() > 0) {
+            let ok = inputStream.read()
+            print("sendPayload::checksum ok", ok)
+            if !(ok > 0) {
                 throw CustomError.notAcknowledged
             }
         }
@@ -226,55 +218,103 @@ class NearbyEndpoint: NSObject {
     }
 
     @objc fileprivate func onTimer(_ timer: Timer) {
-        kill()
+        lost()
+    }
+}
 
-        if let callback {
-            callback(.lost(self.endpointID))
-        }
+// extension NearbyEndpoint: CBCentralManagerDelegate {
+//    func centralManagerDidUpdateState(_ central: CBCentralManager) {
+//        print("NearbyEndpoint::centralManagerDidUpdateState", central.state)
+//
+//        if central.state == .poweredOn {
+//            print("NearbyEndpoint::connect", peripheral)
+//            if let peripheral {
+//                if let centralManager {
+//                    centralManager.connect(peripheral, options: nil)
+//                }
+//            }
+//        }
+//    }
+//
+//    func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+//        print("NearbyEndpoint::didConnect", peripheral)
+//
+//        if let psm {
+//            // Attempt to open an L2CAP channel to the peripheral using the supplied PSM.
+//            peripheral.openL2CAPChannel(psm)
+//        }
+//    }
+//
+//    func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+//        print("NearbyEndpoint::didFailToConnect", peripheral, error)
+//    }
+//
+//    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+//        print("NearbyEndpoint::didDisconnectPeripheral", peripheral, error)
+//    }
+// }
+
+extension NearbyEndpoint: CBPeripheralManagerDelegate {
+    func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
+        print("NearbyEndpoint::peripheralManagerDidUpdateState", peripheral.state)
     }
 }
 
 extension NearbyEndpoint: CBPeripheralDelegate {
-    public func peripheral(_ peripheral: CBPeripheral, didOpen socket: CBL2CAPChannel?, error: Error?) {
-        self.socket = socket
+    func peripheral(_ peripheral: CBPeripheral, didOpen channel: CBL2CAPChannel?, error: Error?) {
+        print("NearbyEndpoint::didOpen", peripheral, socket, error)
+        self.channel = channel
 
-        if let socket {
-            socket.inputStream.delegate = self
-            socket.inputStream.schedule(in: RunLoop.main, forMode: .default)
-            socket.inputStream.open()
+        if let channel {
+            self.inputStream = channel.inputStream
 
-            socket.outputStream.delegate = self
-            socket.outputStream.schedule(in: RunLoop.main, forMode: .default)
-            socket.outputStream.open()
+            if let inputStream {
+                inputStream.delegate = self
+                inputStream.schedule(in: .main, forMode: .default)
+                inputStream.open()
+            }
 
-            _ = socket.outputStream.write(endpointID.data)
+            self.outputStream = channel.outputStream
+
+            if let outputStream {
+                outputStream.delegate = self
+                outputStream.schedule(in: .main, forMode: .default)
+                outputStream.open()
+            }
         }
     }
-    /*
-     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-     }
-     public func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
-     }
-     */
 }
 
 extension NearbyEndpoint: StreamDelegate {
-    public func stream(_ stream: Stream, handle eventCode: Stream.Event) {
+    func stream(_ stream: Stream, handle eventCode: Stream.Event) {
+        // print("NearbyEndpoint::stream")
         switch eventCode {
-        case Stream.Event.openCompleted:
-            print("Stream is open")
-        case Stream.Event.endEncountered:
+        case .openCompleted:
+            print("Stream is open", stream == inputStream ? "(Input)" : stream == outputStream ? "(Output)" : "")
+
+            if let callback, stream == outputStream {
+                callback(.found(self.endpointID, endpointName: self.endpointName, endpointInfo: self.endpointInfo))
+            }
+
+        case .endEncountered:
             print("Stream encountered end")
-        case Stream.Event.hasBytesAvailable:
-            print("Stream has bytes available")
+            try! self.disconnect()
+
         // receive
-        case Stream.Event.hasSpaceAvailable:
-            print("Stream has space available")
+        case .hasBytesAvailable:
+            print("Stream has bytes available")
+
         // send
-        case Stream.Event.errorOccurred:
-            print("Stream error occurred")
+        case .hasSpaceAvailable:
+            print("Stream has space available")
+
+        case .errorOccurred:
+            print("Stream Error on Central: \(stream.streamError?.localizedDescription ?? "Unknown error")")
+            lost()
+
         default:
             print("Unknown stream event")
+            try! self.disconnect()
         }
     }
 }

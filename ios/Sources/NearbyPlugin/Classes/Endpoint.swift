@@ -6,9 +6,17 @@ import Capacitor
     let endpointName: String?
     let endpointInfo: Data?
 
-    init(_ endpointID: EndpointID, endpointName: String? = nil, endpointInfo: Data? = nil) {
+    let rssi: NSNumber?
+    let power: NSNumber?
+    let distance: Double?
+
+    init(_ endpointID: EndpointID, endpointName: String? = nil, endpointInfo: Data? = nil, rssi: NSNumber? = nil, power: NSNumber? = nil, distance: Double? = nil) {
         self.endpointID = endpointID
         self.endpointName = endpointName
         self.endpointInfo = endpointInfo
+
+        self.rssi = rssi
+        self.power = power
+        self.distance = distance
     }
 }
