@@ -54,7 +54,7 @@ public class NearbyAdvertiser {
 
     private boolean isAdvertising;
 
-    public static final int MAXIMUM_DATA_SIZE = 14;
+    public static final int MAXIMUM_DATA_SIZE = 15;
 
     @Nullable
     private Thread thread;
@@ -291,16 +291,10 @@ public class NearbyAdvertiser {
                 return;
             }
 
-            ByteBuffer buffer = ByteBuffer.allocate(1 + size + ((channel != null) ? 1 : 0));
+            ByteBuffer buffer = ByteBuffer.allocate(16);
 
-            if (channel != null) {
-                size |= (byte) 0x80;
-            }
-
-            buffer.put(size);
-
+            if (channel != null) buffer.put(channel.byteValue()); else buffer.put((byte) 0);
             if (endpointInfo != null) buffer.put(endpointInfo);
-            if (channel != null) buffer.put(channel.byteValue());
 
             UUID dataUUID = NearbyHelper.makeUUID(buffer.array());
 

@@ -241,13 +241,9 @@ extension NearbyScanner: CBCentralManagerDelegate {
                 }
 
                 if info == nil {
-                    let size = uuid.data[0] & 0x7f
-
-                    info = (uuid.data[1..<(size)+1])
-
-                    if uuid.data[0] & 0x80 != 0 {
-                        psm = Short(uuid.data[Int(size)+1])
-                    }
+                    psm = Short(uuid.data[0])
+                    
+                    info = (uuid.data[1..<16])
                 }
             }
 

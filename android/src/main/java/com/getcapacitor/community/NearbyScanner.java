@@ -204,14 +204,10 @@ public class NearbyScanner {
                 ByteBuffer buffer = makeBuffer(uuid);
                 buffer.rewind();
 
-                byte size = buffer.get();
+                channel = (short) (buffer.get() & 0xff);
 
-                info = new byte[size & 0x7f];
+                info = new byte[15];
                 buffer.get(info);
-
-                if ((size & 0x80) != 0) {
-                    channel = (short) (buffer.get() & 0xff);
-                }
 
                 break;
             }

@@ -18,7 +18,7 @@ declare module '@capacitor/cli' {
       /**
        * Identifing information about this endpoint, to appear on the remote device.
        *
-       * ___Note: maximum length is 14 bytes.___
+       * ___Note: maximum length is 15 bytes.___
        *
        * @since 4.1.0
        * @type Base64 encoded string
@@ -203,7 +203,7 @@ export interface Endpoint {
   /**
    * Identifing information about this endpoint.
    *
-   * ___Note: maximum length is 14 bytes.___
+   * ___Note: maximum length is 15 bytes.___
    *
    * @since 4.1.0
    */
@@ -278,7 +278,7 @@ export interface InitializeOptions {
   /**
    * Identifing information about this endpoint, to appear on the remote device.
    *
-   * ___Note: maximum length is 14 bytes.___
+   * ___Note: maximum length is 15 bytes.___
    *
    * @since 4.1.0
    * @example "My App"
@@ -310,7 +310,7 @@ export interface StartAdvertisingOptions {
   /**
    * Identifing information about this endpoint.
    *
-   * ___Note: maximum length is 14 bytes.___
+   * ___Note: maximum length is 15 bytes.___
    *
    * @since 4.1.0
    */

@@ -8,7 +8,7 @@
 
 import CoreBluetooth
 
-let MAXIMUM_DATA_SIZE = 14
+let MAXIMUM_DATA_SIZE = 15
 
 public typealias AdvertiseCallback = (AdvertiseResult) -> Void
 
@@ -104,19 +104,13 @@ extension NearbyAdvertiser {
                 return nil
             }
 
-            var data = Data(count: 16)
+            var data = Data(count: 16, repeating: 0)
 
-            data[0] = UInt8(size)
-
-            if channel != nil {
-                data[0] |= 0x80
+            if let channel {
+                data[0] = UInt8(channel)
             }
-
             if let endpointInfo {
                 data[1...] = endpointInfo
-            }
-            if let channel {
-                data[size + 1] = UInt8(channel)
             }
 
             return CBUUID(data: data)
