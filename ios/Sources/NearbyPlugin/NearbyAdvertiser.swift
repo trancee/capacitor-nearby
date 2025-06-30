@@ -104,7 +104,7 @@ extension NearbyAdvertiser {
                 return nil
             }
 
-            var data = Data(count: 16, repeating: 0)
+            var data = Data(repeating: 0, count: 16)
 
             if let channel {
                 data[0] = UInt8(channel)
